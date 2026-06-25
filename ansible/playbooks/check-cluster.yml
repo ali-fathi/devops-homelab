@@ -1,0 +1,27 @@
+---
+- name: Detailed K3s cluster health check
+  hosts: k3s_cluster
+  gather_facts: true
+
+  tasks:
+
+    - name: Verify connectivity
+      ansible.builtin.ping:
+
+    - name: Display system information
+      ansible.builtin.debug:
+        msg:
+          - "Hostname: {{ ansible_hostname }}"
+          - "IP Address: {{ ansible_default_ipv4.address }}"
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "CPU Cores: {{ ansible_processor_vcpus }}"
+          - "Memory: {{ ansible_memtotal_mb }} MB"
+
+    - name: Check disk usage
+      ansible.builtin.command: df -h /
+      register: disk_usage
+      changed_when: false
+
+    - name: Display disk usage
+      ansible.builtin.debug:
+        var: disk_usage.stdout_lines

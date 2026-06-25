@@ -5,10 +5,10 @@
     "dockerfile": "Dockerfile"
   },
 
-  "mounts": [
-    "source=${env:HOME}/.kube/k3s-config,target=/home/vscode/.kube/config,type=bind"
-  ],
-
+"mounts": [
+  "source=${env:HOME}/.kube/k3s-config,target=/home/vscode/.kube/config,type=bind",
+  "source=${env:HOME}/.ssh,target=/home/vscode/.ssh,type=bind"
+],
   "remoteEnv": {
     "KUBECONFIG": "/home/vscode/.kube/config"
   },
