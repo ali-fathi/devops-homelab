@@ -1,0 +1,29 @@
+{
+  "name": "DevOps Homelab",
+
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+
+  "mounts": [
+    "source=${env:HOME}/.kube/k3s-config,target=/home/vscode/.kube/config,type=bind"
+  ],
+
+  "remoteEnv": {
+    "KUBECONFIG": "/home/vscode/.kube/config"
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "hashicorp.terraform",
+        "redhat.ansible",
+        "eamodio.gitlens",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  },
+
+  "remoteUser": "vscode"
+}
