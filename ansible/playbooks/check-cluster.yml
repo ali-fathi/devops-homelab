@@ -11,11 +11,11 @@
     - name: Display system information
       ansible.builtin.debug:
         msg:
-          - "Hostname: {{ ansible_hostname }}"
-          - "IP Address: {{ ansible_default_ipv4.address }}"
-          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
-          - "CPU Cores: {{ ansible_processor_vcpus }}"
-          - "Memory: {{ ansible_memtotal_mb }} MB"
+          - "Hostname: {{ ansible_facts['hostname'] }}"
+          - "IP Address: {{ ansible_facts['default_ipv4']['address'] }}"
+          - "OS: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+          - "CPU Cores: {{ ansible_facts['processor_vcpus'] }}"
+          - "Memory: {{ ansible_facts['memtotal_mb'] }} MB"
 
     - name: Check disk usage
       ansible.builtin.command: df -h /
