@@ -11,4 +11,4 @@ Worker Nodes:
 
 Future MetalLB Pool:
 
-192.168.178.200-220
+192.168.178.210-220
