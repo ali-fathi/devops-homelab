@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-longhorn-lb
+  namespace: nginx-storage-demo
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx-longhorn
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
