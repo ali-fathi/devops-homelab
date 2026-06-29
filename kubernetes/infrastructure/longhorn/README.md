@@ -21,158 +21,15 @@ With Longhorn, data survives Pod restarts, node failures, upgrades, and reschedu
 
 Longhorn provides:
 
-✅ Persistent Volumes (PV)
-
-✅ Persistent Volume Claims (PVC)
-
-✅ Replicated Storage
-
-✅ Snapshots
-
-✅ Backups
-
-✅ Volume Expansion
-
-✅ High Availability
-
-✅ Web Management UI
-
-✅ Kubernetes Native Storage
-
----
-
-# 🧠 Why Longhorn?
-
-Imagine you deploy:
-
-- PostgreSQL
-- MariaDB
-- Harbor
-- Grafana
-- Jenkins
-- Forgejo
-
-Without persistent storage:
-
-```text
-Pod deleted
-    ↓
-Data deleted
-```
-
-With Longhorn:
-
-```text
-Pod deleted
-    ↓
-Pod recreated
-    ↓
-Data still exists
-```
-
----
-
-# 🏗️ How Longhorn Works
-
-Example:
-
-```text
-Kubernetes Pod
-        │
-        ▼
-Persistent Volume Claim
-        │
-        ▼
-Longhorn Volume
-        │
-        ▼
-Replica #1 → Worker1
-Replica #2 → Worker2
-Replica #3 → Master
-```
-
-Data is replicated across nodes.
-
-If one node fails:
-
-```text
-Node Failure
-    ↓
-Application continues running
-```
-
----
-
-# 🏗️ Architecture
-
-```text
-+--------------------------------+
-|           Application          |
-+--------------------------------+
-               │
-               ▼
-+--------------------------------+
-|  Persistent Volume Claim (PVC) |
-+--------------------------------+
-               │
-               ▼
-+--------------------------------+
-|        Longhorn Volume         |
-+--------------------------------+
-       │         │         │
-       ▼         ▼         ▼
-   Replica1  Replica2  Replica3
-```
-
----
-
-# 📚 Core Concepts
-
-Before installation, understand these Kubernetes storage concepts.
-
----
-
-## Persistent Volume (PV)
-
-Actual storage resource.
-
-Example:
-
-```text
-100Gi Volume
-```
-
-Created by Longhorn.
-
----
-
-## Persistent Volume Claim (PVC)
-
-Storage request.
-
-Example:
-
-```yaml
-resources:
-  requests:
-    storage: 10Gi
-```
-
-Application requests storage through PVC.
-
----
-
-## StorageClass
-
-Defines storage behavior.
-
-Example:
-
-```text
-longhorn
-```
-
-Applications use the StorageClass to obtain storage.
+- Persistent Volumes (PV)
+- Persistent Volume Claims (PVC)
+- Replicated Storage
+- Snapshots
+- Backups
+- Volume Expansion
+- High Availability
+- Web Management UI
+- Kubernetes Native Storage
 
 ---
 
@@ -183,71 +40,38 @@ kubernetes/
 └── infrastructure/
     └── longhorn/
         ├── README.md
-        ├── namespace.yaml
         ├── values.yaml
-        └── ingress.yaml
+        └── longhorn-ui-lb.yaml
 ```
 
 ---
 
 # ⚙️ Prerequisites
 
-Before installing Longhorn:
+- K3s cluster healthy
+- MetalLB installed
+- Helm installed
+- Open-iSCSI installed on all nodes
+- DNS working between Pods and Services
 
-✅ K3s cluster healthy
+Recommended K3s configuration:
 
-✅ MetalLB installed
-
-✅ kubectl working
-
-✅ All nodes have enough free disk space
-
-✅ Open-iSCSI installed on all nodes
+```yaml
+disable-network-policy: true
+flannel-backend: host-gw
+disable:
+  - servicelb
+```
 
 ---
 
 # 🚨 IMPORTANT REQUIREMENT
 
-Longhorn requires:
-
-```text
-open-iscsi
-```
-
-on every node.
-
----
-
-# Step 1 – Install Open-iSCSI
-
-Run on ALL nodes.
-
-Master:
-
-```bash
-ssh ansible@192.168.178.80
-```
-
-Workers:
-
-```bash
-ssh ansible@192.168.178.81
-```
-
-```bash
-ssh ansible@192.168.178.82
-```
-
-Install:
+Install open-iscsi on all nodes:
 
 ```bash
 sudo apt update
 sudo apt install -y open-iscsi
-```
-
-Enable:
-
-```bash
 sudo systemctl enable iscsid
 sudo systemctl start iscsid
 ```
@@ -258,68 +82,33 @@ Verify:
 systemctl status iscsid
 ```
 
-Expected:
-
-```text
-active (running)
-```
-
 ---
 
 # 🚀 Installation
 
----
-
-## Step 2 – Add Helm Repository
+## Add Helm Repository
 
 ```bash
 helm repo add longhorn https://charts.longhorn.io
-```
-
-Update:
-
-```bash
 helm repo update
 ```
 
----
-
-## Step 3 – Create Namespace
+## Create Namespace
 
 ```bash
 kubectl create namespace longhorn-system
 ```
 
----
-
-## Step 4 – Install Longhorn
+## Install Longhorn
 
 ```bash
-helm install longhorn longhorn/longhorn \
-  --namespace longhorn-system
+helm install longhorn longhorn/longhorn   --namespace longhorn-system
 ```
 
----
-
-## Step 5 – Verify Installation
+## Verify Installation
 
 ```bash
 kubectl get pods -n longhorn-system
-```
-
-Expected:
-
-```text
-longhorn-manager
-longhorn-driver-deployer
-longhorn-ui
-longhorn-csi-plugin
-```
-
-All should be:
-
-```text
-Running
 ```
 
 ---
@@ -336,18 +125,9 @@ Expected:
 longhorn
 ```
 
-Example:
-
-```text
-NAME                 PROVISIONER
-longhorn (default)   driver.longhorn.io
-```
-
 ---
 
 # 🌐 Access Longhorn UI
-
----
 
 ## Option 1 – Port Forward
 
@@ -361,62 +141,79 @@ Open:
 http://localhost:8080
 ```
 
----
+## Option 2 – MetalLB LoadBalancer (Recommended)
 
-## Option 2 – LoadBalancer
-
-Create:
+Create file `longhorn-ui-lb.yaml`
 
 ```yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: longhorn-ui
+  name: longhorn-frontend-lb
   namespace: longhorn-system
 spec:
   type: LoadBalancer
+  loadBalancerIP: 192.168.178.211
   selector:
     app: longhorn-ui
   ports:
-  - port: 80
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
 ```
 
-Then:
+Apply:
+
+```bash
+kubectl apply -f longhorn-ui-lb.yaml
+```
+
+Verify:
 
 ```bash
 kubectl get svc -n longhorn-system
 ```
 
-MetalLB assigns:
-
-```text
-192.168.178.212
-```
-
 Access:
 
 ```text
-http://192.168.178.212
+http://192.168.178.211
 ```
 
 ---
 
-# 🧪 First Test Volume
+# 🏠 Fritzbox Notes
 
-Create:
+MetalLB pool:
+
+```text
+192.168.178.210 - 192.168.178.220
+```
+
+Longhorn UI IP:
+
+```text
+192.168.178.211
+```
+
+Make sure the Fritzbox DHCP range does not overlap with the MetalLB pool.
+
+Do not use Guest Wi‑Fi when testing MetalLB services.
+
+---
+
+# 🧪 First Test Volume
 
 ```yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: test-pvc
-
 spec:
   accessModes:
     - ReadWriteOnce
-
   storageClassName: longhorn
-
   resources:
     requests:
       storage: 2Gi
@@ -426,70 +223,6 @@ Apply:
 
 ```bash
 kubectl apply -f test-pvc.yaml
-```
-
-Verify:
-
-```bash
-kubectl get pvc
-```
-
-Expected:
-
-```text
-STATUS: Bound
-```
-
----
-
-# 🧪 Test Application
-
-Create:
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-
-metadata:
-  name: nginx-storage
-
-spec:
-  replicas: 1
-
-  selector:
-    matchLabels:
-      app: nginx-storage
-
-  template:
-    metadata:
-      labels:
-        app: nginx-storage
-
-    spec:
-      containers:
-      - name: nginx
-        image: nginx
-
-        volumeMounts:
-        - mountPath: /usr/share/nginx/html
-          name: storage
-
-      volumes:
-      - name: storage
-        persistentVolumeClaim:
-          claimName: test-pvc
-```
-
-Deploy:
-
-```bash
-kubectl apply -f nginx-storage.yaml
-```
-
-Verify:
-
-```bash
-kubectl get pods
 kubectl get pvc
 ```
 
@@ -497,243 +230,113 @@ kubectl get pvc
 
 # 📸 Snapshots
 
-Longhorn supports snapshots.
-
-Use UI:
+Use Longhorn UI:
 
 ```text
-Volume
-  ↓
-Snapshot
+Volume → Snapshot
 ```
 
 Benefits:
 
 - Rollback
-- Backup
 - Recovery
+- Backup points
 
 ---
 
 # 💾 Backups
 
-Longhorn supports:
+Supported targets:
 
 - NFS
 - S3
 - MinIO
 
-Example:
-
-```text
-Longhorn
-    ↓
-MinIO
-    ↓
-Backup Storage
-```
-
 ---
 
 # 🔄 Volume Expansion
 
-Expand PVC:
-
-```yaml
-resources:
-  requests:
-    storage: 10Gi
-```
-
-Apply:
-
-```bash
-kubectl apply -f pvc.yaml
-```
-
-Longhorn expands volume automatically.
+Increase PVC size and reapply.
 
 ---
 
 # 🚨 Troubleshooting
 
----
-
-## Check Longhorn Pods
+## Longhorn UI LoadBalancer Not Working
 
 ```bash
-kubectl get pods -n longhorn-system
+kubectl get svc -n longhorn-system longhorn-frontend-lb
+kubectl get endpoints -n longhorn-system longhorn-frontend-lb
+kubectl get pods -n longhorn-system -l app=longhorn-ui
 ```
 
----
-
-## Check Longhorn Services
-
-```bash
-kubectl get svc -n longhorn-system
-```
-
----
-
-## Check Storage Classes
-
-```bash
-kubectl get storageclass
-```
-
----
-
-## Check PVC
-
-```bash
-kubectl get pvc
-```
-
----
-
-## Describe PVC
-
-```bash
-kubectl describe pvc test-pvc
-```
-
----
-
-## Check Volume Status
-
-Open Longhorn UI.
-
-Verify:
+Expected endpoints:
 
 ```text
-Healthy
-Attached
+10.42.x.x:8000
 ```
 
----
+Check MetalLB:
 
-# ❌ PVC Stuck in Pending
+```bash
+kubectl get pods -n metallb-system
+kubectl get ipaddresspool -n metallb-system
+kubectl get l2advertisement -n metallb-system
+```
 
-Check:
+Test:
+
+```bash
+curl -I http://192.168.178.211
+```
+
+## PVC Stuck in Pending
 
 ```bash
 kubectl describe pvc
 ```
 
-Common causes:
-
-- Longhorn not installed
-- StorageClass missing
-- Node issue
-
----
-
-# ❌ Volume Detached
-
-Check Longhorn UI.
-
-Possible causes:
-
-- Node offline
-- Disk full
-
----
-
-# ❌ Pod Cannot Mount Volume
-
-Verify:
+## Pod Cannot Mount Volume
 
 ```bash
 kubectl describe pod POD_NAME
-```
-
-Check events:
-
-```bash
 kubectl get events
 ```
 
----
-
-# ❌ Longhorn Pods Crash
-
-Verify:
+## Longhorn Pods Crash
 
 ```bash
 systemctl status iscsid
-```
-
-Most common cause:
-
-```text
-open-iscsi not installed
 ```
 
 ---
 
 # 📊 Useful Commands
 
-View PVCs:
-
 ```bash
 kubectl get pvc
-```
-
-View PVs:
-
-```bash
 kubectl get pv
-```
-
-View Storage Classes:
-
-```bash
 kubectl get storageclass
-```
-
-View Longhorn Pods:
-
-```bash
 kubectl get pods -n longhorn-system
-```
-
-View Longhorn Services:
-
-```bash
 kubectl get svc -n longhorn-system
-```
-
-View Longhorn Logs:
-
-```bash
-kubectl logs -n longhorn-system deployment/longhorn-driver-deployer
+kubectl get endpoints -n longhorn-system
+kubectl get all -n longhorn-system
 ```
 
 ---
 
 # 🎯 Real-World Use Cases
 
-Applications that should use Longhorn:
-
-✅ PostgreSQL
-
-✅ MariaDB
-
-✅ Harbor
-
-✅ Forgejo
-
-✅ Jenkins
-
-✅ Grafana
-
-✅ Prometheus
-
-✅ MinIO
-
-✅ Nextcloud
-
-✅ Home Assistant
+- PostgreSQL
+- MariaDB
+- Harbor
+- Forgejo
+- Jenkins
+- Grafana
+- Prometheus
+- MinIO
+- Nextcloud
+- Home Assistant
 
 ---
 
@@ -752,29 +355,20 @@ Loki
 MinIO
 ```
 
-Everything deployed later in this homelab will depend on Longhorn.
-
 ---
 
 # ✅ Learning Outcomes
 
-After completing this phase you should understand:
-
-✅ Persistent Volumes
-
-✅ Persistent Volume Claims
-
-✅ Storage Classes
-
-✅ Stateful Applications
-
-✅ Snapshots
-
-✅ Backups
-
-✅ Replication
-
-✅ High Availability Storage
+- Persistent Volumes
+- Persistent Volume Claims
+- Storage Classes
+- Stateful Applications
+- Snapshots
+- Backups
+- Replication
+- High Availability Storage
+- Longhorn UI Exposure Through MetalLB
+- Longhorn Troubleshooting
 
 ---
 
@@ -792,8 +386,8 @@ into:
 Production-Ready Platform
 ```
 
-MetalLB gave your cluster networking.
+MetalLB provides networking.
 
-Longhorn gives your cluster storage.
+Longhorn provides storage.
 
 Together they form the foundation of everything that will be deployed later in this DevOps Homelab.
