@@ -1,4 +1,12 @@
 apiVersion: v1
-kind: Namespace
+kind: PersistentVolumeClaim
 metadata:
-  name: nginx-storage-demo
+  name: nginx-html-pvc
+  namespace: nginx-storage-demo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 2Gi
