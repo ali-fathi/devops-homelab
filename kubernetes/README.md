@@ -39,7 +39,7 @@ The cluster is based on **K3s** and is managed from the DevContainer using:
 
 ## Recommended K3s Baseline Configuration
 
-After installing K3s, configure the master node with the following baseline:
+After installing K3s, configure the master node with the following baseline (more info under docs/k3s-baseline-networking.md)
 
 File:
 ```bash
