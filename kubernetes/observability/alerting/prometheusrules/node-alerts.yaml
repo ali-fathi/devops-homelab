@@ -1,0 +1,62 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: node-alerts
+  namespace: monitoring
+
+spec:
+  groups:
+    - name: node-alerts
+
+      rules:
+
+        - alert: NodeDown
+          expr: up{job="node-exporter"} == 0
+          for: 2m
+
+          labels:
+            severity: critical
+
+          annotations:
+            summary: "Node Down"
+            description: "Node {{ $labels.instance }} is unreachable."
+
+        - alert: HighCPUUsage
+          expr: |
+            (
+              100 -
+              (
+                avg by(instance)
+                (
+                  rate(node_cpu_seconds_total{mode="idle"}[5m])
+                ) * 100
+              )
+            ) > 85
+          for: 10m
+
+          labels:
+            severity: warning
+
+          annotations:
+            summary: "High CPU Usage"
+            description: "CPU usage on {{ $labels.instance }} is above 85%."
+
+        - alert: HighMemoryUsage
+          expr: |
+            (
+              (
+                node_memory_MemTotal_bytes
+                -
+                node_memory_MemAvailable_bytes
+              )
+              /
+              node_memory_MemTotal_bytes
+            ) * 100 > 90
+          for: 10m
+
+          labels:
+            severity: critical
+
+          annotations:
+            summary: "High Memory Usage"
+            description: "Memory usage on {{ $labels.instance }} exceeded 90%."

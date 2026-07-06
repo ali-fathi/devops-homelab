@@ -1,0 +1,22 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+
+metadata:
+  name: telegram-test
+  namespace: monitoring
+
+spec:
+  groups:
+    - name: telegram-test
+
+      rules:
+        - alert: TelegramTest
+
+          expr: vector(1)
+
+          labels:
+            severity: critical
+
+          annotations:
+            summary: "Telegram Test"
+            description: "Alertmanager Telegram integration works."

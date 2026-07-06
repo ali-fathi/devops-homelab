@@ -1,0 +1,53 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kubernetes-alerts
+  namespace: monitoring
+
+spec:
+  groups:
+    - name: kubernetes-alerts
+
+      rules:
+
+        - alert: PodCrashLoopBackOff
+          expr: |
+            kube_pod_container_status_waiting_reason{
+              reason="CrashLoopBackOff"
+            } > 0
+          for: 5m
+
+          labels:
+            severity: critical
+
+          annotations:
+            summary: "Pod CrashLoopBackOff"
+            description: "Pod {{ $labels.pod }} is crashing."
+
+        - alert: FrequentPodRestarts
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total[1h]
+            ) > 5
+          for: 5m
+
+          labels:
+            severity: warning
+
+          annotations:
+            summary: "Frequent Restarts"
+            description: "Pod {{ $labels.pod }} restarted more than 5 times in the last hour."
+
+        - alert: DeploymentUnavailable
+          expr: |
+            kube_deployment_status_replicas_available
+            <
+            kube_deployment_spec_replicas
+          for: 5m
+
+          labels:
+            severity: critical
+
+          annotations:
+            summary: "Deployment Unavailable"
+            description: "Deployment {{ $labels.deployment }} is not fully available."

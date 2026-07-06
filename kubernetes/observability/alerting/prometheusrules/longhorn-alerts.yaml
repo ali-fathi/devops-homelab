@@ -1,0 +1,52 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: longhorn-alerts
+  namespace: monitoring
+
+spec:
+  groups:
+    - name: longhorn-alerts
+
+      rules:
+
+        - alert: LonghornVolumeDegraded
+          expr: longhorn_volume_robustness != 2
+          for: 5m
+
+          labels:
+            severity: critical
+
+          annotations:
+            summary: "Longhorn Volume Degraded"
+            description: "Volume {{ $labels.volume }} is degraded."
+
+        - alert: LonghornReplicaFailure
+          expr: |
+            longhorn_volume_number_of_replicas
+            <
+            longhorn_volume_spec_number_of_replicas
+          for: 5m
+
+          labels:
+            severity: critical
+
+          annotations:
+            summary: "Longhorn Replica Failure"
+            description: "Volume {{ $labels.volume }} has lost replicas."
+
+        - alert: LonghornDiskPressure
+          expr: |
+            (
+              longhorn_disk_usage_bytes
+              /
+              longhorn_disk_capacity_bytes
+            ) * 100 > 90
+          for: 10m
+
+          labels:
+            severity: critical
+
+          annotations:
+            summary: "Longhorn Disk Usage Above 90%"
+            description: "Disk {{ $labels.disk }} usage is above 90%."

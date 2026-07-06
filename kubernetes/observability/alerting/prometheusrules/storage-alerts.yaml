@@ -1,0 +1,57 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: storage-alerts
+  namespace: monitoring
+
+spec:
+  groups:
+    - name: storage-alerts
+
+      rules:
+
+        - alert: PVCUsage80
+          expr: |
+            (
+              kubelet_volume_stats_used_bytes
+              /
+              kubelet_volume_stats_capacity_bytes
+            ) * 100 > 80
+          for: 15m
+
+          labels:
+            severity: warning
+
+          annotations:
+            summary: "PVC Usage Above 80%"
+            description: "PVC {{ $labels.persistentvolumeclaim }} is above 80%."
+
+        - alert: PVCUsage90
+          expr: |
+            (
+              kubelet_volume_stats_used_bytes
+              /
+              kubelet_volume_stats_capacity_bytes
+            ) * 100 > 90
+          for: 5m
+
+          labels:
+            severity: critical
+
+          annotations:
+            summary: "PVC Usage Above 90%"
+            description: "PVC {{ $labels.persistentvolumeclaim }} is above 90%."
+
+        - alert: PVCPending
+          expr: |
+            kube_persistentvolumeclaim_status_phase{
+              phase="Pending"
+            } > 0
+          for: 5m
+
+          labels:
+            severity: critical
+
+          annotations:
+            summary: "PVC Pending"
+            description: "PVC {{ $labels.persistentvolumeclaim }} is pending."
