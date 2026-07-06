@@ -14,9 +14,18 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     ansible \
-    zsh     \
-    tmux     \
+    zsh \
+    tmux \
+    apt-transport-https \
+    gnupg \
+    lsb-release \
+    software-properties-common \
     && rm -rf /var/lib/apt/lists/*
+
+# -----------------------------------------------------------------------------
+# Azure CLI
+# -----------------------------------------------------------------------------
+RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash
 
 # -----------------------------------------------------------------------------
 # Detect CPU architecture
@@ -64,6 +73,47 @@ RUN ARCH_TYPE=$(cat /tmp/arch) && \
     tar -xzf kustomize.tar.gz && \
     mv kustomize /usr/local/bin/ && \
     rm -f kustomize.tar.gz
+
+# -----------------------------------------------------------------------------
+# yq
+# -----------------------------------------------------------------------------
+RUN ARCH_TYPE=$(cat /tmp/arch) && \
+    YQ_VERSION=v4.47.2 && \
+    curl -fsSL \
+    "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${ARCH_TYPE}" \
+    -o /usr/local/bin/yq && \
+    chmod +x /usr/local/bin/yq
+
+# -----------------------------------------------------------------------------
+# Kubeseal
+# -----------------------------------------------------------------------------
+RUN ARCH_TYPE=$(cat /tmp/arch) && \
+    KUBESEAL_VERSION=$(curl -fsSL https://api.github.com/repos/bitnami-labs/sealed-secrets/releases/latest | jq -r .tag_name) && \
+    curl -fsSL -o kubeseal.tar.gz \
+    "https://github.com/bitnami-labs/sealed-secrets/releases/download/${KUBESEAL_VERSION}/kubeseal-${KUBESEAL_VERSION#v}-linux-${ARCH_TYPE}.tar.gz" && \
+    tar -xzf kubeseal.tar.gz && \
+    install -m 755 kubeseal /usr/local/bin/kubeseal && \
+    rm -f kubeseal kubeseal.tar.gz
+
+# -----------------------------------------------------------------------------
+# k9s (Optional but Recommended)
+# -----------------------------------------------------------------------------
+RUN ARCH_TYPE=$(cat /tmp/arch) && \
+    K9S_VERSION=$(curl -fsSL https://api.github.com/repos/derailed/k9s/releases/latest | jq -r .tag_name) && \
+    curl -fsSL -o k9s.tar.gz \
+    "https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_Linux_${ARCH_TYPE}.tar.gz" && \
+    tar -xzf k9s.tar.gz && \
+    mv k9s /usr/local/bin/ && \
+    rm -f LICENSE README.md k9s.tar.gz
+
+# -----------------------------------------------------------------------------
+# Verify Tooling
+# -----------------------------------------------------------------------------
+RUN kubectl version --client=true && \
+    helm version && \
+    terraform version && \
+    ansible --version && \
+    az version
 
 # -----------------------------------------------------------------------------
 # Cleanup
