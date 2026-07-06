@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     ansible \
     zsh \
-    tmux \
+    neovim \
     apt-transport-https \
     gnupg \
     lsb-release \
