@@ -7,113 +7,54 @@ metadata:
 data:
   log-alerts.yaml: |
     groups:
-      - name: log-alerts
+      - name: critical-log-alerts
         interval: 1m
 
         rules:
 
           # ------------------------------------------------------------
-          # Critical logs across all namespaces
+          # Critical logs across application namespaces only
+          # Excludes observability/debug/system namespaces to avoid spam.
           # ------------------------------------------------------------
-          - alert: LokiCriticalLogsDetected
+          - alert: LokiCriticalApplicationLogsDetected
             expr: |
               sum by (namespace, pod, container) (
                 count_over_time(
-                  {namespace!=""}
-                  |~ "(?i)critical|fatal|panic|segmentation fault|segfault"
-                  [5m]
-                )
-              ) > 0
-            for: 1m
-            labels:
-              severity: critical
-              source: loki
-              category: logs
-            annotations:
-              summary: "Critical log detected"
-              description: "Critical/fatal/panic log detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
-
-          # ------------------------------------------------------------
-          # Real error-level logs across all namespaces
-          # This avoids matching harmless info logs that only contain
-          # the word 'error' inside a URL, query string, or metadata.
-          # ------------------------------------------------------------
-          - alert: LokiRealErrorLevelLogsDetected
-            expr: |
-              sum by (namespace, pod, container) (
-                count_over_time(
-                  {namespace!=""}
-                  |~ "(?i)level=error|level=\"error\"|severity=error|severity=\"error\"|level=err|level=\"err\""
+                  {
+                    namespace!="",
+                    namespace!="logging",
+                    namespace!="monitoring",
+                    namespace!="kube-system",
+                    namespace!="longhorn-system",
+                    namespace!="external-secrets-system",
+                    pod!~".*netshoot.*|.*curl-test.*|.*debug.*|.*test.*"
+                  }
+                  |~ "(?i)critical|fatal|panic|segmentation fault|segfault|data corruption|corruption detected"
                   [5m]
                 )
               ) > 0
             for: 2m
             labels:
-              severity: error
+              severity: critical
               source: loki
-              category: logs
+              category: application
             annotations:
-              summary: "Real error-level log detected"
-              description: "A real error-level log was detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
+              summary: "Critical application log detected"
+              description: "Critical/fatal/panic log detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
 
           # ------------------------------------------------------------
-          # Error burst across all namespaces
-          # This alerts only when errors are repeated.
-          # It prevents Telegram spam from one-off harmless errors.
+          # OOM / memory exhaustion logs
+          # Good high-signal alert.
           # ------------------------------------------------------------
-          - alert: LokiErrorBurstDetected
+          - alert: LokiOOMDetected
             expr: |
               sum by (namespace, pod, container) (
                 count_over_time(
-                  {namespace!=""}
-                  |~ "(?i)error|exception|failed|failure"
-                  !~ "level=info"
-                  !~ "msg=\"Request Completed\""
-                  !~ "plugins.update.checker"
-                  !~ "flag evaluation succeeded"
-                  [10m]
-                )
-              ) > 15
-            for: 5m
-            labels:
-              severity: error
-              source: loki
-              category: logs
-            annotations:
-              summary: "Error burst detected"
-              description: "More than 15 error-related log entries detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }} during the last 10 minutes."
-
-          # ------------------------------------------------------------
-          # Timeout burst
-          # ------------------------------------------------------------
-          - alert: LokiTimeoutBurstDetected
-            expr: |
-              sum by (namespace, pod, container) (
-                count_over_time(
-                  {namespace!=""}
-                  |~ "(?i)timeout|timed out|deadline exceeded|context deadline exceeded"
-                  !~ "level=info"
-                  [10m]
-                )
-              ) > 5
-            for: 5m
-            labels:
-              severity: error
-              source: loki
-              category: logs
-            annotations:
-              summary: "Timeout burst detected"
-              description: "More than 5 timeout-related log entries detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }} during the last 10 minutes."
-
-          # ------------------------------------------------------------
-          # Longhorn serious storage problems
-          # ------------------------------------------------------------
-          - alert: LokiLonghornCriticalLogsDetected
-            expr: |
-              sum by (namespace, pod, container) (
-                count_over_time(
-                  {namespace="longhorn-system"}
-                  |~ "(?i)degraded|faulted|replica failed|replica failure|volume .* faulted|volume .* degraded|failed to attach|failed to detach|disk pressure|no available disk|insufficient storage"
+                  {
+                    namespace!="",
+                    pod!~".*netshoot.*|.*curl-test.*|.*debug.*|.*test.*"
+                  }
+                  |~ "(?i)oomkilled|out of memory|oom killer|memory cgroup out of memory|cannot allocate memory"
                   [5m]
                 )
               ) > 0
@@ -121,64 +62,41 @@ data:
             labels:
               severity: critical
               source: loki
-              component: longhorn
-              category: storage
+              category: kubernetes
             annotations:
-              summary: "Critical Longhorn log detected"
-              description: "Critical Longhorn storage log detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
+              summary: "OOM or memory exhaustion detected"
+              description: "OOM or memory exhaustion detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
 
           # ------------------------------------------------------------
-          # Longhorn repeated error burst
+          # Longhorn critical storage issues only
+          # This avoids alerting on generic Longhorn noise.
           # ------------------------------------------------------------
-          - alert: LokiLonghornErrorBurstDetected
+          - alert: LokiLonghornCriticalStorageLogsDetected
             expr: |
               sum by (namespace, pod, container) (
                 count_over_time(
                   {namespace="longhorn-system"}
-                  |~ "(?i)error|failed|failure|timeout"
-                  !~ "level=info"
-                  [10m]
+                  |~ "(?i)volume .* degraded|volume .* faulted|replica .* failed|replica failure|failed to attach|failed to detach|disk pressure|no available disk|insufficient storage|filesystem is read-only|input/output error"
+                  [5m]
                 )
-              ) > 10
-            for: 5m
+              ) > 0
+            for: 2m
             labels:
-              severity: error
+              severity: critical
               source: loki
               component: longhorn
               category: storage
             annotations:
-              summary: "Longhorn error burst detected"
-              description: "More than 10 Longhorn error-related logs detected in pod={{ $labels.pod }}, container={{ $labels.container }} during the last 10 minutes."
+              summary: "Critical Longhorn storage log detected"
+              description: "Critical Longhorn storage issue detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
 
           # ------------------------------------------------------------
-          # Monitoring stack serious errors
-          # Excludes Grafana because Grafana creates noisy info logs
-          # when users run invalid Explore queries.
-          # ------------------------------------------------------------
-          - alert: LokiMonitoringStackErrorBurstDetected
-            expr: |
-              sum by (namespace, pod, container) (
-                count_over_time(
-                  {namespace="monitoring", pod!~".*grafana.*"}
-                  |~ "(?i)error|failed|failure|panic|exception|timeout"
-                  !~ "level=info"
-                  [10m]
-                )
-              ) > 10
-            for: 5m
-            labels:
-              severity: error
-              source: loki
-              component: monitoring
-              category: observability
-            annotations:
-              summary: "Monitoring stack error burst detected"
-              description: "More than 10 monitoring stack error-related logs detected in pod={{ $labels.pod }}, container={{ $labels.container }} during the last 10 minutes."
-
-          # ------------------------------------------------------------
-          # Grafana critical-only rule
-          # This avoids noisy level=info logs, status=400 logs,
-          # query mistakes, and plugin update checker messages.
+          # Grafana real critical logs only
+          # Does NOT alert on:
+          # - level=info
+          # - status=400
+          # - query strings containing error
+          # - plugin update checker noise
           # ------------------------------------------------------------
           - alert: LokiGrafanaCriticalLogsDetected
             expr: |
@@ -190,7 +108,7 @@ data:
                   [5m]
                 )
               ) > 0
-            for: 1m
+            for: 2m
             labels:
               severity: critical
               source: loki
@@ -202,8 +120,7 @@ data:
 
           # ------------------------------------------------------------
           # Grafana HTTP 5xx only
-          # Ignores 400, 401, 403, 404 because those are often user/API
-          # or query mistakes, not Grafana server failures.
+          # Ignores 400/401/403/404 because those are often user/query errors.
           # ------------------------------------------------------------
           - alert: LokiGrafanaHTTP5xxDetected
             expr: |
@@ -214,9 +131,9 @@ data:
                   [5m]
                 )
               ) > 0
-            for: 2m
+            for: 3m
             labels:
-              severity: error
+              severity: critical
               source: loki
               component: grafana
               category: observability
@@ -225,105 +142,131 @@ data:
               description: "Grafana returned HTTP 5xx in pod={{ $labels.pod }}, container={{ $labels.container }}."
 
           # ------------------------------------------------------------
-          # Logging stack errors
-          # Excludes normal cache/memcache warnings and info logs.
+          # Loki critical internal errors only
+          # Excludes common cache lookup warnings/noise.
           # ------------------------------------------------------------
-          - alert: LokiLoggingStackErrorBurstDetected
+          - alert: LokiInternalCriticalLogsDetected
             expr: |
               sum by (namespace, pod, container) (
                 count_over_time(
-                  {namespace="logging"}
-                  |~ "(?i)error|failed|failure|panic|exception|timeout"
-                  !~ "level=info"
+                  {namespace="logging", pod=~".*loki.*"}
+                  |~ "(?i)panic|fatal|critical|corruption|failed to start|out of space|permission denied"
                   !~ "memcache: no servers configured or available"
                   !~ "failed to lookup SRV records"
-                  [10m]
-                )
-              ) > 10
-            for: 5m
-            labels:
-              severity: error
-              source: loki
-              component: logging
-              category: observability
-            annotations:
-              summary: "Logging stack error burst detected"
-              description: "More than 10 logging stack error-related logs detected in pod={{ $labels.pod }}, container={{ $labels.container }} during the last 10 minutes."
-
-          # ------------------------------------------------------------
-          # Logging stack critical logs
-          # ------------------------------------------------------------
-          - alert: LokiLoggingStackCriticalLogsDetected
-            expr: |
-              sum by (namespace, pod, container) (
-                count_over_time(
-                  {namespace="logging"}
-                  |~ "(?i)panic|fatal|critical|failed to start|corruption|out of space"
-                  [5m]
-                )
-              ) > 0
-            for: 1m
-            labels:
-              severity: critical
-              source: loki
-              component: logging
-              category: observability
-            annotations:
-              summary: "Critical logging stack log detected"
-              description: "Critical logging stack log detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
-
-          # ------------------------------------------------------------
-          # Kubernetes image pull problems from logs
-          # ------------------------------------------------------------
-          - alert: LokiImagePullProblemsDetected
-            expr: |
-              sum by (namespace, pod, container) (
-                count_over_time(
-                  {namespace!=""}
-                  |~ "(?i)ImagePullBackOff|ErrImagePull|Back-off pulling image"
                   [5m]
                 )
               ) > 0
             for: 2m
             labels:
-              severity: error
+              severity: critical
               source: loki
-              category: kubernetes
+              component: loki
+              category: observability
             annotations:
-              summary: "Image pull problem detected"
-              description: "Image pull problem detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
+              summary: "Critical Loki internal log detected"
+              description: "Critical Loki internal issue detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
 
           # ------------------------------------------------------------
-          # OOM / memory-related critical logs
+          # Alloy critical logs only
           # ------------------------------------------------------------
-          - alert: LokiOOMDetected
+          - alert: LokiAlloyCriticalLogsDetected
             expr: |
               sum by (namespace, pod, container) (
                 count_over_time(
-                  {namespace!=""}
-                  |~ "(?i)oomkilled|out of memory|oom killer|memory cgroup out of memory"
+                  {namespace="logging", pod=~".*alloy.*"}
+                  |~ "(?i)panic|fatal|critical|failed to start|configuration error|invalid config"
                   [5m]
                 )
               ) > 0
-            for: 1m
+            for: 2m
             labels:
               severity: critical
               source: loki
-              category: kubernetes
+              component: alloy
+              category: observability
             annotations:
-              summary: "OOM condition detected"
-              description: "OOM or memory exhaustion detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
+              summary: "Critical Grafana Alloy log detected"
+              description: "Critical Alloy issue detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
 
           # ------------------------------------------------------------
-          # Optional test rule.
-          # Keep this commented out unless actively testing.
+          # CoreDNS critical only
+          # DNS failures are important, but avoid generic error spam.
+          # ------------------------------------------------------------
+          - alert: LokiCoreDNSCriticalLogsDetected
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace="kube-system", pod=~".*coredns.*"}
+                  |~ "(?i)panic|fatal|plugin/errors.*SERVFAIL|no route to host|connection refused"
+                  [5m]
+                )
+              ) > 5
+            for: 5m
+            labels:
+              severity: critical
+              source: loki
+              component: coredns
+              category: dns
+            annotations:
+              summary: "Critical CoreDNS log pattern detected"
+              description: "Repeated critical CoreDNS log pattern detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
+
+          # ------------------------------------------------------------
+          # Traefik 5xx burst only
+          # Ignores normal 404 and client-side errors.
+          # ------------------------------------------------------------
+          - alert: LokiTraefik5xxBurstDetected
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace="kube-system", pod=~".*traefik.*"}
+                  |~ " 5[0-9][0-9] "
+                  [10m]
+                )
+              ) > 20
+            for: 5m
+            labels:
+              severity: critical
+              source: loki
+              component: traefik
+              category: ingress
+            annotations:
+              summary: "Traefik HTTP 5xx burst detected"
+              description: "More than 20 Traefik HTTP 5xx responses detected in pod={{ $labels.pod }}, container={{ $labels.container }} during the last 10 minutes."
+
+          # ------------------------------------------------------------
+          # External Secrets critical only
+          # Do not alert on every webhook warning/error.
+          # ------------------------------------------------------------
+          - alert: LokiExternalSecretsCriticalLogsDetected
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace="external-secrets-system"}
+                  |~ "(?i)panic|fatal|failed to start|invalid provider config|authentication failed|authorization failed|forbidden|unauthorized"
+                  [10m]
+                )
+              ) > 3
+            for: 5m
+            labels:
+              severity: critical
+              source: loki
+              component: external-secrets
+              category: secrets
+            annotations:
+              summary: "Critical External Secrets log detected"
+              description: "Repeated critical External Secrets issue detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
+
+          # ------------------------------------------------------------
+          # Optional manual test rule.
+          # Keep commented out unless actively testing Telegram.
           # ------------------------------------------------------------
           # - alert: LokiForcedTestAlert
           #   expr: |
           #     sum(
           #       count_over_time(
-          #         {pod="loki-error-test"}
-          #         |= "error"
+          #         {pod="loki-critical-test"}
+          #         |= "fatal"
           #         [5m]
           #       )
           #     ) > 0
@@ -333,4 +276,4 @@ data:
           #     test: "true"
           #   annotations:
           #     summary: "Forced Loki test alert"
-          #     description: "Loki detected the test error log from pod loki-error-test."
+          #     description: "Loki detected the test fatal log from pod loki-critical-test."
