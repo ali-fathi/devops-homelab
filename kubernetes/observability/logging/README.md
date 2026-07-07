@@ -1,6 +1,8 @@
-# 📜 Phase 5 – Centralized Logging with Loki + Promtail
+# 📜 Phase 5 – Centralized Logging with Loki + Grafana Alloy
 
 This phase adds centralized logging and log-based alerting to the DevOps Homelab Kubernetes platform.
+
+Promtail has been replaced with **Grafana Alloy** because Promtail is EOL as of **March 2, 2026**, and Grafana states that future development for this log collection path continues in Grafana Alloy. [1](https://azure.microsoft.com/en-us/pricing/details/key-vault/)
 
 Before this phase, the platform already includes:
 
@@ -20,7 +22,7 @@ After this phase, the platform also includes:
 
 ```text
 Loki
-Promtail
+Grafana Alloy
 Grafana Log Explorer
 Centralized Kubernetes Logs
 LogQL Querying
@@ -34,7 +36,7 @@ Telegram Notifications from Logs
 
 # 🎯 Goal
 
-The goal of this phase is to collect logs from all Kubernetes workloads, make them searchable in Grafana, and optionally trigger alerts when important log patterns appear.
+The goal of this phase is to collect logs from Kubernetes workloads, make those logs searchable in Grafana, and trigger useful Telegram alerts when important log patterns appear.
 
 Metrics answer:
 
@@ -51,10 +53,10 @@ Why is it broken?
 Log-based alerts answer:
 
 ```text
-Something important appeared in the logs and needs attention now.
+Something important appeared in logs and needs attention now.
 ```
 
-Loki is designed for log aggregation and supports alerting and recording rules through its ruler component. [1](https://oneuptime.com/blog/post/2026-02-09-external-secrets-operator-azure-key-vault/view)
+Loki supports alerting and recording rules through its Ruler component, which evaluates LogQL queries and can send alerts to Alertmanager. [2](https://www.suse.com/c/grafana-alloy-part-1-replacing-promtail/)[3](https://grafana.com/docs/loki/latest/alert/)
 
 ---
 
@@ -68,7 +70,7 @@ It is often described as:
 Prometheus for logs
 ```
 
-Unlike Elasticsearch, Loki does not index every word in every log line. Instead, Loki indexes labels such as:
+Unlike traditional full-text logging systems, Loki indexes labels such as:
 
 ```text
 namespace
@@ -78,32 +80,51 @@ node_name
 app
 ```
 
-This makes Loki lighter and cheaper to operate than traditional full-text indexed logging systems. Loki is commonly used in Kubernetes environments because it indexes metadata labels and stores compressed log content. [2](https://computingforgeeks.com/deploy-loki-kubernetes/)[3](https://dasroot.net/posts/2026/04/observability-stack-prometheus-grafana-loki/)
+Loki stores compressed log content and indexes metadata labels, which makes it lighter than full-text indexed logging systems. [4](https://github.com/grafana/alloy-scenarios/tree/main/k8s/logs)[5](https://grafana.com/docs/alloy/latest/collect/logs-in-kubernetes/)
 
 ---
 
-# 🧠 What Is Promtail?
+# 🧠 What Is Grafana Alloy?
 
-Promtail is a log shipping agent.
+Grafana Alloy is Grafana’s telemetry collector.
 
-Promtail runs on every Kubernetes node as a DaemonSet and collects logs from Kubernetes log paths such as:
+In this phase, Alloy replaces Promtail and is responsible for collecting Kubernetes logs and forwarding those logs to Loki.
+
+Grafana Alloy can collect Kubernetes pod logs using `loki.source.kubernetes`, which tails logs from Kubernetes containers through the Kubernetes API. [6](https://dev.to/seewhy/using-helm-chart-to-deploy-grafana-prometheus-and-loki-data-source-on-your-kubernetes-cluster-1287)
+
+Grafana Alloy can forward collected logs to Loki using `loki.write`, and Grafana documents this as part of the Kubernetes logs collection workflow. [7](https://github.com/grafana/helm-charts/blob/main/charts/promtail/README.md)
+
+---
+
+# 🧠 Why Replace Promtail?
+
+Promtail is EOL as of March 2, 2026.
+
+Promtail should be replaced with Grafana Alloy or another supported log collector. [1](https://azure.microsoft.com/en-us/pricing/details/key-vault/)
+
+The new logging pipeline becomes:
 
 ```text
-/var/log/pods/
-/var/log/containers/
+Old:
+Kubernetes Pods
+  ↓
+Promtail
+  ↓
+Loki
+
+New:
+Kubernetes Pods
+  ↓
+Grafana Alloy
+  ↓
+Loki
 ```
-
-Promtail then adds Kubernetes metadata such as namespace, pod, container, and node labels before sending logs to Loki. Promtail commonly runs as a DaemonSet for cluster-wide log collection from every node. [4](https://github.com/grafana/helm-charts/blob/main/charts/promtail/README.md)[5](https://deepwiki.com/grafana/helm-charts/3.2-loki-stack)
-
-> Note: The Promtail Helm chart is marked as deprecated upstream. It is still useful for learning and existing deployments, but a future migration to Grafana Alloy should be considered. [4](https://github.com/grafana/helm-charts/blob/main/charts/promtail/README.md)[5](https://deepwiki.com/grafana/helm-charts/3.2-loki-stack)
 
 ---
 
 # 🧠 What Is LogQL?
 
 LogQL is the query language used by Loki.
-
-It is similar in style to PromQL but is used for logs.
 
 Example:
 
@@ -121,7 +142,7 @@ Show logs from namespace monitoring that contain the word error.
 
 # 🧠 What Is Loki Ruler?
 
-Loki Ruler evaluates LogQL rules periodically.
+Loki Ruler evaluates LogQL alerting rules on a schedule.
 
 It can create:
 
@@ -130,38 +151,37 @@ Recording Rules
 Alerting Rules
 ```
 
-Alerting rules can send alerts to Alertmanager, and Alertmanager can forward those alerts to Telegram. Loki’s ruler is responsible for continually evaluating configured LogQL queries and firing alerts when conditions are met. [1](https://oneuptime.com/blog/post/2026-02-09-external-secrets-operator-azure-key-vault/view)[6](https://medium.com/@ma.ki.rlene/how-to-use-external-secrets-operator-with-aks-and-azure-key-vault-9c4c093052fe)
+Alerting rules can be sent to Alertmanager, and Alertmanager can forward those alerts to Telegram.
 
 ---
 
 # 🏗️ Architecture
 
+## Logging Pipeline
+
 ```text
 Kubernetes Pods
       │
       ▼
-Container Log Files
+Grafana Alloy
       │
       ▼
-Promtail DaemonSet
+Loki Gateway
       │
       ▼
 Loki
       │
       ▼
-Grafana
-      │
-      ▼
-Explore Logs with LogQL
+Grafana Explore
 ```
 
-With log-based alerting:
+## Log-Based Alerting Pipeline
 
 ```text
 Kubernetes Logs
       │
       ▼
-Promtail
+Grafana Alloy
       │
       ▼
 Loki
@@ -196,15 +216,16 @@ Sending log alerts to Alertmanager
 
 ---
 
-## Promtail
+## Grafana Alloy
 
 Responsible for:
 
 ```text
-Reading pod logs
-Adding Kubernetes labels
-Tracking log positions
-Shipping logs to Loki
+Discovering Kubernetes Pods
+Collecting Pod logs
+Adding useful labels
+Processing log entries
+Forwarding logs to Loki
 ```
 
 ---
@@ -237,7 +258,7 @@ Sending Telegram notifications
 
 ---
 
-# ✅ Why This Is Important
+# ✅ Why This Phase Is Important
 
 With this phase, troubleshooting becomes much easier.
 
@@ -254,9 +275,9 @@ Which pod generated the error?
 Which namespace is noisy?
 ```
 
-After Loki is deployed, all of those questions can be investigated from Grafana.
+After Loki and Alloy are deployed, logs from Kubernetes workloads can be searched from Grafana.
 
-After Loki alerting is configured, important log patterns can immediately notify Telegram.
+After Loki alerting is configured, important log patterns can trigger Telegram messages.
 
 ---
 
@@ -278,7 +299,7 @@ Grafana is already exposed through MetalLB:
 http://192.168.178.212
 ```
 
-Loki does not need a MetalLB IP because Grafana can reach Loki internally through Kubernetes service DNS.
+Loki does not need a MetalLB IP because Grafana reaches Loki internally through Kubernetes DNS.
 
 Recommended access model:
 
@@ -296,7 +317,7 @@ Loki internal service
 
 # 📂 Repository Structure
 
-Create the following folder structure:
+Use this folder structure:
 
 ```text
 kubernetes/
@@ -304,7 +325,7 @@ kubernetes/
     └── logging/
         ├── README.md
         ├── loki-values.yaml
-        ├── promtail-values.yaml
+        ├── alloy-values.yaml
         ├── grafana-loki-datasource.yaml
         ├── loki-log-alert-rules.yaml
         └── queries-cheatsheet.md
@@ -321,7 +342,7 @@ cd kubernetes/observability/logging
 
 # ✅ Prerequisites
 
-Before installing Loki and Promtail, verify:
+Before installing Loki and Alloy, verify:
 
 ```text
 K3s is healthy
@@ -469,13 +490,11 @@ Verify Loki chart is available:
 helm search repo grafana/loki
 ```
 
-Verify Promtail chart is available:
+Verify Alloy chart is available:
 
 ```bash
-helm search repo grafana/promtail
+helm search repo grafana/alloy
 ```
-
-Grafana provides Helm charts for Loki and Promtail through the Grafana Helm repository. [4](https://github.com/grafana/helm-charts/blob/main/charts/promtail/README.md)[7](https://github.com/grafana/helm-charts/blob/main/charts/loki-stack/README.md)
 
 ---
 
@@ -493,7 +512,31 @@ kubectl get namespace logging
 
 ---
 
-# 🚀 Step 3 – Create Loki Values File
+# 🚀 Step 3 – Remove Promtail If Already Installed
+
+If Promtail was previously installed, remove it to avoid duplicate logs.
+
+```bash
+helm uninstall promtail -n logging
+```
+
+Verify Promtail is gone:
+
+```bash
+kubectl get pods -n logging | grep promtail
+```
+
+Expected:
+
+```text
+# no output
+```
+
+Do not run Promtail and Alloy together long-term because duplicate collectors can ship duplicate log entries to Loki.
+
+---
+
+# 🚀 Step 4 – Create Loki Values File
 
 Create:
 
@@ -515,6 +558,11 @@ loki:
   storage:
     type: filesystem
 
+    bucketNames:
+      chunks: loki-chunks
+      ruler: loki-ruler
+      admin: loki-admin
+
   schemaConfig:
     configs:
       - from: "2024-01-01"
@@ -534,8 +582,13 @@ loki:
     retention_enabled: true
     delete_request_store: filesystem
 
-  ruler:
+  rulerConfig:
     enable_api: true
+    enable_alertmanager_v2: true
+
+    alertmanager_url: http://monitoring-kube-prometheus-alertmanager.monitoring.svc.cluster.local:9093
+
+    evaluation_interval: 1m
 
     storage:
       type: local
@@ -544,13 +597,9 @@ loki:
 
     rule_path: /tmp/loki-rules
 
-    alertmanager_url: http://monitoring-kube-prometheus-alertmanager.monitoring.svc.cluster.local:9093
-
     ring:
       kvstore:
         store: inmemory
-
-    evaluation_interval: 1m
 
 singleBinary:
   replicas: 1
@@ -590,6 +639,12 @@ write:
 backend:
   replicas: 0
 
+chunksCache:
+  enabled: false
+
+resultsCache:
+  enabled: false
+
 monitoring:
   serviceMonitor:
     enabled: true
@@ -618,8 +673,6 @@ Lightweight
 Easy to operate
 Easy to troubleshoot
 ```
-
-Grafana documents monolithic Loki as suitable for smaller meta-monitoring stacks, while microservices mode is recommended for larger production environments. [8](https://grafana.com/docs/loki/latest/setup/install/helm/)
 
 ---
 
@@ -689,8 +742,6 @@ This keeps logs for:
 30 days
 ```
 
-This is a good starting point for a homelab.
-
 ---
 
 ## Gateway
@@ -706,20 +757,21 @@ The Loki Gateway provides a stable internal endpoint:
 http://loki-gateway.logging.svc.cluster.local
 ```
 
-Grafana and Promtail use this endpoint.
+Grafana and Alloy use this endpoint.
 
 ---
 
 ## Ruler
 
 ```yaml
-ruler:
+rulerConfig:
   enable_api: true
+  enable_alertmanager_v2: true
 ```
 
 This enables Loki alerting rules.
 
-The Loki ruler evaluates LogQL rules and sends alerts to Alertmanager. [1](https://oneuptime.com/blog/post/2026-02-09-external-secrets-operator-azure-key-vault/view)[9](https://azure.microsoft.com/en-us/pricing/details/key-vault/)
+The Loki Ruler evaluates LogQL rules and sends alerts to Alertmanager.
 
 ---
 
@@ -729,7 +781,7 @@ The Loki ruler evaluates LogQL rules and sends alerts to Alertmanager. [1](https
 alertmanager_url: http://monitoring-kube-prometheus-alertmanager.monitoring.svc.cluster.local:9093
 ```
 
-This tells Loki where to send firing log-based alerts.
+This tells Loki where to send log-based alerts.
 
 ---
 
@@ -754,7 +806,7 @@ because `auth_enabled: false` means Loki uses the `fake` tenant for rules.
 
 ---
 
-# 🚀 Step 4 – Create Loki Log Alert Rules
+# 🚀 Step 5 – Create Loki Log Alert Rules
 
 Create:
 
@@ -779,80 +831,12 @@ data:
 
         rules:
 
-          - alert: LokiErrorLogsDetected
-            expr: |
-              sum by (namespace, pod, container) (
-                count_over_time(
-                  {namespace!=""}
-                  |= "error"
-                  [5m]
-                )
-              ) > 0
-            for: 1m
-            labels:
-              severity: warning
-              source: loki
-            annotations:
-              summary: "Error log detected"
-              description: "Error log detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
-
-          - alert: LokiExceptionLogsDetected
-            expr: |
-              sum by (namespace, pod, container) (
-                count_over_time(
-                  {namespace!=""}
-                  |~ "(?i)exception"
-                  [5m]
-                )
-              ) > 0
-            for: 1m
-            labels:
-              severity: warning
-              source: loki
-            annotations:
-              summary: "Exception log detected"
-              description: "Exception log detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
-
-          - alert: LokiFailedLogsDetected
-            expr: |
-              sum by (namespace, pod, container) (
-                count_over_time(
-                  {namespace!=""}
-                  |~ "(?i)failed|failure"
-                  [5m]
-                )
-              ) > 3
-            for: 2m
-            labels:
-              severity: warning
-              source: loki
-            annotations:
-              summary: "Repeated failure logs detected"
-              description: "More than 3 failure-related log entries detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
-
-          - alert: LokiTimeoutLogsDetected
-            expr: |
-              sum by (namespace, pod, container) (
-                count_over_time(
-                  {namespace!=""}
-                  |~ "(?i)timeout|timed out"
-                  [5m]
-                )
-              ) > 0
-            for: 1m
-            labels:
-              severity: warning
-              source: loki
-            annotations:
-              summary: "Timeout log detected"
-              description: "Timeout log detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
-
           - alert: LokiCriticalLogsDetected
             expr: |
               sum by (namespace, pod, container) (
                 count_over_time(
                   {namespace!=""}
-                  |~ "(?i)critical|fatal|panic"
+                  |~ "(?i)critical|fatal|panic|segmentation fault|segfault"
                   [5m]
                 )
               ) > 0
@@ -860,16 +844,76 @@ data:
             labels:
               severity: critical
               source: loki
+              category: logs
             annotations:
               summary: "Critical log detected"
               description: "Critical/fatal/panic log detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
 
-          - alert: LokiLonghornErrorLogs
+          - alert: LokiRealErrorLevelLogsDetected
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace!=""}
+                  |~ "(?i)level=error|level=\"error\"|severity=error|severity=\"error\"|level=err|level=\"err\""
+                  [5m]
+                )
+              ) > 0
+            for: 2m
+            labels:
+              severity: error
+              source: loki
+              category: logs
+            annotations:
+              summary: "Real error-level log detected"
+              description: "A real error-level log was detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
+
+          - alert: LokiErrorBurstDetected
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace!=""}
+                  |~ "(?i)error|exception|failed|failure"
+                  !~ "level=info"
+                  !~ "msg=\"Request Completed\""
+                  !~ "plugins.update.checker"
+                  !~ "flag evaluation succeeded"
+                  [10m]
+                )
+              ) > 15
+            for: 5m
+            labels:
+              severity: error
+              source: loki
+              category: logs
+            annotations:
+              summary: "Error burst detected"
+              description: "More than 15 error-related log entries detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }} during the last 10 minutes."
+
+          - alert: LokiTimeoutBurstDetected
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace!=""}
+                  |~ "(?i)timeout|timed out|deadline exceeded|context deadline exceeded"
+                  !~ "level=info"
+                  [10m]
+                )
+              ) > 5
+            for: 5m
+            labels:
+              severity: error
+              source: loki
+              category: logs
+            annotations:
+              summary: "Timeout burst detected"
+              description: "More than 5 timeout-related log entries detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }} during the last 10 minutes."
+
+          - alert: LokiLonghornCriticalLogsDetected
             expr: |
               sum by (namespace, pod, container) (
                 count_over_time(
                   {namespace="longhorn-system"}
-                  |~ "(?i)error|failed|degraded|replica"
+                  |~ "(?i)degraded|faulted|replica failed|replica failure|volume .* faulted|volume .* degraded|failed to attach|failed to detach|disk pressure|no available disk|insufficient storage"
                   [5m]
                 )
               ) > 0
@@ -878,1426 +922,66 @@ data:
               severity: critical
               source: loki
               component: longhorn
+              category: storage
             annotations:
-              summary: "Longhorn error log detected"
-              description: "Longhorn-related error log detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
+              summary: "Critical Longhorn log detected"
+              description: "Critical Longhorn storage log detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
 
-          - alert: LokiMonitoringStackErrors
+          - alert: LokiLonghornErrorBurstDetected
             expr: |
               sum by (namespace, pod, container) (
                 count_over_time(
-                  {namespace="monitoring"}
-                  |~ "(?i)error|failed|panic|exception"
-                  [5m]
+                  {namespace="longhorn-system"}
+                  |~ "(?i)error|failed|failure|timeout"
+                  !~ "level=info"
+                  [10m]
                 )
-              ) > 0
-            for: 1m
+              ) > 10
+            for: 5m
             labels:
-              severity: warning
+              severity: error
+              source: loki
+              component: longhorn
+              category: storage
+            annotations:
+              summary: "Longhorn error burst detected"
+              description: "More than 10 Longhorn error-related logs detected in pod={{ $labels.pod }}, container={{ $labels.container }} during the last 10 minutes."
+
+          - alert: LokiMonitoringStackErrorBurstDetected
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace="monitoring", pod!~".*grafana.*"}
+                  |~ "(?i)error|failed|failure|panic|exception|timeout"
+                  !~ "level=info"
+                  [10m]
+                )
+              ) > 10
+            for: 5m
+            labels:
+              severity: error
               source: loki
               component: monitoring
+              category: observability
             annotations:
-              summary: "Monitoring stack error log detected"
-              description: "Monitoring stack error detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
+              summary: "Monitoring stack error burst detected"
+              description: "More than 10 monitoring stack error-related logs detected in pod={{ $labels.pod }}, container={{ $labels.container }} during the last 10 minutes."
 
-          - alert: LokiLoggingStackErrors
+          - alert: LokiGrafanaCriticalLogsDetected
             expr: |
               sum by (namespace, pod, container) (
                 count_over_time(
-                  {namespace="logging"}
-                  |~ "(?i)error|failed|panic|exception"
+                  {namespace="monitoring", pod=~".*grafana.*"}
+                  | logfmt
+                  | level=~"error|fatal|panic"
                   [5m]
                 )
               ) > 0
             for: 1m
             labels:
-              severity: warning
+              severity: critical
               source: loki
-              component: logging
+              component: grafana
+              category: observability
             annotations:
-              summary: "Logging stack error log detected"
-              description: "Logging stack error detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
-```
-
-Apply:
-
-```bash
-kubectl apply -f loki-log-alert-rules.yaml
-```
-
-Verify:
-
-```bash
-kubectl get configmap -n logging loki-log-alert-rules
-```
-
----
-
-# 🚀 Step 5 – Install Loki
-
-From the logging folder:
-
-```bash
-helm install loki \
-grafana/loki \
--n logging \
--f loki-values.yaml
-```
-
-Watch pods:
-
-```bash
-kubectl get pods -n logging -w
-```
-
-Expected:
-
-```text
-loki-0              Running
-loki-gateway-xxxxx  Running
-```
-
-If Loki is already installed, upgrade instead:
-
-```bash
-helm upgrade loki \
-grafana/loki \
--n logging \
--f loki-values.yaml
-```
-
----
-
-# 🚀 Step 6 – Verify Loki PVC
-
-```bash
-kubectl get pvc -n logging
-```
-
-Expected:
-
-```text
-storage-loki-0   Bound   20Gi   longhorn
-```
-
-If the PVC is Pending:
-
-```bash
-kubectl describe pvc -n logging
-```
-
-Check Longhorn:
-
-```bash
-kubectl get pods -n longhorn-system
-```
-
----
-
-# 🚀 Step 7 – Verify Loki Services
-
-```bash
-kubectl get svc -n logging
-```
-
-Expected services include:
-
-```text
-loki
-loki-gateway
-```
-
----
-
-# 🚀 Step 8 – Test Loki Internally
-
-Create a temporary curl pod:
-
-```bash
-kubectl run curl-test \
-  --image=curlimages/curl \
-  -n logging \
-  -it --rm --restart=Never -- sh
-```
-
-Inside the pod:
-
-```bash
-curl http://loki-gateway.logging.svc.cluster.local/ready
-```
-
-Expected:
-
-```text
-ready
-```
-
-Exit the pod:
-
-```bash
-exit
-```
-
----
-
-# 🚀 Step 9 – Verify Rule File Is Mounted
-
-```bash
-kubectl exec -it -n logging loki-0 -- sh
-```
-
-Inside:
-
-```bash
-ls -lah /var/loki/rules/fake
-```
-
-Expected:
-
-```text
-log-alerts.yaml
-```
-
-Check content:
-
-```bash
-cat /var/loki/rules/fake/log-alerts.yaml
-```
-
-Exit:
-
-```bash
-exit
-```
-
----
-
-# 🚀 Step 10 – Verify Loki Ruler Logs
-
-```bash
-kubectl logs -n logging loki-0 | grep -i ruler
-```
-
-Check for errors:
-
-```bash
-kubectl logs -n logging loki-0 | grep -i error
-```
-
-Check Alertmanager connectivity:
-
-```bash
-kubectl logs -n logging loki-0 | grep -i alertmanager
-```
-
----
-
-# 🚀 Step 11 – Create Promtail Values File
-
-Create:
-
-```bash
-nano promtail-values.yaml
-```
-
-Content:
-
-```yaml
-config:
-  clients:
-    - url: http://loki-gateway.logging.svc.cluster.local/loki/api/v1/push
-
-  snippets:
-    pipelineStages:
-      - cri: {}
-
-    extraRelabelConfigs:
-      - source_labels:
-          - __meta_kubernetes_pod_node_name
-        target_label: node_name
-
-      - source_labels:
-          - __meta_kubernetes_namespace
-        target_label: namespace
-
-      - source_labels:
-          - __meta_kubernetes_pod_name
-        target_label: pod
-
-      - source_labels:
-          - __meta_kubernetes_pod_container_name
-        target_label: container
-
-resources:
-  requests:
-    cpu: 50m
-    memory: 64Mi
-  limits:
-    cpu: 300m
-    memory: 256Mi
-
-serviceMonitor:
-  enabled: true
-```
-
----
-
-# 🧠 Promtail Values Explanation
-
-## Loki Client URL
-
-```yaml
-url: http://loki-gateway.logging.svc.cluster.local/loki/api/v1/push
-```
-
-Promtail sends logs to Loki using this endpoint.
-
----
-
-## CRI Pipeline Stage
-
-```yaml
-pipelineStages:
-  - cri: {}
-```
-
-This parses Kubernetes container runtime logs.
-
----
-
-## Labels
-
-Promtail adds labels:
-
-```text
-node_name
-namespace
-pod
-container
-```
-
-These labels make Grafana LogQL queries much easier.
-
-Example:
-
-```logql
-{namespace="monitoring", container="grafana"}
-```
-
----
-
-## Resource Limits
-
-Promtail is lightweight.
-
-Initial settings:
-
-```text
-CPU request: 50m
-Memory request: 64Mi
-CPU limit: 300m
-Memory limit: 256Mi
-```
-
----
-
-# 🚀 Step 12 – Install Promtail
-
-```bash
-helm install promtail \
-grafana/promtail \
--n logging \
--f promtail-values.yaml
-```
-
-If Promtail is already installed, upgrade instead:
-
-```bash
-helm upgrade promtail \
-grafana/promtail \
--n logging \
--f promtail-values.yaml
-```
-
-Verify:
-
-```bash
-kubectl get pods -n logging
-```
-
-Expected:
-
-```text
-promtail-xxxxx   Running
-promtail-yyyyy   Running
-promtail-zzzzz   Running
-```
-
-You should have one Promtail pod per Kubernetes node.
-
-Check DaemonSet:
-
-```bash
-kubectl get daemonset -n logging
-```
-
-Expected:
-
-```text
-promtail   DESIRED 3   READY 3
-```
-
----
-
-# 🚀 Step 13 – Verify Promtail Logs
-
-```bash
-kubectl logs -n logging daemonset/promtail
-```
-
-You should see output showing Promtail starting and pushing logs to Loki.
-
-If needed, check one pod:
-
-```bash
-kubectl get pods -n logging -l app.kubernetes.io/name=promtail
-```
-
-Then:
-
-```bash
-kubectl logs -n logging <promtail-pod-name>
-```
-
----
-
-# 🚀 Step 14 – Add Loki Datasource to Grafana Manually
-
-Open Grafana:
-
-```text
-http://192.168.178.212
-```
-
-Go to:
-
-```text
-Connections
-  → Data sources
-  → Add data source
-  → Loki
-```
-
-Configure:
-
-```text
-Name: Loki
-URL: http://loki-gateway.logging.svc.cluster.local
-Access: Server / Proxy
-```
-
-Click:
-
-```text
-Save & test
-```
-
-Expected:
-
-```text
-Successfully queried the Loki API
-```
-
----
-
-# 🚀 Step 15 – Add Loki Datasource with GitOps-Friendly ConfigMap
-
-If Grafana is configured with the datasource sidecar, create the datasource as a ConfigMap.
-
-Create:
-
-```bash
-nano grafana-loki-datasource.yaml
-```
-
-Content:
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: grafana-loki-datasource
-  namespace: monitoring
-  labels:
-    grafana_datasource: "1"
-
-data:
-  loki-datasource.yaml: |
-    apiVersion: 1
-
-    datasources:
-      - name: Loki
-        type: loki
-        access: proxy
-        url: http://loki-gateway.logging.svc.cluster.local
-        isDefault: false
-        editable: true
-```
-
-Apply:
-
-```bash
-kubectl apply -f grafana-loki-datasource.yaml
-```
-
-Restart Grafana if the datasource does not appear:
-
-```bash
-kubectl rollout restart deployment monitoring-grafana -n monitoring
-```
-
----
-
-# 🚀 Step 16 – Verify Logs in Grafana
-
-Open Grafana:
-
-```text
-http://192.168.178.212
-```
-
-Go to:
-
-```text
-Explore
-```
-
-Select datasource:
-
-```text
-Loki
-```
-
-Run:
-
-```logql
-{namespace="monitoring"}
-```
-
-Expected logs from:
-
-```text
-Grafana
-Prometheus
-Alertmanager
-```
-
----
-
-# 🚨 Log-Based Alerting
-
-Log-based alerting allows Telegram notifications when important log patterns appear.
-
-Example:
-
-```text
-A pod logs "fatal error"
-      ↓
-Promtail ships log to Loki
-      ↓
-Loki Ruler evaluates LogQL rule
-      ↓
-Loki sends alert to Alertmanager
-      ↓
-Alertmanager sends Telegram notification
-```
-
----
-
-# 🚨 Test Log-Based Alert
-
-Create a pod that logs an error:
-
-```bash
-kubectl run loki-error-test \
-  --image=busybox:1.36 \
-  --restart=Never \
-  -- sh -c 'echo "error: this is a Loki alert test"; sleep 300'
-```
-
-Check the log:
-
-```bash
-kubectl logs loki-error-test
-```
-
-Expected:
-
-```text
-error: this is a Loki alert test
-```
-
-Wait 1–2 minutes.
-
----
-
-## Check Grafana Explore
-
-Run:
-
-```logql
-{pod="loki-error-test"}
-```
-
-Then:
-
-```logql
-{pod="loki-error-test"} |= "error"
-```
-
----
-
-## Check Alertmanager
-
-Open Alertmanager UI or port-forward:
-
-```bash
-kubectl port-forward -n monitoring svc/monitoring-kube-prometheus-alertmanager 9093
-```
-
-Open:
-
-```text
-http://localhost:9093
-```
-
-Look for:
-
-```text
-LokiErrorLogsDetected
-```
-
----
-
-## Check Telegram
-
-Expected Telegram notification:
-
-```text
-LokiErrorLogsDetected
-
-Error log detected in namespace=default, pod=loki-error-test, container=loki-error-test.
-```
-
----
-
-## Cleanup Test Pod
-
-```bash
-kubectl delete pod loki-error-test
-```
-
----
-
-# LogQL Query Examples
-
-## All Logs
-
-```logql
-{}
-```
-
----
-
-## Monitoring Namespace
-
-```logql
-{namespace="monitoring"}
-```
-
----
-
-## Longhorn Logs
-
-```logql
-{namespace="longhorn-system"}
-```
-
----
-
-## Logging Stack Logs
-
-```logql
-{namespace="logging"}
-```
-
----
-
-## Errors Across All Namespaces
-
-```logql
-{} |= "error"
-```
-
----
-
-## Warnings Across All Namespaces
-
-```logql
-{} |= "warn"
-```
-
----
-
-## Grafana Logs
-
-```logql
-{namespace="monitoring", pod=~".*grafana.*"}
-```
-
----
-
-## Prometheus Logs
-
-```logql
-{namespace="monitoring", pod=~".*prometheus.*"}
-```
-
----
-
-## Alertmanager Logs
-
-```logql
-{namespace="monitoring", pod=~".*alertmanager.*"}
-```
-
----
-
-## Longhorn Errors
-
-```logql
-{namespace="longhorn-system"} |= "error"
-```
-
----
-
-## CrashLoopBackOff Messages
-
-```logql
-{} |= "CrashLoopBackOff"
-```
-
----
-
-## OOM Messages
-
-```logql
-{} |= "OOM"
-```
-
----
-
-## Timeout Messages
-
-```logql
-{} |= "timeout"
-```
-
----
-
-## Failed Messages
-
-```logql
-{} |= "failed"
-```
-
----
-
-## Logs From One Node
-
-```logql
-{node_name="k3s-worker1"}
-```
-
----
-
-## Logs From One Pod
-
-```logql
-{pod="POD_NAME"}
-```
-
----
-
-## Logs From One Container
-
-```logql
-{container="grafana"}
-```
-
----
-
-## Count Errors Over Time
-
-```logql
-sum by(namespace) (
-  count_over_time({namespace!=""} |= "error" [5m])
-)
-```
-
----
-
-# Create `queries-cheatsheet.md`
-
-Create:
-
-```bash
-nano queries-cheatsheet.md
-```
-
-Content:
-
-```markdown
-# Loki LogQL Cheatsheet
-
-## All logs
-
-```logql
-{}
-```
-
-## Namespace logs
-
-```logql
-{namespace="monitoring"}
-```
-
-## Longhorn logs
-
-```logql
-{namespace="longhorn-system"}
-```
-
-## Logging stack logs
-
-```logql
-{namespace="logging"}
-```
-
-## Errors
-
-```logql
-{} |= "error"
-```
-
-## Warnings
-
-```logql
-{} |= "warn"
-```
-
-## Failed messages
-
-```logql
-{} |= "failed"
-```
-
-## Timeout messages
-
-```logql
-{} |= "timeout"
-```
-
-## OOM messages
-
-```logql
-{} |= "OOM"
-```
-
-## CrashLoopBackOff messages
-
-```logql
-{} |= "CrashLoopBackOff"
-```
-
-## Grafana logs
-
-```logql
-{pod=~".*grafana.*"}
-```
-
-## Prometheus logs
-
-```logql
-{pod=~".*prometheus.*"}
-```
-
-## Alertmanager logs
-
-```logql
-{pod=~".*alertmanager.*"}
-```
-
-## Logs from one node
-
-```logql
-{node_name="k3s-worker1"}
-```
-
-## Logs from one pod
-
-```logql
-{pod="POD_NAME"}
-```
-
-## Error count over 5 minutes
-
-```logql
-sum by(namespace) (
-  count_over_time({namespace!=""} |= "error" [5m])
-)
-```
-```
-
----
-
-# Operational Commands
-
-## Check Loki Pods
-
-```bash
-kubectl get pods -n logging
-```
-
----
-
-## Check Loki PVC
-
-```bash
-kubectl get pvc -n logging
-```
-
----
-
-## Check Loki Services
-
-```bash
-kubectl get svc -n logging
-```
-
----
-
-## Check Promtail DaemonSet
-
-```bash
-kubectl get daemonset -n logging
-```
-
----
-
-## Check Promtail Logs
-
-```bash
-kubectl logs -n logging daemonset/promtail
-```
-
----
-
-## Check Loki Logs
-
-```bash
-kubectl logs -n logging statefulset/loki
-```
-
----
-
-## Check Ruler Logs
-
-```bash
-kubectl logs -n logging loki-0 | grep -i ruler
-```
-
----
-
-## Check Logging Events
-
-```bash
-kubectl get events -n logging --sort-by=.metadata.creationTimestamp
-```
-
----
-
-# Troubleshooting
-
-## Loki Pod Pending
-
-Check PVC:
-
-```bash
-kubectl get pvc -n logging
-```
-
-Describe PVC:
-
-```bash
-kubectl describe pvc -n logging
-```
-
-Common causes:
-
-```text
-Longhorn is unhealthy
-StorageClass missing
-Insufficient storage
-```
-
----
-
-## Loki Not Ready
-
-Check logs:
-
-```bash
-kubectl logs -n logging statefulset/loki
-```
-
-Check readiness:
-
-```bash
-kubectl run curl-test \
-  --image=curlimages/curl \
-  -n logging \
-  -it --rm --restart=Never -- sh
-```
-
-Inside:
-
-```bash
-curl http://loki-gateway.logging.svc.cluster.local/ready
-```
-
-Expected:
-
-```text
-ready
-```
-
----
-
-## Promtail Not Running
-
-Check:
-
-```bash
-kubectl get daemonset -n logging
-```
-
-Describe:
-
-```bash
-kubectl describe daemonset promtail -n logging
-```
-
-Common causes:
-
-```text
-Node scheduling issue
-Permission issue
-HostPath mount issue
-```
-
----
-
-## Grafana Cannot Connect to Loki
-
-Check service:
-
-```bash
-kubectl get svc -n logging
-```
-
-Test from monitoring namespace:
-
-```bash
-kubectl run curl-test \
-  --image=curlimages/curl \
-  -n monitoring \
-  -it --rm --restart=Never -- sh
-```
-
-Inside:
-
-```bash
-curl http://loki-gateway.logging.svc.cluster.local/ready
-```
-
-Expected:
-
-```text
-ready
-```
-
----
-
-## No Logs in Grafana
-
-Check Promtail:
-
-```bash
-kubectl logs -n logging daemonset/promtail
-```
-
-Check Loki:
-
-```bash
-kubectl logs -n logging statefulset/loki
-```
-
-Try broad query:
-
-```logql
-{}
-```
-
-Then narrow:
-
-```logql
-{namespace="monitoring"}
-```
-
----
-
-## Loki Alert Rules Not Firing
-
-Check the query manually in Grafana Explore:
-
-```logql
-sum by (namespace, pod, container) (
-  count_over_time({namespace!=""} |= "error" [5m])
-)
-```
-
-If this query returns no data, the alert will not fire.
-
----
-
-## Loki Rule File Not Mounted
-
-Check:
-
-```bash
-kubectl exec -it -n logging loki-0 -- ls -lah /var/loki/rules/fake
-```
-
-Expected:
-
-```text
-log-alerts.yaml
-```
-
----
-
-## Loki Cannot Reach Alertmanager
-
-Test from Loki pod:
-
-```bash
-kubectl exec -it -n logging loki-0 -- sh
-```
-
-Inside:
-
-```bash
-wget -qO- http://monitoring-kube-prometheus-alertmanager.monitoring.svc.cluster.local:9093/api/v2/status
-```
-
-If this fails, check service name:
-
-```bash
-kubectl get svc -n monitoring | grep alertmanager
-```
-
----
-
-## Alert Reaches Alertmanager But Not Telegram
-
-Check Alertmanager config:
-
-```bash
-kubectl exec -it \
--n monitoring \
-alertmanager-monitoring-kube-prometheus-alertmanager-0 \
--- cat /etc/alertmanager/config_out/alertmanager.env.yaml
-```
-
-Check Telegram receiver exists:
-
-```yaml
-receiver: telegram
-```
-
-Check Telegram notifications:
-
-```bash
-kubectl logs -n monitoring alertmanager-monitoring-kube-prometheus-alertmanager-0
-```
-
----
-
-## Too Many Alerts
-
-Tune thresholds:
-
-```text
-> 0    very sensitive
-> 3    moderate
-> 10   less noisy
-```
-
-Increase:
-
-```yaml
-for: 5m
-```
-
-to avoid short spikes.
-
----
-
-## Too Many Labels
-
-Do not add high-cardinality labels such as:
-
-```text
-request_id
-user_id
-trace_id
-timestamp
-full_url
-session_id
-```
-
-Good labels:
-
-```text
-namespace
-pod
-container
-node_name
-app
-```
-
-Loki is efficient when labels are low-cardinality. High-cardinality labels can make Loki slower and more expensive because Loki indexes labels. [2](https://computingforgeeks.com/deploy-loki-kubernetes/)[3](https://dasroot.net/posts/2026/04/observability-stack-prometheus-grafana-loki/)
-
----
-
-# Best Practices
-
-## Do
-
-```text
-Use Longhorn persistence
-Keep Loki internal
-Access logs through Grafana
-Use 30-day retention
-Start with SingleBinary mode
-Use namespace/pod/container labels
-Use LogQL in Grafana Explore
-Monitor Loki through Prometheus
-Use Loki Ruler for important log alerts
-Alert on error bursts instead of every single error
-```
-
----
-
-## Do Not
-
-```text
-Expose Loki publicly
-Store logs forever
-Use high-cardinality labels
-Use Loki as a database
-Send secrets into logs
-Alert on every harmless warning
-Use unlimited retention
-```
-
----
-
-# Recommended Log Alerts
-
-Start with:
-
-```text
-Critical:
-- LokiCriticalLogsDetected
-- LokiLonghornErrorLogs
-
-Warning:
-- LokiFailedLogsDetected
-- LokiTimeoutLogsDetected
-- LokiMonitoringStackErrors
-- LokiLoggingStackErrors
-```
-
-Be careful with:
-
-```text
-LokiErrorLogsDetected
-```
-
-because alerting on every single `error` log can be noisy.
-
-A less noisy production-style alert is:
-
-```yaml
-- alert: LokiErrorBurstDetected
-  expr: |
-    sum by (namespace, pod, container) (
-      count_over_time(
-        {namespace!=""}
-        |~ "(?i)error"
-        [5m]
-      )
-    ) > 5
-  for: 2m
-  labels:
-    severity: warning
-    source: loki
-  annotations:
-    summary: "Error burst detected"
-    description: "More than 5 error logs detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
-```
-
----
-
-# Upgrade
-
-Update repositories:
-
-```bash
-helm repo update
-```
-
-Upgrade Loki:
-
-```bash
-helm upgrade loki \
-grafana/loki \
--n logging \
--f loki-values.yaml
-```
-
-Upgrade Promtail:
-
-```bash
-helm upgrade promtail \
-grafana/promtail \
--n logging \
--f promtail-values.yaml
-```
-
-Update alert rules:
-
-```bash
-kubectl apply -f loki-log-alert-rules.yaml
-helm upgrade loki grafana/loki -n logging -f loki-values.yaml
-```
-
----
-
-# Cleanup
-
-Uninstall Promtail:
-
-```bash
-helm uninstall promtail -n logging
-```
-
-Uninstall Loki:
-
-```bash
-helm uninstall loki -n logging
-```
-
-Delete PVCs if logs should be removed permanently:
-
-```bash
-kubectl delete pvc -n logging --all
-```
-
-Delete namespace:
-
-```bash
-kubectl delete namespace logging
-```
-
----
-
-# Validation Checklist
-
-After deployment, verify:
-
-```text
-logging namespace exists
-Loki pod is Running
-Loki PVC is Bound
-Promtail DaemonSet is Ready on all nodes
-Loki datasource is available in Grafana
-Grafana Explore shows logs
-Logs from monitoring namespace are visible
-Logs from longhorn-system namespace are visible
-LogQL queries return results
-Loki ruler is enabled
-Loki alert rules are mounted
-Loki can reach Alertmanager
-Telegram receives log-based alerts
-```
-
----
-
-# Learning Outcomes
-
-After completing Phase 5, you should understand:
-
-```text
-Centralized logging
-Loki architecture
-Promtail log shipping
-Grafana Explore
-LogQL basics
-Log retention
-Kubernetes log collection
-Loki Ruler
-Log-based alerting
-Alertmanager integration
-Telegram notifications from logs
-Difference between metrics and logs
-Troubleshooting with logs
-```
-
----
-
-# Final Platform Status
-
-After Phase 5, the homelab includes:
-
-```text
-Networking      → MetalLB
-Storage         → Longhorn
-Metrics         → Prometheus
-Dashboards      → Grafana
-Alerts          → Alertmanager
-Notifications   → Telegram
-Logs            → Loki
-Log Collector   → Promtail
-Log Alerts      → Loki Ruler
-```
-
-This gives the homelab a complete observability foundation:
-
-```text
-Metrics + Logs + Alerts + Dashboards
-```
-
-This is the same core observability pattern used in many production Kubernetes platforms.
+              summary: "Critical Grafana log detected"
