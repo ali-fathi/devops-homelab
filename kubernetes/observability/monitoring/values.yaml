@@ -1,4 +1,14 @@
 grafana:
+  # Important:
+  # Grafana uses a Longhorn ReadWriteOnce PVC.
+  # With the default RollingUpdate strategy, Kubernetes may start a new Grafana pod
+  # before the old one releases the PVC, causing Multi-Attach errors.
+  #
+  # Recreate ensures the old Grafana pod is stopped first, the PVC is detached,
+  # and only then the new Grafana pod starts.
+  deploymentStrategy:
+    type: Recreate
+
   persistence:
     enabled: true
     storageClassName: longhorn
