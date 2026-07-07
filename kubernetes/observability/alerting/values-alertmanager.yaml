@@ -10,10 +10,12 @@ alertmanager:
       resolve_timeout: 5m
 
     route:
-      receiver: telegram
+      receiver: "null"
 
       group_by:
         - alertname
+        - namespace
+        - severity
 
       group_wait: 30s
       group_interval: 5m
@@ -24,18 +26,18 @@ alertmanager:
             - alertname="Watchdog"
           receiver: "null"
 
+        - matchers:
+            - severity=~"error|critical"
+          receiver: telegram
+          continue: false
+
     receivers:
       - name: telegram
-
         telegram_configs:
           - api_url: https://api.telegram.org
-
             bot_token_file: /etc/alertmanager/secrets/telegram-alerts/bot-token
-
             chat_id: 84899032
-
             send_resolved: true
-
             parse_mode: HTML
 
       - name: "null"
