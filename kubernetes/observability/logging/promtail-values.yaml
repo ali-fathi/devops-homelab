@@ -1,0 +1,35 @@
+config:
+  clients:
+    - url: http://loki-gateway.logging.svc.cluster.local/loki/api/v1/push
+
+  snippets:
+    pipelineStages:
+      - cri: {}
+
+    extraRelabelConfigs:
+      - source_labels:
+          - __meta_kubernetes_pod_node_name
+        target_label: node_name
+
+      - source_labels:
+          - __meta_kubernetes_namespace
+        target_label: namespace
+
+      - source_labels:
+          - __meta_kubernetes_pod_name
+        target_label: pod
+
+      - source_labels:
+          - __meta_kubernetes_pod_container_name
+        target_label: container
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 300m
+    memory: 256Mi
+
+serviceMonitor:
+  enabled: true
