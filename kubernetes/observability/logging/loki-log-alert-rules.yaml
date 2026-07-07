@@ -1,0 +1,152 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-log-alert-rules
+  namespace: logging
+
+data:
+  log-alerts.yaml: |
+    groups:
+      - name: log-alerts
+        interval: 1m
+
+        rules:
+
+          - alert: LokiErrorLogsDetected
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace!=""}
+                  |= "error"
+                  [5m]
+                )
+              ) > 0
+            for: 1m
+            labels:
+              severity: warning
+              source: loki
+            annotations:
+              summary: "Error log detected"
+              description: "Error log detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
+
+          - alert: LokiExceptionLogsDetected
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace!=""}
+                  |~ "(?i)exception"
+                  [5m]
+                )
+              ) > 0
+            for: 1m
+            labels:
+              severity: warning
+              source: loki
+            annotations:
+              summary: "Exception log detected"
+              description: "Exception log detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
+
+          - alert: LokiFailedLogsDetected
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace!=""}
+                  |~ "(?i)failed|failure"
+                  [5m]
+                )
+              ) > 3
+            for: 2m
+            labels:
+              severity: warning
+              source: loki
+            annotations:
+              summary: "Repeated failure logs detected"
+              description: "More than 3 failure-related log entries detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
+
+          - alert: LokiTimeoutLogsDetected
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace!=""}
+                  |~ "(?i)timeout|timed out"
+                  [5m]
+                )
+              ) > 0
+            for: 1m
+            labels:
+              severity: warning
+              source: loki
+            annotations:
+              summary: "Timeout log detected"
+              description: "Timeout log detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
+
+          - alert: LokiCriticalLogsDetected
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace!=""}
+                  |~ "(?i)critical|fatal|panic"
+                  [5m]
+                )
+              ) > 0
+            for: 1m
+            labels:
+              severity: critical
+              source: loki
+            annotations:
+              summary: "Critical log detected"
+              description: "Critical/fatal/panic log detected in namespace={{ $labels.namespace }}, pod={{ $labels.pod }}, container={{ $labels.container }}."
+
+          - alert: LokiLonghornErrorLogs
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace="longhorn-system"}
+                  |~ "(?i)error|failed|degraded|replica"
+                  [5m]
+                )
+              ) > 0
+            for: 1m
+            labels:
+              severity: critical
+              source: loki
+              component: longhorn
+            annotations:
+              summary: "Longhorn error log detected"
+              description: "Longhorn-related error log detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
+
+          - alert: LokiMonitoringStackErrors
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace="monitoring"}
+                  |~ "(?i)error|failed|panic|exception"
+                  [5m]
+                )
+              ) > 0
+            for: 1m
+            labels:
+              severity: warning
+              source: loki
+              component: monitoring
+            annotations:
+              summary: "Monitoring stack error log detected"
+              description: "Monitoring stack error detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
+
+          - alert: LokiLoggingStackErrors
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace="logging"}
+                  |~ "(?i)error|failed|panic|exception"
+                  [5m]
+                )
+              ) > 0
+            for: 1m
+            labels:
+              severity: warning
+              source: loki
+              component: logging
+            annotations:
+              summary: "Logging stack error log detected"
+              description: "Logging stack error detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
