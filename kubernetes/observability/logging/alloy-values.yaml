@@ -1,8 +1,13 @@
 controller:
-  type: deployment
-  replicas: 1
+  type: daemonset
 
 alloy:
+  extraEnv:
+    - name: NODE_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.nodeName
+
   configMap:
     create: true
     content: |-
@@ -13,6 +18,11 @@ alloy:
 
       discovery.kubernetes "pods" {
         role = "pod"
+
+        selectors {
+          role  = "pod"
+          field = "spec.nodeName=" + env("NODE_NAME")
+        }
       }
 
       discovery.relabel "pod_logs" {
@@ -58,6 +68,10 @@ alloy:
 
       loki.process "pod_logs" {
         stage.cri {}
+
+        stage.drop {
+          expression = "failed to create fsnotify watcher: too many open files"
+        }
 
         forward_to = [loki.write.default.receiver]
       }
