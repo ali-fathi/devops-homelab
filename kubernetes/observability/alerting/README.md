@@ -162,7 +162,7 @@ Configuration
 Set External Secrets refresh interval:
 
 ```yaml
-refreshInterval: 24h
+refreshInterval: 48h
 ```
 
 This minimizes API calls and keeps Azure costs extremely low.
@@ -562,7 +562,7 @@ metadata:
   namespace: monitoring
 
 spec:
-  refreshInterval: 24h
+  refreshInterval:48h
 
   secretStoreRef:
     kind: ClusterSecretStore
