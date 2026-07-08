@@ -214,7 +214,7 @@ Recommended low-cost settings:
 ```text
 Use existing Key Vault
 Use Standard tier
-Use ExternalSecret refreshInterval: 24h
+Use ExternalSecret refreshInterval: 48h
 Avoid frequent force-sync
 Avoid reading Key Vault directly from application pods
 Use one ExternalSecret for Garmin-related secrets
@@ -223,7 +223,7 @@ Use one ExternalSecret for Garmin-related secrets
 The Garmin ExternalSecret uses:
 
 ```yaml
-refreshInterval: 24h
+refreshInterval: 48h
 ```
 
 Garmin and InfluxDB credentials rarely change, so there is no need to refresh them every few minutes.
@@ -364,7 +364,7 @@ Store Garmin email:
 
 ```bash
 az keyvault secret set \
-  --vault-name kv-homelab-fathi \
+  --vault-name kv-homelab-k3s \
   --name garmin-connect-email \
   --value "your-garmin-email@example.com"
 ```
@@ -373,7 +373,7 @@ Store Garmin base64 password:
 
 ```bash
 az keyvault secret set \
-  --vault-name kv-homelab-fathi \
+  --vault-name kv-homelab-k3s \
   --name garmin-connect-password-base64 \
   --value "BASE64_ENCODED_GARMIN_PASSWORD"
 ```
@@ -382,7 +382,7 @@ Store InfluxDB username:
 
 ```bash
 az keyvault secret set \
-  --vault-name kv-homelab-fathi \
+  --vault-name kv-homelab-k3s \
   --name garmin-influxdb-username \
   --value "influxdb_user"
 ```
@@ -391,7 +391,7 @@ Store InfluxDB password:
 
 ```bash
 az keyvault secret set \
-  --vault-name kv-homelab-fathi \
+  --vault-name kv-homelab-k3s \
   --name garmin-influxdb-password \
   --value "STRONG_RANDOM_PASSWORD"
 ```
@@ -400,7 +400,7 @@ Verify:
 
 ```bash
 az keyvault secret list \
-  --vault-name kv-homelab-fathi \
+  --vault-name kv-homelab-k3s \
   --query "[].name" \
   -o table
 ```
@@ -431,7 +431,7 @@ metadata:
   name: garmin-secrets
   namespace: garmin
 spec:
-  refreshInterval: 24h
+  refreshInterval: 48h
 
   secretStoreRef:
     name: azure-keyvault
@@ -1176,7 +1176,7 @@ Update Key Vault:
 
 ```bash
 az keyvault secret set \
-  --vault-name kv-homelab-fathi \
+  --vault-name kv-homelab-k3s \
   --name garmin-connect-password-base64 \
   --value "NEW_BASE64_PASSWORD"
 ```
@@ -1208,7 +1208,7 @@ kubectl logs -n garmin deployment/garmin-fetch-data -f
 [ ] Garmin credentials stored only in Azure Key Vault
 [ ] InfluxDB credentials stored only in Azure Key Vault
 [ ] No real secrets committed to Git
-[ ] ExternalSecret refreshInterval set to 24h
+[ ] ExternalSecret refreshInterval set to 48h
 [ ] ESO identity has least-privilege Key Vault access
 [ ] InfluxDB service is ClusterIP only
 [ ] Garmin namespace is not exposed externally
@@ -1225,7 +1225,7 @@ kubectl logs -n garmin deployment/garmin-fetch-data -f
 [ ] Use existing Azure Key Vault
 [ ] Use Standard Key Vault
 [ ] Avoid Premium/HSM for this use case
-[ ] Use refreshInterval: 24h
+[ ] Use refreshInterval: 48h
 [ ] Avoid frequent force-sync
 [ ] Avoid reading Key Vault directly from application pods
 [ ] Use one ExternalSecret for Garmin secrets
