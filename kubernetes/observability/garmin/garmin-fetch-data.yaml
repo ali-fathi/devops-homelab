@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: garminconnect-tokens
+  namespace: garmin
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: garmin-fetch-data
+  namespace: garmin
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: garmin-fetch-data
+  template:
+    metadata:
+      labels:
+        app: garmin-fetch-data
+    spec:
+      securityContext:
+        fsGroup: 1000
+
+      containers:
+        - name: garmin-fetch-data
+          image: thisisarpanghosh/garmin-fetch-data:latest
+          imagePullPolicy: IfNotPresent
+
+          env:
+            - name: INFLUXDB_HOST
+              value: garmin-influxdb
+
+            - name: INFLUXDB_PORT
+              value: "8086"
+
+            - name: INFLUXDB_DATABASE
+              value: GarminStats
+
+            - name: INFLUXDB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: garmin-secrets
+                  key: INFLUXDB_USERNAME
+
+            - name: INFLUXDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: garmin-secrets
+                  key: INFLUXDB_PASSWORD
+
+            - name: GARMINCONNECT_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: garmin-secrets
+                  key: GARMINCONNECT_EMAIL
+
+            - name: GARMINCONNECT_BASE64_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: garmin-secrets
+                  key: GARMINCONNECT_BASE64_PASSWORD
+
+            - name: GARMINCONNECT_IS_CN
+              value: "False"
+
+            - name: TZ
+              value: "Europe/Berlin"
+
+          volumeMounts:
+            - name: garminconnect-tokens
+              mountPath: /home/appuser/.garminconnect
+
+      volumes:
+        - name: garminconnect-tokens
+          persistentVolumeClaim:
+            claimName: garminconnect-tokens
