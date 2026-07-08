@@ -13,8 +13,8 @@ data:
         rules:
 
           # ------------------------------------------------------------
-          # Critical logs across application namespaces only
-          # Excludes observability/debug/system namespaces to avoid spam.
+          # Critical application logs
+          # Excludes observability/system/debug namespaces to avoid spam.
           # ------------------------------------------------------------
           - alert: LokiCriticalApplicationLogsDetected
             expr: |
@@ -30,6 +30,7 @@ data:
                     pod!~".*netshoot.*|.*curl-test.*|.*debug.*|.*test.*"
                   }
                   |~ "(?i)critical|fatal|panic|segmentation fault|segfault|data corruption|corruption detected"
+                  !~ "(source=loki_ruler|rule_type=alerting|executing query|request timings|caller=metrics.go|caller=engine.go|caller=evaluator_local.go|caller=compat.go|context canceled|tail client)"
                   [5m]
                 )
               ) > 0
@@ -44,7 +45,6 @@ data:
 
           # ------------------------------------------------------------
           # OOM / memory exhaustion logs
-          # Good high-signal alert.
           # ------------------------------------------------------------
           - alert: LokiOOMDetected
             expr: |
@@ -55,6 +55,7 @@ data:
                     pod!~".*netshoot.*|.*curl-test.*|.*debug.*|.*test.*"
                   }
                   |~ "(?i)oomkilled|out of memory|oom killer|memory cgroup out of memory|cannot allocate memory"
+                  !~ "(source=loki_ruler|rule_type=alerting|executing query|request timings|context canceled|tail client)"
                   [5m]
                 )
               ) > 0
@@ -69,7 +70,6 @@ data:
 
           # ------------------------------------------------------------
           # Longhorn critical storage issues only
-          # This avoids alerting on generic Longhorn noise.
           # ------------------------------------------------------------
           - alert: LokiLonghornCriticalStorageLogsDetected
             expr: |
@@ -77,6 +77,7 @@ data:
                 count_over_time(
                   {namespace="longhorn-system"}
                   |~ "(?i)volume .* degraded|volume .* faulted|replica .* failed|replica failure|failed to attach|failed to detach|disk pressure|no available disk|insufficient storage|filesystem is read-only|input/output error"
+                  !~ "(source=loki_ruler|rule_type=alerting|executing query|request timings|context canceled|tail client)"
                   [5m]
                 )
               ) > 0
@@ -92,11 +93,7 @@ data:
 
           # ------------------------------------------------------------
           # Grafana real critical logs only
-          # Does NOT alert on:
-          # - level=info
-          # - status=400
-          # - query strings containing error
-          # - plugin update checker noise
+          # Ignores level=info, status=400, query noise, plugin checker.
           # ------------------------------------------------------------
           - alert: LokiGrafanaCriticalLogsDetected
             expr: |
@@ -142,17 +139,17 @@ data:
               description: "Grafana returned HTTP 5xx in pod={{ $labels.pod }}, container={{ $labels.container }}."
 
           # ------------------------------------------------------------
-          # Loki critical internal errors only
-          # Excludes common cache lookup warnings/noise.
+          # Loki internal critical logs only
+          # Excludes normal Loki ruler evaluation logs and tail cancellation noise.
           # ------------------------------------------------------------
           - alert: LokiInternalCriticalLogsDetected
             expr: |
               sum by (namespace, pod, container) (
                 count_over_time(
                   {namespace="logging", pod=~".*loki.*"}
-                  |~ "(?i)panic|fatal|critical|corruption|failed to start|out of space|permission denied"
-                  !~ "memcache: no servers configured or available"
-                  !~ "failed to lookup SRV records"
+                  |~ "(?i)panic|fatal|critical|failed to start|out of space|permission denied|corruption"
+                  !~ "(source=loki_ruler|rule_type=alerting|evaluating rule|executing query|request timings|caller=metrics.go|caller=engine.go|caller=evaluator_local.go|caller=compat.go|context canceled|tail client|grpc tail client)"
+                  !~ "(memcache: no servers configured or available|failed to lookup SRV records)"
                   [5m]
                 )
               ) > 0
@@ -167,7 +164,7 @@ data:
               description: "Critical Loki internal issue detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
 
           # ------------------------------------------------------------
-          # Alloy critical logs only
+          # Grafana Alloy critical logs only
           # ------------------------------------------------------------
           - alert: LokiAlloyCriticalLogsDetected
             expr: |
@@ -175,6 +172,7 @@ data:
                 count_over_time(
                   {namespace="logging", pod=~".*alloy.*"}
                   |~ "(?i)panic|fatal|critical|failed to start|configuration error|invalid config"
+                  !~ "(source=loki_ruler|rule_type=alerting|executing query|request timings|context canceled|tail client)"
                   [5m]
                 )
               ) > 0
@@ -187,6 +185,31 @@ data:
             annotations:
               summary: "Critical Grafana Alloy log detected"
               description: "Critical Alloy issue detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
+
+          # ------------------------------------------------------------
+          # Logging namespace critical logs
+          # Excludes Loki ruler evaluation logs and known non-critical noise.
+          # ------------------------------------------------------------
+          - alert: LokiLoggingStackCriticalLogsDetected
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace="logging"}
+                  |~ "(?i)panic|fatal|critical|failed to start|corruption|out of space|permission denied"
+                  !~ "(source=loki_ruler|rule_type=alerting|evaluating rule|executing query|request timings|caller=metrics.go|caller=engine.go|caller=evaluator_local.go|caller=compat.go|context canceled|tail client|grpc tail client)"
+                  !~ "(memcache: no servers configured or available|failed to lookup SRV records)"
+                  [5m]
+                )
+              ) > 0
+            for: 2m
+            labels:
+              severity: critical
+              source: loki
+              component: logging
+              category: observability
+            annotations:
+              summary: "Critical logging stack log detected"
+              description: "Critical logging stack log detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
 
           # ------------------------------------------------------------
           # CoreDNS critical only
@@ -236,7 +259,7 @@ data:
 
           # ------------------------------------------------------------
           # External Secrets critical only
-          # Do not alert on every webhook warning/error.
+          # Excludes Loki's own ruler query text.
           # ------------------------------------------------------------
           - alert: LokiExternalSecretsCriticalLogsDetected
             expr: |
@@ -244,6 +267,7 @@ data:
                 count_over_time(
                   {namespace="external-secrets-system"}
                   |~ "(?i)panic|fatal|failed to start|invalid provider config|authentication failed|authorization failed|forbidden|unauthorized"
+                  !~ "(source=loki_ruler|rule_type=alerting|evaluating rule|executing query|request timings|caller=metrics.go|caller=engine.go|caller=evaluator_local.go|caller=compat.go|context canceled|tail client)"
                   [10m]
                 )
               ) > 3

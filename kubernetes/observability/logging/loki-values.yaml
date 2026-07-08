@@ -3,14 +3,15 @@ deploymentMode: SingleBinary
 loki:
   auth_enabled: false
 
+  server:
+    log_level: warn
+
   commonConfig:
     replication_factor: 1
 
   storage:
     type: filesystem
 
-    # Required by recent Grafana Loki Helm chart versions,
-    # even when running SingleBinary mode with filesystem storage.
     bucketNames:
       chunks: loki-chunks
       ruler: loki-ruler
@@ -27,10 +28,7 @@ loki:
           period: 24h
 
   limits_config:
-    # 30 days retention
     retention_period: 720h
-
-    # Reject old logs older than 7 days at ingestion time
     reject_old_samples: true
     reject_old_samples_max_age: 168h
 
@@ -38,8 +36,6 @@ loki:
     retention_enabled: true
     delete_request_store: filesystem
 
-  # Loki Ruler configuration for log-based alerting.
-  # This sends Loki/LogQL alerts to the existing Alertmanager instance.
   rulerConfig:
     enable_api: true
     enable_alertmanager_v2: true
@@ -67,8 +63,6 @@ singleBinary:
     storageClass: longhorn
     size: 20Gi
 
-  # Mount Loki alert rules from ConfigMap.
-  # The folder "fake" is used because auth_enabled=false.
   extraVolumes:
     - name: loki-alert-rules
       configMap:
@@ -99,8 +93,6 @@ write:
 backend:
   replicas: 0
 
-# Disable cache components for the homelab setup.
-# This avoids unnecessary memcached service lookups and keeps the stack simpler.
 chunksCache:
   enabled: false
 
