@@ -1,5 +1,5 @@
 global:
-  domain: argocd.homelab.local
+  domain: argocd.greyneo.com
 
 configs:
   params:

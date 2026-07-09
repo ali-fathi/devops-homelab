@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: homelab-platform
+  namespace: argocd
+spec:
+  description: Homelab platform and observability workloads
+
+  sourceRepos:
+    - https://github.com/ali-fathi/devops-homelab.git
+
+  destinations:
+    - namespace: garmin
+      server: https://kubernetes.default.svc
+
+    - namespace: monitoring
+      server: https://kubernetes.default.svc
+
+    - namespace: logging
+      server: https://kubernetes.default.svc
+
+    - namespace: external-secrets-system
+      server: https://kubernetes.default.svc
+
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

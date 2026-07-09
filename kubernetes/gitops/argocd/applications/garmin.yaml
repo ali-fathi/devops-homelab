@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: garmin
+  namespace: argocd
+spec:
+  project: homelab-platform
+
+  source:
+    repoURL: https://github.com/ali-fathi/devops-homelab.git
+    targetRevision: main
+    path: kubernetes/observability/garmin
+
+    directory:
+      recurse: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: garmin
+
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: true
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
