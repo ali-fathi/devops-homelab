@@ -45,6 +45,12 @@
       "id": "logs",
       "name": "Logs",
       "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "text",
+      "name": "Text",
+      "version": ""
     }
   ],
   "annotations": {
@@ -71,6 +77,22 @@
   "liveNow": false,
   "panels": [
     {
+      "id": 100,
+      "type": "text",
+      "title": "Dashboard behavior",
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### Optimized Loki Critical & Error Logs\n\nThis dashboard uses LogQL raw string filters to avoid invalid escape errors and suppresses Grafana/Loki self-query noise, dashboard import logs, live-tail cancellations, Alloy throttling, and successful API request logs. **No data is healthy** for most panels."
+      },
+      "transparent": false
+    },
+    {
       "id": 1,
       "type": "stat",
       "title": "Critical Logs - Last 5m",
@@ -78,11 +100,12 @@
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
+      "description": "Zero / No data is healthy. Query uses raw LogQL strings and excludes dashboard self-query noise.",
       "gridPos": {
         "h": 5,
         "w": 6,
         "x": 0,
-        "y": 0
+        "y": 3
       },
       "targets": [
         {
@@ -94,7 +117,7 @@
           "editorMode": "code",
           "queryType": "range",
           "direction": "backward",
-          "expr": "sum(\n  count_over_time(\n    {namespace=~\"${namespace:regex}\", pod=~\"${pod:regex}\", container=~\"${container:regex}\"}\n    |~ \"(?i)critical|fatal|panic|segmentation fault|segfault|data corruption|corruption detected\"\n    [5m]\n  )\n)"
+          "expr": "sum(\n  count_over_time(\n    {namespace=~\"${namespace:regex}\", pod=~\"${pod:regex}\", container=~\"${container:regex}\"}\n    |~ `(?i)critical|fatal|panic|segmentation fault|segfault|data corruption|corruption detected`\n    !~ `(?i)(logger=tsdb[.]loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard[.]grafana[.]app|/apis/dashboard[.]grafana[.]app|/api/dashboards|homelab-loki-critical-error|homelab-loki-critical-error-clean|homelab-loki-critical-error-optimized|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|context canceled|reached tail max duration limit|Error from iterator|Error receiving response from grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg|scheduler_processor[.]go|error notifying scheduler|error processing requests from scheduler|err=EOF|failed to create fsnotify watcher: too many open files)`\n    [5m]\n  )\n)"
         }
       ],
       "fieldConfig": {
@@ -111,8 +134,12 @@
                 "value": null
               },
               {
-                "color": "red",
+                "color": "orange",
                 "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
               }
             ]
           },
@@ -144,11 +171,12 @@
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
+      "description": "Zero / No data is healthy. Query uses raw LogQL strings and excludes dashboard self-query noise.",
       "gridPos": {
         "h": 5,
         "w": 6,
         "x": 6,
-        "y": 0
+        "y": 3
       },
       "targets": [
         {
@@ -160,7 +188,7 @@
           "editorMode": "code",
           "queryType": "range",
           "direction": "backward",
-          "expr": "sum(\n  count_over_time(\n    {namespace=~\"${namespace:regex}\", pod=~\"${pod:regex}\", container=~\"${container:regex}\"}\n    |~ \"(?i)level=error|level=\\\"error\\\"|severity=error|severity=\\\"error\\\"|level=err|level=\\\"err\\\"\"\n    [5m]\n  )\n)"
+          "expr": "sum(\n  count_over_time(\n    {namespace=~\"${namespace:regex}\", pod=~\"${pod:regex}\", container=~\"${container:regex}\"}\n    |~ `(?i)(level=error|level=\\\"error\\\"|severity=error|severity=\\\"error\\\"|level=err|level=\\\"err\\\")`\n    !~ `(?i)(logger=tsdb[.]loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard[.]grafana[.]app|/apis/dashboard[.]grafana[.]app|/api/dashboards|homelab-loki-critical-error|homelab-loki-critical-error-clean|homelab-loki-critical-error-optimized|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|context canceled|reached tail max duration limit|Error from iterator|Error receiving response from grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg|scheduler_processor[.]go|error notifying scheduler|error processing requests from scheduler|err=EOF|failed to create fsnotify watcher: too many open files)`\n    [5m]\n  )\n)"
         }
       ],
       "fieldConfig": {
@@ -214,11 +242,12 @@
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
+      "description": "Zero / No data is healthy. Query uses raw LogQL strings and excludes dashboard self-query noise.",
       "gridPos": {
         "h": 5,
         "w": 6,
         "x": 12,
-        "y": 0
+        "y": 3
       },
       "targets": [
         {
@@ -230,7 +259,7 @@
           "editorMode": "code",
           "queryType": "range",
           "direction": "backward",
-          "expr": "sum(\n  count_over_time(\n    {namespace=~\"${namespace:regex}\", pod=~\"${pod:regex}\", container=~\"${container:regex}\"}\n    |~ \"(?i)oomkilled|out of memory|oom killer|memory cgroup out of memory|cannot allocate memory\"\n    [5m]\n  )\n)"
+          "expr": "sum(\n  count_over_time(\n    {namespace=~\"${namespace:regex}\", pod=~\"${pod:regex}\", container=~\"${container:regex}\"}\n    |~ `(?i)oomkilled|out of memory|oom killer|memory cgroup out of memory|cannot allocate memory`\n    !~ `(?i)(logger=tsdb[.]loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard[.]grafana[.]app|/apis/dashboard[.]grafana[.]app|/api/dashboards|homelab-loki-critical-error|homelab-loki-critical-error-clean|homelab-loki-critical-error-optimized|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|context canceled|reached tail max duration limit|Error from iterator|Error receiving response from grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg|scheduler_processor[.]go|error notifying scheduler|error processing requests from scheduler|err=EOF|failed to create fsnotify watcher: too many open files)`\n    [5m]\n  )\n)"
         }
       ],
       "fieldConfig": {
@@ -280,11 +309,12 @@
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
+      "description": "Zero / No data is healthy. Query uses raw LogQL strings and excludes dashboard self-query noise.",
       "gridPos": {
         "h": 5,
         "w": 6,
         "x": 18,
-        "y": 0
+        "y": 3
       },
       "targets": [
         {
@@ -296,7 +326,7 @@
           "editorMode": "code",
           "queryType": "range",
           "direction": "backward",
-          "expr": "sum(\n  count_over_time(\n    {namespace=\"longhorn-system\"}\n    |~ \"(?i)volume .* degraded|volume .* faulted|replica .* failed|replica failure|failed to attach|failed to detach|disk pressure|no available disk|insufficient storage|filesystem is read-only|input/output error\"\n    [5m]\n  )\n)"
+          "expr": "sum(\n  count_over_time(\n    {namespace=\"longhorn-system\"}\n    |~ `(?i)volume .* degraded|volume .* faulted|replica .* failed|replica failure|failed to attach|failed to detach|disk pressure|no available disk|insufficient storage|filesystem is read-only|input/output error`\n    !~ `(?i)(logger=tsdb[.]loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard[.]grafana[.]app|/apis/dashboard[.]grafana[.]app|/api/dashboards|homelab-loki-critical-error|homelab-loki-critical-error-clean|homelab-loki-critical-error-optimized|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|context canceled|reached tail max duration limit|Error from iterator|Error receiving response from grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg|scheduler_processor[.]go|error notifying scheduler|error processing requests from scheduler|err=EOF|failed to create fsnotify watcher: too many open files)`\n    [5m]\n  )\n)"
         }
       ],
       "fieldConfig": {
@@ -346,11 +376,12 @@
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
+      "description": "Filtered to remove Grafana/Loki dashboard and API self-noise.",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 5
+        "y": 8
       },
       "targets": [
         {
@@ -362,7 +393,7 @@
           "editorMode": "code",
           "queryType": "range",
           "direction": "backward",
-          "expr": "sum by(namespace) (\n  count_over_time(\n    {namespace=~\"${namespace:regex}\"}\n    |~ \"(?i)critical|fatal|panic|segmentation fault|segfault|data corruption|corruption detected\"\n    [5m]\n  )\n)",
+          "expr": "sum by(namespace) (\n  count_over_time(\n    {namespace=~\"${namespace:regex}\"}\n    |~ `(?i)critical|fatal|panic|segmentation fault|segfault|data corruption|corruption detected`\n    !~ `(?i)(logger=tsdb[.]loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard[.]grafana[.]app|/apis/dashboard[.]grafana[.]app|/api/dashboards|homelab-loki-critical-error|homelab-loki-critical-error-clean|homelab-loki-critical-error-optimized|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|context canceled|reached tail max duration limit|Error from iterator|Error receiving response from grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg|scheduler_processor[.]go|error notifying scheduler|error processing requests from scheduler|err=EOF|failed to create fsnotify watcher: too many open files)`\n    [5m]\n  )\n)",
           "legendFormat": "{{namespace}}"
         }
       ],
@@ -435,11 +466,12 @@
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
+      "description": "Filtered to remove Grafana/Loki dashboard and API self-noise.",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 5
+        "y": 8
       },
       "targets": [
         {
@@ -451,7 +483,7 @@
           "editorMode": "code",
           "queryType": "range",
           "direction": "backward",
-          "expr": "sum by(namespace) (\n  count_over_time(\n    {namespace=~\"${namespace:regex}\"}\n    |~ \"(?i)level=error|level=\\\"error\\\"|severity=error|severity=\\\"error\\\"|level=err|level=\\\"err\\\"\"\n    [5m]\n  )\n)",
+          "expr": "sum by(namespace) (\n  count_over_time(\n    {namespace=~\"${namespace:regex}\"}\n    |~ `(?i)(level=error|level=\\\"error\\\"|severity=error|severity=\\\"error\\\"|level=err|level=\\\"err\\\")`\n    !~ `(?i)(logger=tsdb[.]loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard[.]grafana[.]app|/apis/dashboard[.]grafana[.]app|/api/dashboards|homelab-loki-critical-error|homelab-loki-critical-error-clean|homelab-loki-critical-error-optimized|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|context canceled|reached tail max duration limit|Error from iterator|Error receiving response from grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg|scheduler_processor[.]go|error notifying scheduler|error processing requests from scheduler|err=EOF|failed to create fsnotify watcher: too many open files)`\n    [5m]\n  )\n)",
           "legendFormat": "{{namespace}}"
         }
       ],
@@ -491,12 +523,8 @@
                 "value": null
               },
               {
-                "color": "orange",
-                "value": 1
-              },
-              {
                 "color": "red",
-                "value": 10
+                "value": 1
               }
             ]
           },
@@ -528,11 +556,12 @@
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
+      "description": "Top actual sources after dashboard/Grafana/Loki API noise filtering.",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 13
+        "y": 16
       },
       "targets": [
         {
@@ -543,9 +572,9 @@
           },
           "editorMode": "code",
           "queryType": "instant",
-          "instant": true,
           "direction": "backward",
-          "expr": "topk(10,\n  sum by(namespace, pod, container) (\n    count_over_time(\n      {namespace=~\"${namespace:regex}\", pod=~\"${pod:regex}\", container=~\"${container:regex}\"}\n      |~ \"(?i)critical|fatal|panic|segmentation fault|segfault|data corruption|corruption detected\"\n      [15m]\n    )\n  )\n)"
+          "expr": "topk(10,\n  sum by(namespace, pod, container) (\n    count_over_time(\n      {namespace=~\"${namespace:regex}\", pod=~\"${pod:regex}\", container=~\"${container:regex}\"}\n      |~ `(?i)critical|fatal|panic|segmentation fault|segfault|data corruption|corruption detected`\n      !~ `(?i)(logger=tsdb[.]loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard[.]grafana[.]app|/apis/dashboard[.]grafana[.]app|/api/dashboards|homelab-loki-critical-error|homelab-loki-critical-error-clean|homelab-loki-critical-error-optimized|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|context canceled|reached tail max duration limit|Error from iterator|Error receiving response from grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg|scheduler_processor[.]go|error notifying scheduler|error processing requests from scheduler|err=EOF|failed to create fsnotify watcher: too many open files)`\n      [15m]\n    )\n  )\n)",
+          "instant": true
         }
       ],
       "fieldConfig": {
@@ -598,11 +627,12 @@
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
+      "description": "Top actual sources after dashboard/Grafana/Loki API noise filtering.",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 13
+        "y": 16
       },
       "targets": [
         {
@@ -613,9 +643,9 @@
           },
           "editorMode": "code",
           "queryType": "instant",
-          "instant": true,
           "direction": "backward",
-          "expr": "topk(10,\n  sum by(namespace, pod, container) (\n    count_over_time(\n      {namespace=~\"${namespace:regex}\", pod=~\"${pod:regex}\", container=~\"${container:regex}\"}\n      |~ \"(?i)level=error|level=\\\"error\\\"|severity=error|severity=\\\"error\\\"|level=err|level=\\\"err\\\"\"\n      [15m]\n    )\n  )\n)"
+          "expr": "topk(10,\n  sum by(namespace, pod, container) (\n    count_over_time(\n      {namespace=~\"${namespace:regex}\", pod=~\"${pod:regex}\", container=~\"${container:regex}\"}\n      |~ `(?i)(level=error|level=\\\"error\\\"|severity=error|severity=\\\"error\\\"|level=err|level=\\\"err\\\")`\n      !~ `(?i)(logger=tsdb[.]loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard[.]grafana[.]app|/apis/dashboard[.]grafana[.]app|/api/dashboards|homelab-loki-critical-error|homelab-loki-critical-error-clean|homelab-loki-critical-error-optimized|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|context canceled|reached tail max duration limit|Error from iterator|Error receiving response from grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg|scheduler_processor[.]go|error notifying scheduler|error processing requests from scheduler|err=EOF|failed to create fsnotify watcher: too many open files)`\n      [15m]\n    )\n  )\n)",
+          "instant": true
         }
       ],
       "fieldConfig": {
@@ -639,12 +669,8 @@
                 "value": null
               },
               {
-                "color": "orange",
-                "value": 1
-              },
-              {
                 "color": "red",
-                "value": 10
+                "value": 1
               }
             ]
           },
@@ -672,11 +698,12 @@
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
+      "description": "Filtered to remove Grafana/Loki dashboard and API self-noise.",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 21
+        "y": 24
       },
       "targets": [
         {
@@ -688,7 +715,7 @@
           "editorMode": "code",
           "queryType": "range",
           "direction": "backward",
-          "expr": "sum by(pod, container) (\n  count_over_time(\n    {namespace=\"longhorn-system\"}\n    |~ \"(?i)volume .* degraded|volume .* faulted|replica .* failed|replica failure|failed to attach|failed to detach|disk pressure|no available disk|insufficient storage|filesystem is read-only|input/output error\"\n    [5m]\n  )\n)",
+          "expr": "sum by(pod, container) (\n  count_over_time(\n    {namespace=\"longhorn-system\"}\n    |~ `(?i)volume .* degraded|volume .* faulted|replica .* failed|replica failure|failed to attach|failed to detach|disk pressure|no available disk|insufficient storage|filesystem is read-only|input/output error`\n    !~ `(?i)(logger=tsdb[.]loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard[.]grafana[.]app|/apis/dashboard[.]grafana[.]app|/api/dashboards|homelab-loki-critical-error|homelab-loki-critical-error-clean|homelab-loki-critical-error-optimized|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|context canceled|reached tail max duration limit|Error from iterator|Error receiving response from grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg|scheduler_processor[.]go|error notifying scheduler|error processing requests from scheduler|err=EOF|failed to create fsnotify watcher: too many open files)`\n    [5m]\n  )\n)",
           "legendFormat": "{{pod}} / {{container}}"
         }
       ],
@@ -756,16 +783,17 @@
     {
       "id": 10,
       "type": "timeseries",
-      "title": "Grafana Critical Logs and HTTP 5xx",
+      "title": "Grafana Real Errors and HTTP 5xx",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
+      "description": "Filtered to remove Grafana/Loki dashboard and API self-noise.",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 21
+        "y": 24
       },
       "targets": [
         {
@@ -777,7 +805,7 @@
           "editorMode": "code",
           "queryType": "range",
           "direction": "backward",
-          "expr": "sum by(pod, container) (\n  count_over_time(\n    {namespace=\"monitoring\", pod=~\".*grafana.*\"}\n    | logfmt\n    | level=~\"error|fatal|panic\"\n    [5m]\n  )\n)",
+          "expr": "sum by(pod, container) (\n  count_over_time(\n    {namespace=\"monitoring\", pod=~\".*grafana.*\"}\n    !~ `(?i)(logger=tsdb[.]loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard[.]grafana[.]app|/apis/dashboard[.]grafana[.]app|/api/dashboards|homelab-loki-critical-error|homelab-loki-critical-error-clean|homelab-loki-critical-error-optimized|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|context canceled|reached tail max duration limit|Error from iterator|Error receiving response from grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg|scheduler_processor[.]go|error notifying scheduler|error processing requests from scheduler|err=EOF|failed to create fsnotify watcher: too many open files)`\n    | logfmt\n    | level=~\"error|fatal|panic\"\n    [5m]\n  )\n)",
           "legendFormat": "level error/fatal/panic: {{pod}} / {{container}}"
         },
         {
@@ -789,7 +817,7 @@
           "editorMode": "code",
           "queryType": "range",
           "direction": "backward",
-          "expr": "sum by(pod, container) (\n  count_over_time(\n    {namespace=\"monitoring\", pod=~\".*grafana.*\"}\n    |~ \"status=5[0-9][0-9]\"\n    [5m]\n  )\n)",
+          "expr": "sum by(pod, container) (\n  count_over_time(\n    {namespace=\"monitoring\", pod=~\".*grafana.*\"}\n    |~ `status=5[0-9][0-9]`\n    !~ `(?i)(logger=tsdb[.]loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard[.]grafana[.]app|/apis/dashboard[.]grafana[.]app|/api/dashboards|homelab-loki-critical-error|homelab-loki-critical-error-clean|homelab-loki-critical-error-optimized|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|context canceled|reached tail max duration limit|Error from iterator|Error receiving response from grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg|scheduler_processor[.]go|error notifying scheduler|error processing requests from scheduler|err=EOF|failed to create fsnotify watcher: too many open files)`\n    [5m]\n  )\n)",
           "legendFormat": "HTTP 5xx: {{pod}} / {{container}}"
         }
       ],
@@ -862,11 +890,12 @@
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
+      "description": "Filtered to remove Grafana/Loki dashboard and API self-noise.",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 29
+        "y": 32
       },
       "targets": [
         {
@@ -878,7 +907,7 @@
           "editorMode": "code",
           "queryType": "range",
           "direction": "backward",
-          "expr": "sum by(pod, container) (\n  count_over_time(\n    {namespace=\"logging\", pod=~\".*loki.*|.*alloy.*\"}\n    |~ \"(?i)panic|fatal|critical|failed to start|configuration error|invalid config|corruption|out of space|permission denied\"\n    [5m]\n  )\n)",
+          "expr": "sum by(pod, container) (\n  count_over_time(\n    {namespace=\"logging\", pod=~\".*loki.*|.*alloy.*\"}\n    |~ `(?i)panic|fatal|critical|failed to start|configuration error|invalid config|corruption|out of space|permission denied`\n    !~ `(?i)(logger=tsdb[.]loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard[.]grafana[.]app|/apis/dashboard[.]grafana[.]app|/api/dashboards|homelab-loki-critical-error|homelab-loki-critical-error-clean|homelab-loki-critical-error-optimized|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|context canceled|reached tail max duration limit|Error from iterator|Error receiving response from grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg|scheduler_processor[.]go|error notifying scheduler|error processing requests from scheduler|err=EOF|failed to create fsnotify watcher: too many open files)`\n    [5m]\n  )\n)",
           "legendFormat": "{{pod}} / {{container}}"
         }
       ],
@@ -951,11 +980,12 @@
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
+      "description": "Filtered to remove Grafana/Loki dashboard and API self-noise.",
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 29
+        "y": 32
       },
       "targets": [
         {
@@ -967,7 +997,7 @@
           "editorMode": "code",
           "queryType": "range",
           "direction": "backward",
-          "expr": "sum by(namespace, pod, container) (\n  count_over_time(\n    {namespace=~\"${namespace:regex}\", pod=~\"${pod:regex}\", container=~\"${container:regex}\"}\n    |~ \"(?i)oomkilled|out of memory|oom killer|memory cgroup out of memory|cannot allocate memory\"\n    [5m]\n  )\n)",
+          "expr": "sum by(namespace, pod, container) (\n  count_over_time(\n    {namespace=~\"${namespace:regex}\", pod=~\"${pod:regex}\", container=~\"${container:regex}\"}\n    |~ `(?i)oomkilled|out of memory|oom killer|memory cgroup out of memory|cannot allocate memory`\n    !~ `(?i)(logger=tsdb[.]loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard[.]grafana[.]app|/apis/dashboard[.]grafana[.]app|/api/dashboards|homelab-loki-critical-error|homelab-loki-critical-error-clean|homelab-loki-critical-error-optimized|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|context canceled|reached tail max duration limit|Error from iterator|Error receiving response from grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg|scheduler_processor[.]go|error notifying scheduler|error processing requests from scheduler|err=EOF|failed to create fsnotify watcher: too many open files)`\n    [5m]\n  )\n)",
           "legendFormat": "{{namespace}} / {{pod}} / {{container}}"
         }
       ],
@@ -1035,16 +1065,17 @@
     {
       "id": 13,
       "type": "logs",
-      "title": "Recent Critical and Real Error Logs",
+      "title": "Recent High-Signal Critical and Real Error Logs",
       "datasource": {
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
+      "description": "Shows high-signal matching log lines after noise filtering.",
       "gridPos": {
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 37
+        "y": 40
       },
       "targets": [
         {
@@ -1056,7 +1087,7 @@
           "editorMode": "code",
           "queryType": "range",
           "direction": "backward",
-          "expr": "{namespace=~\"${namespace:regex}\", pod=~\"${pod:regex}\", container=~\"${container:regex}\"}\n|~ \"(?i)critical|fatal|panic|segmentation fault|segfault|data corruption|corruption detected|level=error|level=\\\"error\\\"|severity=error|severity=\\\"error\\\"|oomkilled|out of memory\""
+          "expr": "{namespace=~\"${namespace:regex}\", pod=~\"${pod:regex}\", container=~\"${container:regex}\"}\n|~ `(?i)critical|fatal|panic|segmentation fault|segfault|data corruption|corruption detected|level=error|level=\"error\"|severity=error|severity=\"error\"|oomkilled|out of memory`\n!~ `(?i)(logger=tsdb[.]loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard[.]grafana[.]app|/apis/dashboard[.]grafana[.]app|/api/dashboards|homelab-loki-critical-error|homelab-loki-critical-error-clean|homelab-loki-critical-error-optimized|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|context canceled|reached tail max duration limit|Error from iterator|Error receiving response from grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg|scheduler_processor[.]go|error notifying scheduler|error processing requests from scheduler|err=EOF|failed to create fsnotify watcher: too many open files)`"
         }
       ],
       "options": {
@@ -1078,11 +1109,12 @@
         "type": "loki",
         "uid": "${DS_LOKI}"
       },
+      "description": "Shows high-signal matching log lines after noise filtering.",
       "gridPos": {
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 47
+        "y": 50
       },
       "targets": [
         {
@@ -1094,7 +1126,7 @@
           "editorMode": "code",
           "queryType": "range",
           "direction": "backward",
-          "expr": "{namespace=\"logging\", pod=~\".*loki.*\"}\n|~ \"(?i)ruler|alertmanager|evaluating rule|sending|notify|failed to send|error sending\""
+          "expr": "{namespace=\"logging\", pod=~\"loki-.*\", container=\"loki\"}\n|~ `(?i)ruler|alertmanager|evaluating rule|sending|notify|failed to send|error sending`\n!~ `(?i)(logger=tsdb[.]loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard[.]grafana[.]app|/apis/dashboard[.]grafana[.]app|/api/dashboards|homelab-loki-critical-error|homelab-loki-critical-error-clean|homelab-loki-critical-error-optimized|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|context canceled|reached tail max duration limit|Error from iterator|Error receiving response from grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg|scheduler_processor[.]go|error notifying scheduler|error processing requests from scheduler|err=EOF|failed to create fsnotify watcher: too many open files)`"
         }
       ],
       "options": {
@@ -1118,7 +1150,10 @@
     "critical",
     "errors",
     "homelab",
-    "alloy"
+    "alloy",
+    "optimized",
+    "clean",
+    "v2"
   ],
   "templating": {
     "list": [
@@ -1205,7 +1240,6 @@
   },
   "timepicker": {
     "refresh_intervals": [
-      "10s",
       "30s",
       "1m",
       "5m",
@@ -1215,8 +1249,8 @@
     ]
   },
   "timezone": "browser",
-  "title": "Homelab - Loki Critical and Error Logs",
-  "uid": "homelab-loki-critical-error-fixed",
+  "title": "Homelab - Loki Critical and Error Logs v2",
+  "uid": "homelab-loki-critical-error-v2",
   "version": 1,
   "weekStart": ""
 }
