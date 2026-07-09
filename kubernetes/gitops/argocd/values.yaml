@@ -5,6 +5,15 @@ configs:
   params:
     server.insecure: true
 
+  cm:
+    accounts.ali: apiKey, login
+    admin.enabled: "true"
+
+  rbac:
+    policy.default: role:readonly
+    policy.csv: |
+      g, ali, role:admin
+
 server:
   service:
     type: LoadBalancer
