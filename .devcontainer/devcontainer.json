@@ -5,10 +5,11 @@
     "dockerfile": "Dockerfile"
   },
 
-"mounts": [
-  "source=${env:HOME}/.kube/k3s-config,target=/home/vscode/.kube/config,type=bind",
-  "source=${env:HOME}/.ssh,target=/home/vscode/.ssh,type=bind"
-],
+  "mounts": [
+    "source=${env:HOME}/.kube/k3s-config,target=/home/vscode/.kube/config,type=bind",
+    "source=${env:HOME}/.ssh,target=/home/vscode/.ssh,type=bind"
+  ],
+
   "remoteEnv": {
     "KUBECONFIG": "/home/vscode/.kube/config"
   },
@@ -19,6 +20,7 @@
         "ms-kubernetes-tools.vscode-kubernetes-tools",
         "hashicorp.terraform",
         "redhat.ansible",
+        "redhat.vscode-yaml",
         "eamodio.gitlens",
         "ms-azuretools.vscode-docker"
       ]
