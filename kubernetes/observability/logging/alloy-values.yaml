@@ -2,6 +2,8 @@ controller:
   type: daemonset
 
 alloy:
+  enableReporting: false
+
   extraEnv:
     - name: NODE_NAME
       valueFrom:
@@ -12,7 +14,7 @@ alloy:
     create: true
     content: |-
       logging {
-        level  = "info"
+        level  = "error"
         format = "logfmt"
       }
 
@@ -21,7 +23,7 @@ alloy:
 
         selectors {
           role  = "pod"
-          field = "spec.nodeName=" + env("NODE_NAME")
+          field = "spec.nodeName=" + sys.env("NODE_NAME")
         }
       }
 
@@ -70,7 +72,19 @@ alloy:
         stage.cri {}
 
         stage.drop {
+          older_than = "1h"
+        }
+
+        stage.drop {
           expression = "failed to create fsnotify watcher: too many open files"
+        }
+
+        stage.drop {
+          expression = "client-side throttling, not priority and fairness"
+        }
+
+        stage.drop {
+          expression = "failed to register collector with remote server"
         }
 
         forward_to = [loki.write.default.receiver]
@@ -78,7 +92,7 @@ alloy:
 
       loki.write "default" {
         endpoint {
-          url = "http://loki-gateway.logging.svc.cluster.local/loki/api/v1/push"
+          url = "http://loki.logging.svc.cluster.local:3100/loki/api/v1/push"
         }
       }
 
