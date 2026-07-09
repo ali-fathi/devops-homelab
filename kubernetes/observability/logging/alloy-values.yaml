@@ -31,6 +31,18 @@ alloy:
         targets = discovery.kubernetes.pods.targets
 
         rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          regex         = "alloy-.*"
+          action        = "drop"
+        }
+
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          regex         = "loki-canary-.*"
+          action        = "drop"
+        }
+
+        rule {
           source_labels = ["__meta_kubernetes_namespace"]
           target_label  = "namespace"
         }
@@ -85,6 +97,14 @@ alloy:
 
         stage.drop {
           expression = "failed to register collector with remote server"
+        }
+
+        stage.drop {
+          expression = "reached tail max duration limit"
+        }
+
+        stage.drop {
+          expression = "Error receiving response from grpc tail client"
         }
 
         forward_to = [loki.write.default.receiver]
