@@ -14,7 +14,7 @@ data:
 
           # ------------------------------------------------------------
           # Critical application logs
-          # Excludes observability/system/debug namespaces to avoid spam.
+          # Excludes observability/system/debug namespaces and known self-query noise.
           # ------------------------------------------------------------
           - alert: LokiCriticalApplicationLogsDetected
             expr: |
@@ -30,7 +30,7 @@ data:
                     pod!~".*netshoot.*|.*curl-test.*|.*debug.*|.*test.*"
                   }
                   |~ "(?i)critical|fatal|panic|segmentation fault|segfault|data corruption|corruption detected"
-                  !~ "(source=loki_ruler|rule_type=alerting|executing query|request timings|caller=metrics.go|caller=engine.go|caller=evaluator_local.go|caller=compat.go|context canceled|tail client)"
+                  !~ "(?i)(logger=tsdb.loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard.grafana.app|/apis/dashboard.grafana.app|/api/dashboards|homelab-loki-critical-error|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|source=loki_ruler|rule_type=alerting|executing query|request timings|context canceled|tail client|grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg)"
                   [5m]
                 )
               ) > 0
@@ -45,6 +45,7 @@ data:
 
           # ------------------------------------------------------------
           # OOM / memory exhaustion logs
+          # Excludes Loki Gateway/Grafana query strings that only contain the OOM keywords.
           # ------------------------------------------------------------
           - alert: LokiOOMDetected
             expr: |
@@ -52,10 +53,11 @@ data:
                 count_over_time(
                   {
                     namespace!="",
-                    pod!~".*netshoot.*|.*curl-test.*|.*debug.*|.*test.*"
+                    pod!~".*netshoot.*|.*curl-test.*|.*debug.*|.*test.*|loki-gateway.*",
+                    container!="nginx"
                   }
                   |~ "(?i)oomkilled|out of memory|oom killer|memory cgroup out of memory|cannot allocate memory"
-                  !~ "(source=loki_ruler|rule_type=alerting|executing query|request timings|context canceled|tail client)"
+                  !~ "(?i)(logger=tsdb.loki|endpoint=queryData|lokiPath=/loki/api/v1/query|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|supportingQueryType|Response received from loki|Grafana/[0-9]|dashboard.grafana.app|/apis/dashboard.grafana.app|/api/dashboards|homelab-loki-critical-error|logger=context|logger=live|Initialized channel handler|Request Completed|statusCode=200|status=200|status=201|status=204|status=304|status=400|status=404|source=loki_ruler|rule_type=alerting|executing query|request timings|context canceled|tail client|grpc tail client|client-side throttling|failed to register collector with remote server|noop client|remotecfg)"
                   [5m]
                 )
               ) > 0
@@ -77,7 +79,7 @@ data:
                 count_over_time(
                   {namespace="longhorn-system"}
                   |~ "(?i)volume .* degraded|volume .* faulted|replica .* failed|replica failure|failed to attach|failed to detach|disk pressure|no available disk|insufficient storage|filesystem is read-only|input/output error"
-                  !~ "(source=loki_ruler|rule_type=alerting|executing query|request timings|context canceled|tail client)"
+                  !~ "(?i)(logger=tsdb.loki|endpoint=queryData|/loki/api/v1/query|/loki/api/v1/query_range|GET /loki/api/v1/query|GET /loki/api/v1/query_range|query=|Response received from loki|dashboard.grafana.app|source=loki_ruler|rule_type=alerting|executing query|request timings|context canceled|tail client|grpc tail client)"
                   [5m]
                 )
               ) > 0
@@ -93,13 +95,14 @@ data:
 
           # ------------------------------------------------------------
           # Grafana real critical logs only
-          # Ignores level=info, status=400, query noise, plugin checker.
+          # Ignores dashboard/API request noise and successful datasource queries.
           # ------------------------------------------------------------
           - alert: LokiGrafanaCriticalLogsDetected
             expr: |
               sum by (namespace, pod, container) (
                 count_over_time(
                   {namespace="monitoring", pod=~".*grafana.*"}
+                  !~ "(?i)(logger=tsdb.loki|endpoint=queryData|Response received from loki|dashboard.grafana.app|/apis/dashboard.grafana.app|/api/dashboards|homelab-loki-critical-error|logger=context|logger=live|Initialized channel handler|Request Completed|status=200|status=201|status=204|status=304|status=400|status=404)"
                   | logfmt
                   | level=~"error|fatal|panic"
                   [5m]
@@ -117,7 +120,7 @@ data:
 
           # ------------------------------------------------------------
           # Grafana HTTP 5xx only
-          # Ignores 400/401/403/404 because those are often user/query errors.
+          # Ignores normal 400/401/403/404 and dashboard import/query noise.
           # ------------------------------------------------------------
           - alert: LokiGrafanaHTTP5xxDetected
             expr: |
@@ -125,6 +128,7 @@ data:
                 count_over_time(
                   {namespace="monitoring", pod=~".*grafana.*"}
                   |~ "status=5[0-9][0-9]"
+                  !~ "(?i)(logger=tsdb.loki|endpoint=queryData|Response received from loki|dashboard.grafana.app|/apis/dashboard.grafana.app|/api/dashboards|homelab-loki-critical-error)"
                   [5m]
                 )
               ) > 0
@@ -140,16 +144,15 @@ data:
 
           # ------------------------------------------------------------
           # Loki internal critical logs only
-          # Excludes normal Loki ruler evaluation logs and tail cancellation noise.
+          # IMPORTANT: restricted to the real Loki container, not loki-gateway nginx.
           # ------------------------------------------------------------
           - alert: LokiInternalCriticalLogsDetected
             expr: |
               sum by (namespace, pod, container) (
                 count_over_time(
-                  {namespace="logging", pod=~".*loki.*"}
+                  {namespace="logging", pod=~"loki-.*", container="loki"}
                   |~ "(?i)panic|fatal|critical|failed to start|out of space|permission denied|corruption"
-                  !~ "(source=loki_ruler|rule_type=alerting|evaluating rule|executing query|request timings|caller=metrics.go|caller=engine.go|caller=evaluator_local.go|caller=compat.go|context canceled|tail client|grpc tail client)"
-                  !~ "(memcache: no servers configured or available|failed to lookup SRV records)"
+                  !~ "(?i)(source=loki_ruler|rule_type=alerting|evaluating rule|executing query|request timings|caller=metrics.go|caller=engine.go|caller=evaluator_local.go|caller=compat.go|scheduler_processor.go|tail.go|http.go|Error receiving response from grpc tail client|Error from iterator|reached tail max duration limit|context canceled|rpc error: code = Canceled|err=EOF|tail client|grpc tail client|client-side throttling|failed to register collector with remote server|remotecfg|noop client|memcache: no servers configured or available|failed to lookup SRV records)"
                   [5m]
                 )
               ) > 0
@@ -164,7 +167,31 @@ data:
               description: "Critical Loki internal issue detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
 
           # ------------------------------------------------------------
+          # Real Loki Gateway 5xx burst
+          # This replaces false critical/OOM alerts from nginx access logs.
+          # ------------------------------------------------------------
+          - alert: LokiGatewayHTTP5xxBurstDetected
+            expr: |
+              sum by (namespace, pod, container) (
+                count_over_time(
+                  {namespace="logging", pod=~"loki-gateway.*", container="nginx"}
+                  |~ " 5[0-9][0-9] "
+                  [10m]
+                )
+              ) > 10
+            for: 5m
+            labels:
+              severity: critical
+              source: loki
+              component: loki-gateway
+              category: observability
+            annotations:
+              summary: "Loki Gateway HTTP 5xx burst detected"
+              description: "More than 10 Loki Gateway HTTP 5xx responses detected in pod={{ $labels.pod }}, container={{ $labels.container }} during the last 10 minutes."
+
+          # ------------------------------------------------------------
           # Grafana Alloy critical logs only
+          # Excludes known harmless Alloy/Kubernetes throttling and remotecfg noise.
           # ------------------------------------------------------------
           - alert: LokiAlloyCriticalLogsDetected
             expr: |
@@ -172,7 +199,7 @@ data:
                 count_over_time(
                   {namespace="logging", pod=~".*alloy.*"}
                   |~ "(?i)panic|fatal|critical|failed to start|configuration error|invalid config"
-                  !~ "(source=loki_ruler|rule_type=alerting|executing query|request timings|context canceled|tail client)"
+                  !~ "(?i)(client-side throttling|failed to register collector with remote server|remotecfg|noop client|source=loki_ruler|rule_type=alerting|executing query|request timings|context canceled|tail client)"
                   [5m]
                 )
               ) > 0
@@ -188,16 +215,19 @@ data:
 
           # ------------------------------------------------------------
           # Logging namespace critical logs
-          # Excludes Loki ruler evaluation logs and known non-critical noise.
+          # Excludes loki-gateway nginx access logs and known cancellation/noise.
           # ------------------------------------------------------------
           - alert: LokiLoggingStackCriticalLogsDetected
             expr: |
               sum by (namespace, pod, container) (
                 count_over_time(
-                  {namespace="logging"}
+                  {
+                    namespace="logging",
+                    container!="nginx",
+                    pod!~"loki-gateway.*|loki-canary.*"
+                  }
                   |~ "(?i)panic|fatal|critical|failed to start|corruption|out of space|permission denied"
-                  !~ "(source=loki_ruler|rule_type=alerting|evaluating rule|executing query|request timings|caller=metrics.go|caller=engine.go|caller=evaluator_local.go|caller=compat.go|context canceled|tail client|grpc tail client)"
-                  !~ "(memcache: no servers configured or available|failed to lookup SRV records)"
+                  !~ "(?i)(source=loki_ruler|rule_type=alerting|evaluating rule|executing query|request timings|caller=metrics.go|caller=engine.go|caller=evaluator_local.go|caller=compat.go|scheduler_processor.go|tail.go|http.go|Error receiving response from grpc tail client|Error from iterator|reached tail max duration limit|context canceled|rpc error: code = Canceled|err=EOF|tail client|grpc tail client|client-side throttling|failed to register collector with remote server|remotecfg|noop client|memcache: no servers configured or available|failed to lookup SRV records)"
                   [5m]
                 )
               ) > 0
@@ -213,7 +243,6 @@ data:
 
           # ------------------------------------------------------------
           # CoreDNS critical only
-          # DNS failures are important, but avoid generic error spam.
           # ------------------------------------------------------------
           - alert: LokiCoreDNSCriticalLogsDetected
             expr: |
@@ -236,7 +265,6 @@ data:
 
           # ------------------------------------------------------------
           # Traefik 5xx burst only
-          # Ignores normal 404 and client-side errors.
           # ------------------------------------------------------------
           - alert: LokiTraefik5xxBurstDetected
             expr: |
@@ -259,7 +287,6 @@ data:
 
           # ------------------------------------------------------------
           # External Secrets critical only
-          # Excludes Loki's own ruler query text.
           # ------------------------------------------------------------
           - alert: LokiExternalSecretsCriticalLogsDetected
             expr: |
@@ -267,7 +294,7 @@ data:
                 count_over_time(
                   {namespace="external-secrets-system"}
                   |~ "(?i)panic|fatal|failed to start|invalid provider config|authentication failed|authorization failed|forbidden|unauthorized"
-                  !~ "(source=loki_ruler|rule_type=alerting|evaluating rule|executing query|request timings|caller=metrics.go|caller=engine.go|caller=evaluator_local.go|caller=compat.go|context canceled|tail client)"
+                  !~ "(?i)(source=loki_ruler|rule_type=alerting|evaluating rule|executing query|request timings|caller=metrics.go|caller=engine.go|caller=evaluator_local.go|caller=compat.go|context canceled|tail client|dashboard.grafana.app|/apis/dashboard.grafana.app|query=)"
                   [10m]
                 )
               ) > 3
@@ -280,24 +307,3 @@ data:
             annotations:
               summary: "Critical External Secrets log detected"
               description: "Repeated critical External Secrets issue detected in pod={{ $labels.pod }}, container={{ $labels.container }}."
-
-          # ------------------------------------------------------------
-          # Optional manual test rule.
-          # Keep commented out unless actively testing Telegram.
-          # ------------------------------------------------------------
-          # - alert: LokiForcedTestAlert
-          #   expr: |
-          #     sum(
-          #       count_over_time(
-          #         {pod="loki-critical-test"}
-          #         |= "fatal"
-          #         [5m]
-          #       )
-          #     ) > 0
-          #   labels:
-          #     severity: critical
-          #     source: loki
-          #     test: "true"
-          #   annotations:
-          #     summary: "Forced Loki test alert"
-          #     description: "Loki detected the test fatal log from pod loki-critical-test."
