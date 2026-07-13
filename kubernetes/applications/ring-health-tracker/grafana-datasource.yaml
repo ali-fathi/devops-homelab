@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource-ring-health-victoriametrics
+  namespace: monitoring
+  labels:
+    grafana_datasource: "1"
+data:
+  ring-health-victoriametrics.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Ring Health VictoriaMetrics
+        type: prometheus
+        uid: ring-health-victoriametrics
+        access: proxy
+        url: http://victoriametrics.ring-health.svc.cluster.local:8428
+        isDefault: false
+        editable: true

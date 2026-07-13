@@ -1,0 +1,1967 @@
+apiVersion: v1
+data:
+  ring-health-dashboard.json: |
+    {
+      "__inputs": [],
+      "__requires": [
+        {
+          "type": "grafana",
+          "id": "grafana",
+          "name": "Grafana",
+          "version": "10.0.0"
+        },
+        {
+          "type": "datasource",
+          "id": "prometheus",
+          "name": "Prometheus",
+          "version": "1.0.0"
+        },
+        {
+          "type": "panel",
+          "id": "stat",
+          "name": "Stat",
+          "version": ""
+        },
+        {
+          "type": "panel",
+          "id": "timeseries",         "name": "Time series",
+          "version": ""
+        },
+        {
+          "type": "panel",
+          "id": "row",
+          "name": "Row",
+          "version": ""
+        }
+      ],
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "liveNow": false,
+      "panels": [
+        {
+          "id": 1,
+          "type": "row",
+          "title": "Vitals (raw)",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Heart Rate (latest)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 1,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "last_over_time(biometric_hr_bpm{device=~\"$device\"}[$__range])",
+              "format": "time_series",
+              "legendFormat": "",
+              "range": false,
+              "refId": "A",
+              "instant": true,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bpm",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 50
+                  },
+                  {
+                    "color": "orange",
+                    "value": 90
+                  },
+                  {
+                    "color": "red",
+                    "value": 120
+                  }
+                ]
+              },
+              "mappings": [],
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
+            "orientation": "auto",
+            "textMode": "auto",
+            "wideLayout": true,
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Resting HR (24h min)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 4,
+            "y": 1,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "min_over_time(biometric_hr_bpm{device=~\"$device\"}[24h])",
+              "format": "time_series",
+              "legendFormat": "",
+              "range": false,
+              "refId": "A",
+              "instant": true,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bpm",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 50
+                  },
+                  {
+                    "color": "orange",
+                    "value": 90
+                  },
+                  {
+                    "color": "red",
+                    "value": 120
+                  }
+                ]
+              },
+              "mappings": [],
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
+            "orientation": "auto",
+            "textMode": "auto",
+            "wideLayout": true,
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "HRV (latest RMSSD)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 8,
+            "y": 1,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "last_over_time(biometric_hrv_rmssd{device=~\"$device\"}[$__range])",
+              "format": "time_series",
+              "legendFormat": "",
+              "range": false,
+              "refId": "A",
+              "instant": true,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": [],
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
+            "orientation": "auto",
+            "textMode": "auto",
+            "wideLayout": true,
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "SpO2 (latest)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 1,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "last_over_time(biometric_spo2_pct{device=~\"$device\"}[$__range])",
+              "format": "time_series",
+              "legendFormat": "",
+              "range": false,
+              "refId": "A",
+              "instant": true,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 92
+                  },
+                  {
+                    "color": "green",
+                    "value": 95
+                  }
+                ]
+              },
+              "mappings": [],
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
+            "orientation": "auto",
+            "textMode": "auto",
+            "wideLayout": true,
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 6,
+          "type": "stat",
+          "title": "Stress (latest)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 16,
+            "y": 1,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "last_over_time(biometric_stress{device=~\"$device\"}[$__range])",
+              "format": "time_series",
+              "legendFormat": "",
+              "range": false,
+              "refId": "A",
+              "instant": true,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 50
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "mappings": [],
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
+            "orientation": "auto",
+            "textMode": "auto",
+            "wideLayout": true,
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 7,
+          "type": "stat",
+          "title": "Ring Battery",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 20,
+            "y": 1,
+            "w": 4,
+            "h": 4
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "last_over_time(ring_battery_pct{device=~\"$device\"}[$__range])",
+              "format": "time_series",
+              "legendFormat": "",
+              "range": false,
+              "refId": "A",
+              "instant": true,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 20
+                  },
+                  {
+                    "color": "green",
+                    "value": 50
+                  }
+                ]
+              },
+              "mappings": [],
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
+            "orientation": "auto",
+            "textMode": "auto",
+            "wideLayout": true,
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "Heart Rate (5-min raw)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 5,
+            "w": 16,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "biometric_hr_bpm{device=~\"$device\"}",
+              "format": "time_series",
+              "legendFormat": "{{device}} HR",
+              "range": true,
+              "refId": "A",
+              "instant": false,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bpm",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "barAlignment": 0,
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "spanNulls": false,
+                "showPoints": "never",
+                "pointSize": 5,
+                "axisPlacement": "auto",
+                "axisLabel": "",
+                "axisColorMode": "text",
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc",
+              "hideZeros": false
+            },
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "min",
+                "max"
+              ]
+            }
+          }
+        },
+        {
+          "id": 9,
+          "type": "timeseries",
+          "title": "HRV (RMSSD, 30-min raw)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 16,
+            "y": 5,
+            "w": 8,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "biometric_hrv_rmssd{device=~\"$device\"}",
+              "format": "time_series",
+              "legendFormat": "{{device}} HRV",
+              "range": true,
+              "refId": "A",
+              "instant": false,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "barAlignment": 0,
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "spanNulls": false,
+                "showPoints": "never",
+                "pointSize": 5,
+                "axisPlacement": "auto",
+                "axisLabel": "",
+                "axisColorMode": "text",
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc",
+              "hideZeros": false
+            },
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "min",
+                "max"
+              ]
+            }
+          }
+        },
+        {
+          "id": 10,
+          "type": "row",
+          "title": "Activity",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 13,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 11,
+          "type": "timeseries",
+          "title": "Steps per hour",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 14,
+            "w": 8,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "biometric_steps{device=~\"$device\"}",
+              "format": "time_series",
+              "legendFormat": "{{device}} steps",
+              "range": true,
+              "refId": "A",
+              "instant": false,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "bars",
+                "lineInterpolation": "linear",
+                "barAlignment": 0,
+                "lineWidth": 2,
+                "fillOpacity": 35,
+                "gradientMode": "none",
+                "spanNulls": false,
+                "showPoints": "never",
+                "pointSize": 5,
+                "axisPlacement": "auto",
+                "axisLabel": "",
+                "axisColorMode": "text",
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc",
+              "hideZeros": false
+            },
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "min",
+                "max"
+              ]
+            }
+          }
+        },
+        {
+          "id": 12,
+          "type": "timeseries",
+          "title": "Calories per hour",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 8,
+            "y": 14,
+            "w": 8,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "biometric_calories{device=~\"$device\"}",
+              "format": "time_series",
+              "legendFormat": "{{device}} kcal",
+              "range": true,
+              "refId": "A",
+              "instant": false,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "bars",
+                "lineInterpolation": "linear",
+                "barAlignment": 0,
+                "lineWidth": 2,
+                "fillOpacity": 35,
+                "gradientMode": "none",
+                "spanNulls": false,
+                "showPoints": "never",
+                "pointSize": 5,
+                "axisPlacement": "auto",
+                "axisLabel": "",
+                "axisColorMode": "text",
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc",
+              "hideZeros": false
+            },
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "min",
+                "max"
+              ]
+            }
+          }
+        },
+        {
+          "id": 13,
+          "type": "timeseries",
+          "title": "Distance per hour",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 16,
+            "y": 14,
+            "w": 8,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "biometric_distance_meters{device=~\"$device\"}",
+              "format": "time_series",
+              "legendFormat": "{{device}} meters",
+              "range": true,
+              "refId": "A",
+              "instant": false,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "lengthm",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "bars",
+                "lineInterpolation": "linear",
+                "barAlignment": 0,
+                "lineWidth": 2,
+                "fillOpacity": 35,
+                "gradientMode": "none",
+                "spanNulls": false,
+                "showPoints": "never",
+                "pointSize": 5,
+                "axisPlacement": "auto",
+                "axisLabel": "",
+                "axisColorMode": "text",
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc",
+              "hideZeros": false
+            },
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "min",
+                "max"
+              ]
+            }
+          }
+        },
+        {
+          "id": 14,
+          "type": "row",
+          "title": "Sleep",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 22,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 15,
+          "type": "stat",
+          "title": "Sleep Total (latest session)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 23,
+            "w": 6,
+            "h": 4
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "last_over_time(biometric_sleep_total_min{device=~\"$device\"}[$__range])",
+              "format": "time_series",
+              "legendFormat": "",
+              "range": false,
+              "refId": "A",
+              "instant": true,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "m",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": [],
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
+            "orientation": "auto",
+            "textMode": "auto",
+            "wideLayout": true,
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 16,
+          "type": "stat",
+          "title": "Deep Sleep (latest session)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 6,
+            "y": 23,
+            "w": 6,
+            "h": 4
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "last_over_time(biometric_sleep_deep_min{device=~\"$device\"}[$__range])",
+              "format": "time_series",
+              "legendFormat": "",
+              "range": false,
+              "refId": "A",
+              "instant": true,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "m",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": [],
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
+            "orientation": "auto",
+            "textMode": "auto",
+            "wideLayout": true,
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 17,
+          "type": "stat",
+          "title": "REM Sleep (latest session)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 23,
+            "w": 6,
+            "h": 4
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "last_over_time(biometric_sleep_rem_min{device=~\"$device\"}[$__range])",
+              "format": "time_series",
+              "legendFormat": "",
+              "range": false,
+              "refId": "A",
+              "instant": true,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "m",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": [],
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
+            "orientation": "auto",
+            "textMode": "auto",
+            "wideLayout": true,
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 18,
+          "type": "stat",
+          "title": "Light Sleep (latest session)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 18,
+            "y": 23,
+            "w": 6,
+            "h": 4
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "last_over_time(biometric_sleep_light_min{device=~\"$device\"}[$__range])",
+              "format": "time_series",
+              "legendFormat": "",
+              "range": false,
+              "refId": "A",
+              "instant": true,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "m",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": [],
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "values": false,
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": ""
+            },
+            "orientation": "auto",
+            "textMode": "auto",
+            "wideLayout": true,
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center"
+          }
+        },
+        {
+          "id": 19,
+          "type": "timeseries",
+          "title": "Sleep stages per session",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 27,
+            "w": 24,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "biometric_sleep_total_min{device=~\"$device\"}",
+              "format": "time_series",
+              "legendFormat": "total",
+              "range": true,
+              "refId": "A",
+              "instant": false,
+              "interval": ""
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "biometric_sleep_deep_min{device=~\"$device\"}",
+              "format": "time_series",
+              "legendFormat": "deep",
+              "range": true,
+              "refId": "B",
+              "instant": false,
+              "interval": ""
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "biometric_sleep_rem_min{device=~\"$device\"}",
+              "format": "time_series",
+              "legendFormat": "rem",
+              "range": true,
+              "refId": "C",
+              "instant": false,
+              "interval": ""
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "biometric_sleep_light_min{device=~\"$device\"}",
+              "format": "time_series",
+              "legendFormat": "light",
+              "range": true,
+              "refId": "D",
+              "instant": false,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "m",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "bars",
+                "lineInterpolation": "linear",
+                "barAlignment": 0,
+                "lineWidth": 2,
+                "fillOpacity": 25,
+                "gradientMode": "none",
+                "spanNulls": false,
+                "showPoints": "never",
+                "pointSize": 5,
+                "axisPlacement": "auto",
+                "axisLabel": "",
+                "axisColorMode": "text",
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc",
+              "hideZeros": false
+            },
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "min",
+                "max"
+              ]
+            }
+          }
+        },
+        {
+          "id": 20,
+          "type": "row",
+          "title": "Oxygen, Stress and Battery",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 35,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 21,
+          "type": "timeseries",
+          "title": "SpO2",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 36,
+            "w": 8,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "biometric_spo2_pct{device=~\"$device\"}",
+              "format": "time_series",
+              "legendFormat": "{{device}} SpO2",
+              "range": true,
+              "refId": "A",
+              "instant": false,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "barAlignment": 0,
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "spanNulls": false,
+                "showPoints": "never",
+                "pointSize": 5,
+                "axisPlacement": "auto",
+                "axisLabel": "",
+                "axisColorMode": "text",
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc",
+              "hideZeros": false
+            },
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "min",
+                "max"
+              ]
+            }
+          }
+        },
+        {
+          "id": 22,
+          "type": "timeseries",
+          "title": "Stress score",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 8,
+            "y": 36,
+            "w": 8,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "biometric_stress{device=~\"$device\"}",
+              "format": "time_series",
+              "legendFormat": "{{device}} stress",
+              "range": true,
+              "refId": "A",
+              "instant": false,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "barAlignment": 0,
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "spanNulls": false,
+                "showPoints": "never",
+                "pointSize": 5,
+                "axisPlacement": "auto",
+                "axisLabel": "",
+                "axisColorMode": "text",
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc",
+              "hideZeros": false
+            },
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "min",
+                "max"
+              ]
+            }
+          }
+        },
+        {
+          "id": 23,
+          "type": "timeseries",
+          "title": "Ring battery and charging",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 16,
+            "y": 36,
+            "w": 8,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "ring_battery_pct{device=~\"$device\"}",
+              "format": "time_series",
+              "legendFormat": "battery %",
+              "range": true,
+              "refId": "A",
+              "instant": false,
+              "interval": ""
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "ring_charging{device=~\"$device\"} * 100",
+              "format": "time_series",
+              "legendFormat": "charging x100",
+              "range": true,
+              "refId": "B",
+              "instant": false,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "barAlignment": 0,
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "spanNulls": false,
+                "showPoints": "never",
+                "pointSize": 5,
+                "axisPlacement": "auto",
+                "axisLabel": "",
+                "axisColorMode": "text",
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc",
+              "hideZeros": false
+            },
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "min",
+                "max"
+              ]
+            }
+          }
+        },
+        {
+          "id": 24,
+          "type": "row",
+          "title": "Useful derived views",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 44,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "id": 25,
+          "type": "timeseries",
+          "title": "Overnight Resting HR (rolling 8h min)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 45,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "min_over_time(biometric_hr_bpm{device=~\"$device\"}[8h])",
+              "format": "time_series",
+              "legendFormat": "{{device}} RHR 8h min",
+              "range": true,
+              "refId": "A",
+              "instant": false,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bpm",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "barAlignment": 0,
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "spanNulls": false,
+                "showPoints": "never",
+                "pointSize": 5,
+                "axisPlacement": "auto",
+                "axisLabel": "",
+                "axisColorMode": "text",
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc",
+              "hideZeros": false
+            },
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "min",
+                "max"
+              ]
+            }
+          }
+        },
+        {
+          "id": 26,
+          "type": "timeseries",
+          "title": "Daily step total",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ring-health-victoriametrics"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 45,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "ring-health-victoriametrics"
+              },
+              "editorMode": "code",
+              "expr": "sum_over_time(biometric_steps{device=~\"$device\"}[24h])",
+              "format": "time_series",
+              "legendFormat": "{{device}} steps 24h",
+              "range": true,
+              "refId": "A",
+              "instant": false,
+              "interval": ""
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "barAlignment": 0,
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "spanNulls": false,
+                "showPoints": "never",
+                "pointSize": 5,
+                "axisPlacement": "auto",
+                "axisLabel": "",
+                "axisColorMode": "text",
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "hideFrom": {
+                  "tooltip": false,
+                  "viz": false,
+                  "legend": false
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "options": {
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc",
+              "hideZeros": false
+            },
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "lastNotNull",
+                "min",
+                "max"
+              ]
+            }
+          }
+        }
+      ],
+      "preload": false,
+      "refresh": "1m",
+      "schemaVersion": 41,
+      "tags": [
+        "ring-health",
+        "biometrics",
+        "colmi-r02",
+        "victoriametrics",
+        "homelab"
+      ],
+      "templating": {
+        "list": [
+          {
+            "name": "device",
+            "type": "query",
+            "label": "device",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "ring-health-victoriametrics"
+            },
+            "definition": "label_values({__name__=~\"biometric_.*|ring_.*\"}, device)",
+            "query": "label_values({__name__=~\"biometric_.*|ring_.*\"}, device)",
+            "refresh": 1,
+            "sort": 1,
+            "multi": true,
+            "includeAll": true,
+            "allValue": ".*",
+            "current": {
+              "selected": true,
+              "text": "All",
+              "value": "$__all"
+            },
+            "options": [],
+            "hide": 0,
+            "regex": "",
+            "skipUrlSync": false
+          }
+        ]
+      },
+      "time": {
+        "from": "now-24h",
+        "to": "now"
+      },
+      "timepicker": {
+        "refresh_intervals": [
+          "30s",
+          "1m",
+          "5m",
+          "15m",
+          "30m",
+          "1h"
+        ]
+      },
+      "timezone": "browser",
+      "title": "Biometrics - Colmi R02 - Ring Health",
+      "uid": "ring-health-biometrics-colmi-r02",
+      "version": 1,
+      "weekStart": ""
+    }
+kind: ConfigMap
+metadata:
+  labels:
+    grafana_dashboard: "1"
+  name: ring-health-dashboard
+  namespace: monitoring
+

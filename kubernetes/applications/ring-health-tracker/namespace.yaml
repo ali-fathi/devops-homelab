@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ring-health
+  labels:
+    app.kubernetes.io/name: ring-health-tracker
+    app.kubernetes.io/part-of: health-observability
