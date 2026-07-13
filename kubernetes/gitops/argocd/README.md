@@ -1268,6 +1268,38 @@ Week 1 is complete when:
 
 ---
 
+cd ~/workspace/devops-homelab
+
+# Validate app manifests
+kubectl apply --dry-run=server -f kubernetes/applications/ring-health-tracker/
+
+# Commit app manifests
+git add kubernetes/applications/ring-health-tracker
+git commit -m "Add Ring Health Tracker VictoriaMetrics backend"
+git push origin main
+
+# Update Argo CD project
+kubectl apply -f kubernetes/gitops/argocd/projects/homelab-platform-project.yaml
+
+git add kubernetes/gitops/argocd/projects/homelab-platform-project.yaml
+git commit -m "Allow ring-health namespace in Argo CD project"
+git push origin main
+
+# Create/apply Argo CD application
+kubectl apply -f kubernetes/gitops/argocd/applications/ring-health-tracker.yaml
+
+git add kubernetes/gitops/argocd/applications/ring-health-tracker.yaml
+git commit -m "GitOps Ring Health Tracker with Argo CD"
+git push origin main
+
+# Refresh/sync
+argocd app refresh ring-health-tracker --hard
+argocd app sync ring-health-tracker
+argocd app get ring-health-tracker
+argocd app resources ring-health-tracker
+
+
+
 ## 23. References
 
 - Argo CD documentation: https://argo-cd.readthedocs.io/
