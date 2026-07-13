@@ -25,6 +25,9 @@ spec:
     - namespace: argocd
       server: https://kubernetes.default.svc
 
+    - namespace: ring-health
+      server: https://kubernetes.default.svc
+
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
