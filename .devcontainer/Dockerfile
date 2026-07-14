@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y \
     apt-transport-https \
     gnupg \
     lsb-release \
+    yamllint \
     software-properties-common \
     && rm -rf /var/lib/apt/lists/*
 

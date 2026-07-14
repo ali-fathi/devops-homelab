@@ -1,0 +1,30 @@
+---
+extends: default
+
+rules:
+  line-length:
+    max: 160
+    level: warning
+
+  comments:
+    min-spaces-from-content: 1
+
+  truthy:
+    allowed-values:
+      - "true"
+      - "false"
+      - "on"
+      - "off"
+
+  document-start:
+    present: false
+
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+ignore: |
+  kubernetes/observability/monitoring/dashboards/
+  kubernetes/applications/ring-health-tracker/grafana/
+  **/*.json
