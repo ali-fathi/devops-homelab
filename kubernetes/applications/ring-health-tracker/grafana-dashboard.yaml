@@ -1964,4 +1964,3 @@ metadata:
     grafana_dashboard: "1"
   name: ring-health-dashboard
   namespace: monitoring
-

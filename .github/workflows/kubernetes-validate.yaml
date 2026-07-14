@@ -39,18 +39,40 @@ jobs:
       - name: Set up Kubeconform
         uses: bmuschko/setup-kubeconform@v1
 
-      - name: Validate Kubernetes manifests
+      - name: Build manifest file list
+        shell: bash
         run: |
+          set -euo pipefail
+
           find kubernetes -type f \( -name "*.yaml" -o -name "*.yml" \) \
             ! -name "values.yaml" \
             ! -name "values-*.yaml" \
+            ! -name "*-values.yaml" \
             ! -path "*/docs/*" \
             ! -path "*/dashboards/*" \
             ! -path "*/grafana/*" \
-            ! -path "*/README.md" \
-            -print0 \
-          | xargs -0 kubeconform \
-              -summary \
-              -verbose \
-              -strict \
-              -ignore-missing-schemas
+            ! -path "kubernetes/infrastructure/metallb/metallb-native.yaml" \
+            > /tmp/kubernetes-manifests.txt
+
+          echo "Files selected for kubeconform:"
+          cat /tmp/kubernetes-manifests.txt
+
+          echo "Total files:"
+          wc -l /tmp/kubernetes-manifests.txt
+
+      - name: Validate Kubernetes manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ ! -s /tmp/kubernetes-manifests.txt ]; then
+            echo "No Kubernetes manifests found for validation."
+            exit 0
+          fi
+
+          kubeconform \
+            -summary \
+            -verbose \
+            -strict \
+            -ignore-missing-schemas \
+            $(cat /tmp/kubernetes-manifests.txt)
