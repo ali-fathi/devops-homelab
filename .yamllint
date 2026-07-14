@@ -16,15 +16,20 @@ rules:
       - "on"
       - "off"
 
-  document-start:
-    present: false
+  document-start: disable
 
   indentation:
     spaces: 2
     indent-sequences: true
     check-multi-line-strings: false
 
+  empty-lines:
+    max: 1
+    max-start: 0
+    max-end: 0
+
 ignore: |
   kubernetes/observability/monitoring/dashboards/
   kubernetes/applications/ring-health-tracker/grafana/
+  kubernetes/infrastructure/metallb/metallb-native.yaml
   **/*.json
