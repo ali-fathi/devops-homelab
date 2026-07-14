@@ -9,9 +9,10 @@ spec:
   source:
     repoURL: https://github.com/ali-fathi/devops-homelab.git
     targetRevision: main
-    path: kubernetes/observability/garmin
+    path: kubernetes/applications/garmin
 
     directory:
+      include: "{*.yaml,*.yml}"
       recurse: true
 
   destination:
