@@ -1299,6 +1299,17 @@ argocd app get ring-health-tracker
 argocd app resources ring-health-tracker
 
 
+## Related Docs
+
+Recommended related files:
+
+```text
+docs/gitops.md
+docs/runbooks/argocd-app-outofsync.md
+docs/runbooks/argocd-comparison-error.md
+docs/runbooks/external-secrets-debug.md
+kubernetes/gitops/argocd/docs/argocd-cheatsheet.md
+```
 
 ## 23. References
 
