@@ -1,0 +1,69 @@
+name: Build Homelab API Container
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/homelab-api/**"
+      - ".github/workflows/homelab-api-build.yaml"
+
+  pull_request:
+    paths:
+      - "apps/homelab-api/**"
+      - ".github/workflows/homelab-api-build.yaml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: homelab-api-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, scan, and publish image
+    runs-on: ubuntu-latest
+
+    env:
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/homelab-api
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Build container image
+        run: |
+          docker build \
+            --label org.opencontainers.image.source="https://github.com/${{ github.repository }}" \
+            --label org.opencontainers.image.revision="${{ github.sha }}" \
+            --label org.opencontainers.image.title="homelab-api" \
+            -t ${IMAGE_NAME}:${{ github.sha }} \
+            -t ${IMAGE_NAME}:latest \
+            apps/homelab-api
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/homelab-api:${{ github.sha }}
+          format: table
+          exit-code: "0"
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
+            -u "${{ github.actor }}" \
+            --password-stdin
+
+      - name: Push container image
+        if: github.event_name != 'pull_request'
+        run: |
+          docker push ${IMAGE_NAME}:${{ github.sha }}
+          docker push ${IMAGE_NAME}:latest
