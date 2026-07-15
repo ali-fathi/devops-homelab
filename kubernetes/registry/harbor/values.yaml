@@ -1,0 +1,27 @@
+# Harbor values for homelab planning.
+# Target exposure model: MetalLB LoadBalancer.
+# Reserved Harbor IP: 192.168.178.215.
+# Review the exact Harbor chart version before applying these values.
+
+expose:
+  type: loadBalancer
+
+  tls:
+    enabled: true
+
+  loadBalancer:
+    name: harbor
+    IP: 192.168.178.215
+    ports:
+      httpPort: 80
+      httpsPort: 443
+    annotations: {}
+    sourceRanges: []
+
+externalURL: https://harbor.greyneo.com
+
+persistence:
+  enabled: true
+
+# Keep chart defaults for PVC sizes until Harbor storage requirements are reviewed.
+# Before production-like use, define explicit sizes, backup plan, and restore procedure.
