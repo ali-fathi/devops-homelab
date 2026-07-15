@@ -1,0 +1,8 @@
+title = "devops-homelab gitleaks config"
+
+[allowlist]
+description = "Allow known non-secret documentation examples"
+paths = [
+  '''docs/.*''',
+  '''.*README.md''',
+]
