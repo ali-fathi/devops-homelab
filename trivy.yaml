@@ -1,0 +1,10 @@
+format: table
+
+severity:
+  - CRITICAL
+  - HIGH
+
+scan:
+  skip-dirs:
+    - kubernetes/observability/monitoring/dashboards
+    - kubernetes/applications/ring-health-tracker/grafana
