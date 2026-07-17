@@ -1,127 +1,355 @@
-# Health Dashboard Kubernetes Application
+# Health Dashboard Kubernetes Runbook
 
-This directory contains the production Kubernetes resources for the self-hosted Health Dashboard.
+This directory is the Kubernetes/GitOps deployment layer for the Health Dashboard.
 
-The dashboard combines:
-
-```text
-Garmin data  -> InfluxDB in namespace garmin
-Ring data    -> VictoriaMetrics in namespace ring-health
-Dashboard   -> Flask application in namespace health
-```
-
-The application is exposed on the LAN through MetalLB:
+For the complete architecture and DevOps study explanation, read:
 
 ```text
-http://192.168.178.216
+apps/health-dashboard/README.md
 ```
 
-The dashboard is intentionally not exposed publicly. It contains personal health information.
+This document focuses on operating the Kubernetes application.
 
-## Resources
+---
+
+## 1. Application contract
 
 ```text
-namespace.yaml        Namespace: health
-configmap.yaml        Non-secret runtime configuration
-external-secret.yaml  InfluxDB credentials from Azure Key Vault
-deployment.yaml       Flask/Gunicorn Deployment
-service.yaml          MetalLB LoadBalancer Service
+Namespace: health
+Service: health-dashboard
+MetalLB IP: 192.168.178.216
+Container port: 8080
+Service port: 80
+Argo CD Application: health-dashboard
 ```
 
-## Prerequisites
-
-The cluster must already have:
+The application reads:
 
 ```text
-K3s
-MetalLB with the homelab-pool address pool
-External Secrets Operator
-Azure Key Vault ClusterSecretStore named azure-keyvault
-Garmin InfluxDB
-Ring VictoriaMetrics
-Argo CD
+InfluxDB:
+  garmin-influxdb.garmin.svc.cluster.local:8086
+  database: GarminStats
+
+VictoriaMetrics:
+  victoriametrics.ring-health.svc.cluster.local:8428
+  Ring device: colmi_r02
 ```
 
-Verify:
+The Dashboard must run in production mode:
+
+```text
+MOCK_DATA=false
+```
+
+---
+
+## 2. File responsibilities
+
+```text
+namespace.yaml
+  Creates the health namespace.
+
+configmap.yaml
+  Stores non-secret runtime settings such as database hosts and RING_DEVICE.
+
+external-secret.yaml
+  Reads InfluxDB credentials from Azure Key Vault through External Secrets Operator.
+
+deployment.yaml
+  Defines the Deployment, container image, probes, resources, and security context.
+
+service.yaml
+  Exposes the Deployment through a fixed MetalLB LAN address.
+
+kustomization.yaml
+  Renders all resources and replaces the base image with the immutable digest written by CI.
+```
+
+The actual file name is `deployment.yaml`; the space before it above is only for alignment.
+
+---
+
+## 3. Prerequisites
+
+Verify Kubernetes access:
 
 ```bash
-kubectl get nodes
-kubectl get ipaddresspool -n metallb-system
-kubectl get clustersecretstore azure-keyvault
-kubectl get pods -n garmin
-kubectl get pods -n ring-health
+kubectl config current-context
+kubectl get nodes -o wide
 ```
 
-The Azure Key Vault must contain:
+Verify MetalLB:
+
+```bash
+kubectl get pods -n metallb-system
+kubectl get ipaddresspool -n metallb-system
+kubectl get l2advertisement -n metallb-system
+```
+
+The address pool must contain:
+
+```text
+192.168.178.216
+```
+
+Verify External Secrets:
+
+```bash
+kubectl get pods -n external-secrets-system
+kubectl get clustersecretstore azure-keyvault
+```
+
+Verify data sources:
+
+```bash
+kubectl get pods -n garmin
+kubectl get pods -n ring-health
+kubectl get svc -n garmin
+kubectl get svc -n ring-health
+```
+
+Azure Key Vault must contain:
 
 ```text
 garmin-influxdb-username
 garmin-influxdb-password
 ```
 
-The ExternalSecret copies those values into the `health` namespace. Kubernetes Secrets cannot be referenced across namespaces.
+These are referenced by `external-secret.yaml`. Real values must never be committed to Git.
 
-## Container image
+---
 
-GitHub Actions builds:
+## 4. Image delivery model
+
+The image is built by:
+
+```text
+.github/workflows/health-dashboard-build.yaml
+```
+
+The published image is:
 
 ```text
 ghcr.io/ali-fathi/health-dashboard:<commit-sha>
 ```
 
-The Deployment is rendered with Kustomize. The base Deployment uses `latest`, but GitHub Actions automatically replaces it with the immutable registry digest after a successful image build.
+The workflow also publishes `latest`, but Kubernetes does not permanently rely on that tag.
 
-The GHCR package must be public, or the namespace must have an image-pull Secret for a private package.
-
-## GitOps deployment
-
-The Argo CD Application is:
-
-```text
-kubernetes/gitops/argocd/applications/health-dashboard.yaml
-```
-
-The Argo CD project must allow the `health` namespace. That destination is configured in:
-
-```text
-kubernetes/gitops/argocd/projects/homelab-platform-project.yaml
-```
-
-Deploy or sync:
-
-```bash
-kubectl apply -f kubernetes/gitops/argocd/projects/homelab-platform-project.yaml
-kubectl apply -f kubernetes/gitops/argocd/applications/health-dashboard.yaml
-argocd app sync health-dashboard
-argocd app wait health-dashboard --health --sync
-```
-
-Check status:
-
-```bash
-argocd app get health-dashboard
-kubectl get all -n health
-kubectl get externalsecret -n health
-```
-
-## MetalLB access
-
-The Service requests:
+After the image is pushed, GitHub Actions captures the registry digest and changes `kustomization.yaml` from:
 
 ```yaml
-loadBalancerIP: 192.168.178.216
+newTag: latest
 ```
 
-Confirm that the address is unused before deployment:
+to:
+
+```yaml
+digest: sha256:...
+```
+
+Kustomize then renders the final image as:
+
+```text
+ghcr.io/ali-fathi/health-dashboard@sha256:...
+```
+
+This means:
+
+- no manual image edit is needed;
+- each deployment refers to one exact image;
+- rollback is a Git revert;
+- Argo CD remains the component that deploys Kubernetes resources.
+
+The GHCR package must be public, or the namespace must have a valid image-pull Secret.
+
+---
+
+## 5. Kustomize rendering
+
+Render the application locally:
+
+```bash
+kubectl kustomize kubernetes/applications/health-dashboard
+```
+
+Inspect the rendered image:
+
+```bash
+kubectl kustomize kubernetes/applications/health-dashboard \
+  | grep -A1 -B1 'image:'
+```
+
+After the CI write-back commit, expect:
+
+```text
+image: ghcr.io/ali-fathi/health-dashboard@sha256:...
+```
+
+`kustomization.yaml` includes:
+
+```text
+namespace.yaml
+configmap.yaml
+external-secret.yaml
+deployment.yaml
+service.yaml
+```
+
+The Argo CD Application uses Kustomize and does not try to apply the README as a Kubernetes object.
+
+---
+
+## 6. First deployment
+
+First verify the MetalLB address is unused:
 
 ```bash
 kubectl get svc -A -o wide | grep 192.168.178.216 || true
 ```
 
-After deployment:
+Push the application and workflow to GitHub:
+
+```bash
+git add apps/health-dashboard \
+  .github/workflows/health-dashboard-build.yaml \
+  kubernetes/applications/health-dashboard \
+  kubernetes/gitops/argocd
+
+git commit -m "Deploy health dashboard through automated GitOps"
+git push origin main
+```
+
+Wait for GitHub Actions to:
+
+```text
+Run tests
+Build the image
+Run Trivy
+Push the image
+Commit the image digest to kustomization.yaml
+```
+
+Pull the automatic bot commit:
+
+```bash
+git pull origin main
+git log --oneline -5
+```
+
+Confirm the digest exists:
+
+```bash
+grep -n 'digest\|newTag' kustomization.yaml
+```
+
+Register the AppProject and Application once:
+
+```bash
+kubectl apply -f ../gitops/argocd/projects/homelab-platform-project.yaml
+kubectl apply -f ../gitops/argocd/applications/health-dashboard.yaml
+```
+
+Sync:
+
+```bash
+argocd app refresh health-dashboard --hard
+argocd app sync health-dashboard
+argocd app wait health-dashboard --health --sync
+```
+
+---
+
+## 7. Verify deployment
+
+```bash
+kubectl get all -n health
+kubectl get externalsecret -n health
+kubectl get secret -n health
+```
+
+Expected:
+
+```text
+health-dashboard-xxxxx   1/1   Running
+health-dashboard         LoadBalancer   ...   192.168.178.216
+```
+
+Check Argo CD:
+
+```bash
+argocd app get health-dashboard
+argocd app resources health-dashboard
+```
+
+Expected:
+
+```text
+Sync Status: Synced
+Health Status: Healthy
+```
+
+Check the deployed image:
+
+```bash
+kubectl get deployment health-dashboard -n health \
+  -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+```
+
+Expected:
+
+```text
+ghcr.io/ali-fathi/health-dashboard@sha256:...
+```
+
+---
+
+## 8. Verify ExternalSecret
+
+```bash
+kubectl get externalsecret health-dashboard-secrets -n health
+kubectl describe externalsecret health-dashboard-secrets -n health
+```
+
+Check Secret key names without printing values:
+
+```bash
+kubectl describe secret health-dashboard-secrets -n health
+```
+
+Expected keys:
+
+```text
+INFLUXDB_USERNAME
+INFLUXDB_PASSWORD
+```
+
+If synchronization fails:
+
+```bash
+kubectl get clustersecretstore azure-keyvault
+kubectl describe clustersecretstore azure-keyvault
+kubectl get pods -n external-secrets-system
+```
+
+---
+
+## 9. Verify MetalLB
 
 ```bash
 kubectl get svc health-dashboard -n health
+kubectl describe svc health-dashboard -n health
+```
+
+Expected:
+
+```text
+Type: LoadBalancer
+External IP: 192.168.178.216
+```
+
+Test from the LAN:
+
+```bash
 curl http://192.168.178.216/healthz
 ```
 
@@ -131,42 +359,41 @@ Expected:
 {"status":"healthy"}
 ```
 
-## Real-data verification
+If no IP is assigned, check:
 
-The application uses real data only when:
-
-```text
-MOCK_DATA=false
+```bash
+kubectl get ipaddresspool -n metallb-system
+kubectl get l2advertisement -n metallb-system
+kubectl get pods -n metallb-system
+kubectl get svc -A -o wide | grep 192.168.178.216
 ```
 
-It reads:
+---
 
-```text
-InfluxDB:
-  garmin-influxdb.garmin.svc.cluster.local:8086
-  database: GarminStats
+## 10. Verify source connectivity
 
-VictoriaMetrics:
-  victoriametrics.ring-health.svc.cluster.local:8428
-```
-
-Verify connectivity from the application pod:
+InfluxDB connectivity from the Dashboard pod:
 
 ```bash
 kubectl exec -n health deployment/health-dashboard -- \
-  curl -fsS http://garmin-influxdb.garmin.svc.cluster.local:8086/ping \
-  -o /dev/null -w '%{http_code}\n'
+  curl -fsS \
+  http://garmin-influxdb.garmin.svc.cluster.local:8086/ping \
+  -o /dev/null \
+  -w '%{http_code}\n'
 ```
 
-Expected InfluxDB status:
+Expected:
 
 ```text
 204
 ```
 
+VictoriaMetrics connectivity:
+
 ```bash
 kubectl exec -n health deployment/health-dashboard -- \
-  curl -fsS http://victoriametrics.ring-health.svc.cluster.local:8428/-/ready
+  curl -fsS \
+  http://victoriametrics.ring-health.svc.cluster.local:8428/-/ready
 ```
 
 Expected:
@@ -175,14 +402,14 @@ Expected:
 OK
 ```
 
-Check the Health API:
+Check the API:
 
 ```bash
-curl -s 'http://192.168.178.216/api/health' \
+curl -s http://192.168.178.216/api/health \
   | jq '{status, mocked, daily: {date, recovery_score, hrv, sleep_score, steps}}'
 ```
 
-A real-data response must contain:
+Real production result:
 
 ```json
 {
@@ -191,70 +418,209 @@ A real-data response must contain:
 }
 ```
 
-If the databases are unavailable, production mode returns HTTP 503. It does **not** silently display mock data. Mock data is available only when `MOCK_DATA=true` is explicitly configured.
+The application returns HTTP `503` when production data sources cannot be read. It does not silently switch to mock values.
 
-## Operations
+---
 
-Logs:
+## 11. Argo CD operations
 
-```bash
-kubectl logs -n health deployment/health-dashboard --tail=100 -f
-```
-
-Restart after a configuration or Secret update:
+Refresh:
 
 ```bash
-kubectl rollout restart deployment health-dashboard -n health
-kubectl rollout status deployment health-dashboard -n health
+argocd app refresh health-dashboard --hard
 ```
 
-Force ExternalSecret synchronization after changing Azure Key Vault:
+View status:
 
 ```bash
-kubectl annotate externalsecret health-dashboard-secrets \
-  -n health force-sync="$(date +%s)" --overwrite
+argocd app get health-dashboard
 ```
 
-Export data:
+View resources:
 
 ```bash
-curl -L 'http://192.168.178.216/api/report/export?format=csv' -o health-report.csv
-curl -L 'http://192.168.178.216/api/report/export?format=json' -o health-report.json
-curl -L 'http://192.168.178.216/api/report/download' -o health-report.pdf
+argocd app resources health-dashboard
 ```
 
-## Image update workflow
-
-```text
-1. Change apps/health-dashboard.
-2. Push to main.
-3. GitHub Actions runs tests, builds, and scans the image.
-4. GitHub Actions pushes the image and captures its immutable digest.
-5. GitHub Actions updates kustomization.yaml and commits the digest.
-6. Argo CD detects the Git change and syncs the new Deployment.
-```
-
-Example:
+View differences:
 
 ```bash
-git add apps/health-dashboard
-git commit -m "Update health dashboard"
-git push origin main
+argocd app diff health-dashboard
 ```
 
-After GitHub Actions succeeds, monitor the automatic deployment commit:
+Sync:
 
 ```bash
-git log --oneline -5
-argocd app refresh health-dashboard
+argocd app sync health-dashboard
+```
+
+Wait for health:
+
+```bash
 argocd app wait health-dashboard --health --sync
 ```
 
-## Safety notes
+View history:
 
-- This is a personal health-data application, not a medical device.
-- Keep the Service LAN-only unless authentication and TLS are added.
-- Do not commit InfluxDB credentials.
-- Do not manually change the image tag; GitHub Actions writes the immutable digest to `kustomization.yaml`.
-- The dashboard is stateless; Garmin and Ring data remain in their own PVC-backed databases.
-- Back up the Garmin and VictoriaMetrics Longhorn volumes independently.
+```bash
+argocd app history health-dashboard
+```
+
+Do not use manual `kubectl edit` as a permanent configuration change. Make changes in Git.
+
+---
+
+## 12. Update and rollback
+
+### Normal update
+
+```text
+Edit apps/health-dashboard
+→ push main
+→ GitHub Actions tests/builds/scans/pushes
+→ GitHub Actions updates kustomization.yaml
+→ Argo CD detects the Git commit
+→ Kubernetes rolls out the digest
+```
+
+Monitor:
+
+```bash
+git pull origin main
+git log --oneline -5
+argocd app refresh health-dashboard
+argocd app wait health-dashboard --health --sync
+kubectl rollout status deployment/health-dashboard -n health
+```
+
+### Rollback
+
+Find digest commits:
+
+```bash
+git log --oneline -- kustomization.yaml
+```
+
+Revert the bad deployment commit:
+
+```bash
+git revert <commit>
+git push origin main
+```
+
+Sync:
+
+```bash
+argocd app sync health-dashboard
+```
+
+The Dashboard is stateless. Rollback does not change Garmin or Ring database contents.
+
+---
+
+## 13. Logs and runtime diagnostics
+
+Application logs:
+
+```bash
+kubectl logs -n health deployment/health-dashboard --tail=100
+kubectl logs -n health deployment/health-dashboard -f
+```
+
+Previous crashed container:
+
+```bash
+kubectl logs -n health deployment/health-dashboard --previous
+```
+
+Pod details:
+
+```bash
+kubectl describe pod -n health -l app.kubernetes.io/name=health-dashboard
+```
+
+Events:
+
+```bash
+kubectl get events -n health --sort-by=.metadata.creationTimestamp
+```
+
+Deployment status:
+
+```bash
+kubectl rollout status deployment/health-dashboard -n health
+kubectl rollout history deployment/health-dashboard -n health
+```
+
+---
+
+## 14. Troubleshooting table
+
+| Symptom | Check | Common cause |
+|---|---|---|
+| `ImagePullBackOff` | `kubectl describe pod` | Private GHCR package or wrong digest |
+| `CrashLoopBackOff` | `kubectl logs --previous` | Missing Secret, invalid config, import error |
+| ExternalSecret not synced | `kubectl describe externalsecret` | Azure key missing or ClusterSecretStore failure |
+| Service has no IP | `kubectl describe svc` | MetalLB pool/IP conflict |
+| HTTP 503 from API | Application logs | InfluxDB or VictoriaMetrics unavailable |
+| `mocked: true` | ConfigMap and pod env | `MOCK_DATA=true` accidentally deployed |
+| No Garmin measurements | InfluxDB queries | Garmin collector not synchronized or field mismatch |
+| No Ring measurements | VictoriaMetrics query | Ring app not ingesting or wrong device label |
+| Argo `OutOfSync` | `argocd app diff` | Git/live drift or pending digest commit |
+| Argo comparison error | `argocd app get` | Invalid Kustomize or Kubernetes manifest |
+| Rollout stuck | `kubectl describe deployment` | Failed readiness, image pull, or resource issue |
+
+---
+
+## 15. Security and exposure
+
+The Service is LAN-only:
+
+```yaml
+loadBalancerSourceRanges:
+  - 192.168.178.0/24
+```
+
+The Dashboard currently has no login system and no TLS. Do not expose it publicly.
+
+Before public exposure, add:
+
+```text
+HTTPS through Traefik
+Authentication
+Authorization
+Cloudflare Access or VPN restriction
+Audit logging
+```
+
+Never commit:
+
+```text
+InfluxDB username
+InfluxDB password
+GHCR token
+Azure credentials
+```
+
+---
+
+## 16. Backups
+
+The Dashboard has no PVC and is stateless.
+
+Back up the data stores instead:
+
+```bash
+kubectl get pvc -n garmin
+kubectl get pvc -n ring-health
+```
+
+Important PVCs:
+
+```text
+garmin-influxdb-data
+garminconnect-tokens
+victoriametrics-data
+```
+
+Use Longhorn backup and test restoration. An application image rollback cannot restore deleted health data.

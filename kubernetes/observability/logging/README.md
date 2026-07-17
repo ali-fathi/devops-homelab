@@ -1,8 +1,14 @@
 # 📜 Phase 5 – Centralized Logging with Loki + Grafana Alloy
 
+For the broad platform study guide, read:
+
+```text
+docs/homelab-study-guide.md
+```
+
 This phase adds centralized logging and log-based alerting to the DevOps Homelab Kubernetes platform.
 
-Promtail has been replaced with **Grafana Alloy** because Promtail is EOL as of **March 2, 2026**, and Grafana states that future development for this log collection path continues in Grafana Alloy. [1](https://azure.microsoft.com/en-us/pricing/details/key-vault/)
+Promtail has been replaced with **Grafana Alloy** because Promtail is EOL as of **March 2, 2026**, and Grafana states that future development for this log collection path continues in Grafana Alloy.
 
 Before this phase, the platform already includes:
 
@@ -100,7 +106,7 @@ Grafana Alloy can forward collected logs to Loki using `loki.write`, and Grafana
 
 Promtail is EOL as of March 2, 2026.
 
-Promtail should be replaced with Grafana Alloy or another supported log collector. [1](https://azure.microsoft.com/en-us/pricing/details/key-vault/)
+Promtail should be replaced with Grafana Alloy or another supported log collector.
 
 The new logging pipeline becomes:
 
@@ -985,3 +991,12 @@ data:
               category: observability
             annotations:
               summary: "Critical Grafana log detected"
+```
+
+The detailed active rule set is stored in:
+
+```text
+kubernetes/observability/logging/loki-log-alert-rules.yaml
+```
+
+Validate the ConfigMap and rules before applying them. Avoid running Alloy and Promtail together because both collectors would duplicate log entries.

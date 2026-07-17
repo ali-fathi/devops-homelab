@@ -1,5 +1,11 @@
 # 🚨 Phase 4.1 – Azure Key Vault + External Secrets Operator + Alertmanager + Telegram
 
+For the broad platform study guide, read:
+
+```text
+docs/homelab-study-guide.md
+```
+
 ## Overview
 
 This phase extends the monitoring stack by introducing secure secret management and alerting.

@@ -1,30 +1,136 @@
+# Kubernetes Observability
 
-```markdown
-# Observability
+This directory contains platform-level monitoring, logging, dashboards, and alerting configuration.
 
-This directory contains observability platform configuration.
+For the complete repository-wide study guide:
 
-## Includes
+```text
+docs/homelab-study-guide.md
+```
 
-- monitoring
-- logging
-- alerting
+## Scope
 
-## Purpose
+```text
+kubernetes/observability/
+├── monitoring/
+├── logging/
+└── alerting/
+```
 
-This folder is for platform observability components and configuration such as:
-
-- Prometheus values
-- Grafana dashboards
-- Grafana datasources
-- PrometheusRules
-- Loki values
-- Alloy values
-- Alertmanager values
-
-## Not for
-
-Application workloads should not live here. For example, Garmin and Ring Health Tracker belong under:
+Application workloads do not belong here. Garmin, Ring Health Tracker, and Health Dashboard belong under:
 
 ```text
 kubernetes/applications/
+```
+
+The observability layer observes applications; it should not become a place to store application Deployments or application databases.
+
+## Signal flow
+
+Metrics:
+
+```text
+Kubernetes and workloads
+  → Prometheus
+  → Grafana dashboards
+  → PrometheusRules
+  → Alertmanager
+  → Telegram
+```
+
+Logs:
+
+```text
+Kubernetes Pods
+  → Grafana Alloy DaemonSet
+  → Loki
+  → Grafana LogQL
+  → Loki ruler alerts
+  → Alertmanager
+```
+
+## Directory responsibilities
+
+### Monitoring
+
+```text
+kubernetes/observability/monitoring/
+```
+
+Contains kube-prometheus-stack values, Grafana LoadBalancer configuration, dashboards, and dashboard catalog documentation.
+
+### Logging
+
+```text
+kubernetes/observability/logging/
+```
+
+Contains Loki values, Alloy values, Grafana Loki datasource, Loki log alert rules, and LogQL query documentation.
+
+### Alerting
+
+```text
+kubernetes/observability/alerting/
+```
+
+Contains Alertmanager values, Telegram ExternalSecret, PrometheusRules, alert runbooks, and message templates.
+
+## GitOps adoption order
+
+Move low-risk configuration first:
+
+```text
+1. Grafana dashboards
+2. Grafana datasources
+3. PrometheusRules
+4. Loki alert rules
+5. Alertmanager templates
+6. Alloy/Loki configuration
+7. Monitoring Helm values
+8. Full platform Helm releases
+```
+
+Storage-backed monitoring components require backups and restore testing before enabling aggressive pruning.
+
+## Validation
+
+```bash
+kubectl get pods -n monitoring
+kubectl get pods -n logging
+kubectl get prometheusrule -A
+kubectl get svc -n monitoring
+kubectl get configmap -n monitoring --show-labels
+kubectl get configmap -n logging --show-labels
+```
+
+## Quality principles
+
+Good observability is:
+
+```text
+relevant
+actionable
+low-noise
+owned
+linked to runbooks
+```
+
+Avoid:
+
+```text
+alerts with no operator action
+dashboards with no owner
+publicly exposed sensitive data
+rules without runbooks
+unbounded log retention
+```
+
+Related documentation:
+
+```text
+kubernetes/observability/monitoring/README.md
+kubernetes/observability/logging/README.md
+kubernetes/observability/alerting/README.md
+kubernetes/observability/logging/queries-cheatsheet.md
+docs/runbooks/
+```

@@ -62,19 +62,17 @@ The repository is designed to be:
 │  Worker: 192.168.178.81             │
 │  Worker: 192.168.178.82             │
 │                                     │
-│  Future Services:                   │
-│  - Forgejo                          │
-│  - Woodpecker CI                    │
-│  - Jenkins                          │
-│  - Harbor                           │
-│  - ArgoCD                           │
-│  - FluxCD                           │
+│  Platform Services:                 │
+│  - Argo CD                          │
 │  - Longhorn                         │
 │  - MetalLB                          │
-│  - Prometheus                       │
-│  - Grafana                          │
-│  - Loki                             │
-│  - Promtail                         │
+│  - Prometheus/Grafana               │
+│  - Alertmanager                     │
+│  - Loki/Grafana Alloy               │
+│  - Garmin InfluxDB                  │
+│  - Ring VictoriaMetrics             │
+│  - Health Dashboard                 │
+│  Planned: Harbor/Forgejo/Jenkins    │
 └─────────────────────────────────────┘
 ```
 
@@ -128,6 +126,12 @@ devops-homelab/
 │
 ├── docs/
 │
+├── apps/
+│   ├── health-dashboard/
+│   └── homelab-api/
+│
+├── .github/workflows/
+│
 ├── ansible/
 │
 ├── terraform/
@@ -136,6 +140,23 @@ devops-homelab/
 │
 └── scripts/
 ```
+
+## 📖 Recommended reading order
+
+```text
+1. docs/homelab-study-guide.md
+2. .devcontainer/README.md
+3. ansible/README.md
+4. kubernetes/README.md
+5. kubernetes/infrastructure/README.md
+6. kubernetes/observability/README.md
+7. kubernetes/gitops/argocd/README.md
+8. apps/health-dashboard/README.md
+9. kubernetes/applications/health-dashboard/README.md
+10. terraform/README.md
+```
+
+The documentation distinguishes implemented components from planned/scaffolded components. Do not treat a future design section as proof that a service is currently installed.
 
 ---
 
@@ -419,28 +440,80 @@ kustomize
 
 ---
 
-# 🎯 Future Platform Components
+# 🎯 Platform Components
 
-The Kubernetes cluster will host:
+Implemented or actively configured:
+
+- Argo CD
+- MetalLB
+- Longhorn
+- Prometheus
+- Grafana
+- Alertmanager
+- Loki
+- Grafana Alloy
+- External Secrets Operator integration
+- Garmin data platform
+- Ring Health Tracker
+- Health Dashboard
+
+Planned or scaffolded:
 
 - Forgejo
 - Woodpecker CI
 - Jenkins
-- Harbor
-- ArgoCD
-- FluxCD
-- MetalLB
-- Traefik
-- Longhorn
-- Sealed Secrets
-- Prometheus
-- Grafana
-- Loki
-- Promtail
+- Harbor deployment
+- Traefik configuration
+- Sealed Secrets usage
+- Terraform-managed infrastructure
 
-All infrastructure and configuration for these services will be stored and managed from this repository.
+All infrastructure and configuration for these services is documented and managed from this repository. See `docs/homelab-study-guide.md` for ownership and current status.
 
 ---
+
+# 📚 Study Guides
+
+The broad platform study guide is:
+
+```text
+docs/homelab-study-guide.md
+```
+
+The Health Dashboard is the complete example application for learning the repository's application delivery path:
+
+```text
+Application code
+  → unit tests
+  → Docker image
+  → Trivy vulnerability scan
+  → GHCR image registry
+  → immutable image digest
+  → Kustomize
+  → Argo CD
+  → Kubernetes Deployment
+  → MetalLB LAN Service
+```
+
+Read the detailed guide here:
+
+```text
+apps/health-dashboard/README.md
+```
+
+Read the Kubernetes operations runbook here:
+
+```text
+kubernetes/applications/health-dashboard/README.md
+```
+
+The current Health Dashboard deployment uses:
+
+```text
+Namespace: health
+MetalLB IP: 192.168.178.216
+Argo CD app: health-dashboard
+Data sources: Garmin InfluxDB and Ring VictoriaMetrics
+```
 
 # 👨‍💻 Author
 

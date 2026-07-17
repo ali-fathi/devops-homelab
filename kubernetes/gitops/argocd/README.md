@@ -1,5 +1,11 @@
 # Argo CD GitOps Deployment - Homelab K3s
 
+For the broad platform study guide, read:
+
+```text
+docs/homelab-study-guide.md
+```
+
 This README documents the complete Argo CD GitOps setup for the `devops-homelab` project.
 
 The goal is to use Argo CD as the GitOps controller for the K3s homelab cluster, expose the Argo CD UI/API through MetalLB, and gradually move workloads from manual `kubectl apply` / `helm upgrade` workflows into declarative Git-managed deployments.

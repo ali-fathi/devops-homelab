@@ -1,5 +1,11 @@
 # 🤖 Ansible Homelab Management
 
+For the repository-wide platform study guide, read:
+
+```text
+docs/homelab-study-guide.md
+```
+
 This directory contains all Ansible configuration, inventory files, playbooks, and future automation used to manage the K3s homelab environment.
 
 The goal is to manage the entire Kubernetes infrastructure from a single location without manually logging into each server.
@@ -107,8 +113,7 @@ ansible/
 │   └── k3s_cluster.yml
 │
 ├── playbooks/
-│   ├── check-cluster.yml
-│   └── check-cluster-detailed.yml
+│   └── check-cluster.yml
 │
 ├── roles/
 │
@@ -560,16 +565,16 @@ Connected successfully to k3s-worker2
 
 # Detailed Health Check
 
-File:
+The current detailed playbook is:
 
 ```text
-playbooks/check-cluster-detailed.yml
+playbooks/check-cluster.yml
 ```
 
 Run:
 
 ```bash
-ansible-playbook playbooks/check-cluster-detailed.yml
+ansible-playbook playbooks/check-cluster.yml
 ```
 
 This playbook collects:

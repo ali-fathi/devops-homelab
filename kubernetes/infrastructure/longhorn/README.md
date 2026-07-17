@@ -1,5 +1,11 @@
 # 💾 Longhorn – Distributed Storage for K3s Homelab
 
+For the broad platform study guide, read:
+
+```text
+docs/homelab-study-guide.md
+```
+
 Longhorn is a cloud-native distributed block storage platform for Kubernetes.
 
 It provides persistent storage for applications running inside your K3s cluster.

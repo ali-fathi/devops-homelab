@@ -1,5 +1,11 @@
 # Harbor Registry
 
+For the repository-wide platform study guide, read:
+
+```text
+docs/homelab-study-guide.md
+```
+
 This directory contains preparation files for deploying Harbor as the private container registry for the homelab.
 
 Harbor will be used to store, scan, and manage container images for homelab applications.

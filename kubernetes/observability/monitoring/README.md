@@ -1,6 +1,12 @@
 # 📊 Phase 4 – Monitoring & Observability
 # Prometheus + Grafana for K3s Homelab
 
+For the broad platform study guide, read:
+
+```text
+docs/homelab-study-guide.md
+```
+
 ## Overview
 
 This phase introduces monitoring and observability into the Kubernetes platform.
@@ -1080,7 +1086,7 @@ Phase 5 introduces centralized logging:
 
 ```text
 Loki
-Promtail
+Grafana Alloy
 Grafana Logs
 ```
 

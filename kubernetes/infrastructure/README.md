@@ -1,5 +1,11 @@
 # Kubernetes Infrastructure
 
+For the repository-wide platform study guide, read:
+
+```text
+docs/homelab-study-guide.md
+```
+
 This directory contains Kubernetes infrastructure components for the homelab cluster.
 
 Infrastructure components are platform-level services that other workloads depend on.

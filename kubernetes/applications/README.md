@@ -279,6 +279,20 @@ LAN-only MetalLB Service at 192.168.178.216
 
 The dashboard reads Garmin InfluxDB and Ring VictoriaMetrics data. It must run with `MOCK_DATA=false` in the cluster.
 
+Study guide:
+
+```text
+apps/health-dashboard/README.md
+```
+
+CI workflow:
+
+```text
+.github/workflows/health-dashboard-build.yaml
+```
+
+The workflow writes an immutable image digest to `kustomization.yaml`; Argo CD then deploys that Git change.
+
 ---
 
 ### Ring Health Tracker

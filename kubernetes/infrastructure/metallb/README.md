@@ -1,5 +1,11 @@
 # 🚀 MetalLB – LoadBalancer for K3s Homelab
 
+For the broad platform study guide, read:
+
+```text
+docs/homelab-study-guide.md
+```
+
 MetalLB is a network load-balancer implementation for **bare-metal Kubernetes clusters** like K3s.
 
 It enables Kubernetes to use:

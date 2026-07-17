@@ -630,4 +630,4 @@ This configuration should be applied immediately after installing K3s, before de
 - Woodpecker CI
 - ArgoCD
 - Prometheus/Grafana
-- Loki/Promtail
+- Loki/Grafana Alloy

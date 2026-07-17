@@ -2,6 +2,8 @@
 
 This file contains useful LogQL queries for the homelab logging stack.
 
+Grafana Alloy is the current Kubernetes log collector. Some older headings below retain the word `Promtail` because the queries and troubleshooting concepts were originally written for that collector; use Alloy Pods and Alloy configuration for current operations.
+
 Stack:
 
 ```text
@@ -12,7 +14,7 @@ Prometheus
 Grafana
 Alertmanager
 Loki
-Promtail
+Grafana Alloy
 Telegram Alerts
 ```
 

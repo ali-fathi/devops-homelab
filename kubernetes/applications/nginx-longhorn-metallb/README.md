@@ -748,4 +748,4 @@ This is an important validation before deploying more advanced services such as:
 - Woodpecker CI
 - ArgoCD
 - Prometheus/Grafana
-- Loki/Promtail
+- Loki/Grafana Alloy

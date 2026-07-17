@@ -1,5 +1,11 @@
 # Homelab API
 
+For the repository-wide platform study guide, read:
+
+```text
+docs/homelab-study-guide.md
+```
+
 This is a small demo application used to learn CI/CD, container builds, image scanning, container registry publishing, and later GitOps deployment.
 
 The application is intentionally simple. The goal is not to build a complex service yet. The goal is to create a clean, repeatable DevOps workflow:
@@ -215,9 +221,13 @@ Make Trivy blocking after findings are understood.
 
 ---
 
+## Current deployment status
+
+The app is currently a CI/CD learning workload. Its GitHub Actions workflow builds, scans, and publishes the image to GHCR. It is not currently deployed by a Kubernetes Application or Argo CD Application in this repository.
+
 ## Future Kubernetes Deployment
 
-This app is not deployed to Kubernetes yet in Week 4.
+This app is not deployed to Kubernetes yet.
 
 Future Kubernetes path could be:
 
