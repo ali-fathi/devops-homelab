@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health Command Center</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/chart.min.js"></script>
+    <script src="/static/dashboard.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <div class="logo-section">
+                <h1>🛡️ Health Command Center</h1>
+                <p>Private Self-Hosted Garmin & Ring Biometrics Tracker</p>
+            </div>
+            <div class="status-badge">
+                <span class="status-dot" id="connection-status-dot"></span>
+                <span id="connection-status-text">Connecting...</span>
+            </div>
+        </header>
+
+        <!-- Tabs Navigation -->
+        <nav class="tabs-nav">
+            <button class="tab-btn active" data-tab="tab-command-center">Command Center</button>
+            <button class="tab-btn" data-tab="tab-weekly-health">Weekly Narrative</button>
+            <button class="tab-btn" data-tab="tab-monthly-report">Monthly Report</button>
+        </nav>
+
+        <!-- TAB 1: Health Command Center -->
+        <div id="tab-command-center" class="tab-pane active">
+            <!-- Metrics Grid -->
+            <div class="metrics-summary-grid">
+                <!-- Recovery / Readiness -->
+                <div class="card metric-card blue">
+                    <div class="metric-card-header">
+                        <span>Readiness / Recovery</span>
+                        <span class="metric-icon">🔋</span>
+                    </div>
+                    <div>
+                        <div class="metric-value" id="recovery-score">N/A</div>
+                        <div id="recovery-change">--</div>
+                    </div>
+                </div>
+
+                <!-- Heart Rate -->
+                <div class="card metric-card red">
+                    <div class="metric-card-header">
+                        <span>HR / Resting HR</span>
+                        <span class="metric-icon">❤️</span>
+                    </div>
+                    <div>
+                        <div class="metric-value" id="heart-rate">N/A</div>
+                        <div id="hr-change">--</div>
+                    </div>
+                </div>
+
+                <!-- HRV -->
+                <div class="card metric-card green">
+                    <div class="metric-card-header">
+                        <span>HRV (RMSSD)</span>
+                        <span class="metric-icon">📈</span>
+                    </div>
+                    <div>
+                        <div class="metric-value"><span id="hrv-value">N/A</span><span class="metric-unit">ms</span></div>
+                        <div id="hrv-change">--</div>
+                    </div>
+                </div>
+
+                <!-- Sleep -->
+                <div class="card metric-card purple">
+                    <div class="metric-card-header">
+                        <span>Sleep Duration</span>
+                        <span class="metric-icon">🌙</span>
+                    </div>
+                    <div>
+                        <div class="metric-value" id="sleep-value">N/A</div>
+                        <div id="sleep-quality" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.2rem;"></div>
+                        <div id="sleep-change">--</div>
+                    </div>
+                </div>
+
+                <!-- Stress & SpO2 -->
+                <div class="card metric-card orange">
+                    <div class="metric-card-header">
+                        <span>Stress / SpO₂</span>
+                        <span class="metric-icon">⚖️</span>
+                    </div>
+                    <div>
+                        <div class="metric-value">
+                            <span id="stress-value">N/A</span>
+                            <span class="metric-unit" style="font-size: 1.1rem; color: var(--text-secondary);">stress</span>
+                            <span style="color: var(--card-border); margin: 0 0.4rem;">|</span>
+                            <span id="spo2-value">N/A</span>
+                        </div>
+                        <div class="metric-change neutral">Intraday levels</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Grid & Workouts -->
+            <div class="charts-grid">
+                <!-- Recovery Trend Chart -->
+                <div class="card">
+                    <h3>🔋 Readiness & Biometrics Trend (7 Days)</h3>
+                    <div class="chart-card-container">
+                        <canvas id="recoveryTrendChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Garmin Workouts -->
+                <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <h3>🏃 Recent Garmin Workouts</h3>
+                        <div class="activity-list" id="workouts-list">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                    
+                    <!-- Ring Sync Info -->
+                    <div style="border-top: 1px solid var(--card-border); margin-top: 1.5rem; padding-top: 1rem; font-size: 0.85rem; color: var(--text-secondary); display: flex; justify-content: space-between;">
+                        <span>Ring Battery: <strong id="ring-battery" style="color: var(--text-primary);">N/A</strong></span>
+                        <span>Synced: <strong id="ring-sync" style="color: var(--text-primary);">N/A</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Row -->
+            <div class="metrics-summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+                <div class="card" style="padding: 1.2rem; text-align: center;">
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.4rem;">Steps</div>
+                    <div class="metric-value" id="steps-value" style="font-size: 1.5rem; margin: 0;">0</div>
+                </div>
+                <div class="card" style="padding: 1.2rem; text-align: center;">
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.4rem;">Calories</div>
+                    <div class="metric-value" id="calories-value" style="font-size: 1.5rem; margin: 0;">0</div>
+                </div>
+                <div class="card" style="padding: 1.2rem; text-align: center;">
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.4rem;">Distance</div>
+                    <div class="metric-value" id="distance-value" style="font-size: 1.5rem; margin: 0;">0.0 km</div>
+                </div>
+                <div class="card" style="padding: 1.2rem; text-align: center;">
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.4rem;">Active Minutes</div>
+                    <div class="metric-value" id="active-min" style="font-size: 1.5rem; margin: 0;">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: Weekly Health Narrative -->
+        <div id="tab-weekly-health" class="tab-pane">
+            <div class="weekly-container">
+                <!-- Detailed narrative cards -->
+                <div class="card narrative-card">
+                    <div class="narrative-title">Weekly Insights & Observations</div>
+                    
+                    <div class="narrative-section" id="weekly-sleep-insights">
+                        <h3>🌙 Sleep Analysis</h3>
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <div class="narrative-section" id="weekly-recovery-trend">
+                        <h3>🔋 Recovery & HRV Trend</h3>
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <div class="narrative-section" id="weekly-workout-summary">
+                        <h3>🏃 Workout & Activity Summary</h3>
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <div class="narrative-section" id="weekly-stress-observations">
+                        <h3>⚖️ Stress & Blood Oxygen</h3>
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <div class="narrative-section" id="weekly-records">
+                        <h3>🏆 Achievements & Milestones</h3>
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <div class="narrative-section" style="margin-bottom: 0;" id="weekly-suggestions">
+                        <h3>🎯 Suggested Focus for Coming Week</h3>
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Sidebar for Score & trends -->
+                <div class="weekly-sidebar">
+                    <div class="card weekly-score-box">
+                        <h3>Weekly Health Score</h3>
+                        <div class="score-circle">
+                            <span class="score-num" id="weekly-score-num">0</span>
+                            <span style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 500;">points</span>
+                        </div>
+                        <p id="weekly-score-label" style="font-weight: 600; color: var(--accent-blue);"></p>
+                    </div>
+
+                    <div class="card" style="height: 250px; position: relative;">
+                        <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">HRV vs Resting HR</h3>
+                        <div style="height: 180px; position: relative;">
+                            <canvas id="hrvHrvTrendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: Monthly Health Report -->
+        <div id="tab-monthly-report" class="tab-pane">
+            <div class="monthly-actions-bar">
+                <div class="date-selector">
+                    <label for="report-month" style="margin-right: 0.5rem; color: var(--text-secondary); font-size: 0.95rem;">Select Report Month:</label>
+                    <select id="report-month">
+                        <option value="2026-07">July 2026</option>
+                        <option value="2026-06">June 2026</option>
+                        <option value="2026-05">May 2026</option>
+                    </select>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn btn-secondary" id="btn-export-csv">📥 Export CSV</button>
+                    <button class="btn btn-secondary" id="btn-export-json">📄 Export JSON</button>
+                    <button class="btn btn-secondary" id="btn-regenerate">🔄 Regenerate Report</button>
+                    <button class="btn btn-primary" id="btn-download-pdf">🖨️ Download PDF</button>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <!-- Sleep Quality & Duration Chart -->
+                <div class="card">
+                    <h3>🌙 Sleep Performance (Monthly Trend)</h3>
+                    <div class="chart-card-container">
+                        <canvas id="sleepQualityChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Insights Sidebar -->
+                <div class="card" id="monthly-insights-list">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Comparison Table Card -->
+            <div class="card" style="margin-top: 1.5rem;">
+                <h3>📊 Month-over-Month Comparison</h3>
+                <div class="comparison-table-wrapper">
+                    <table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Current Month</th>
+                                <th>Previous Month</th>
+                                <th>Difference</th>
+                            </tr>
+                        </thead>
+                        <tbody id="monthly-comparison-table-body">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
