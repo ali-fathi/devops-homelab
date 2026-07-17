@@ -51,13 +51,21 @@ class HealthDashboardTests(unittest.TestCase):
                 return []
 
         class EmptyInfluxClient:
-            def query(self, _query):
+            def __init__(self):
+                self.queries = []
+
+            def query(self, query):
+                self.queries.append(query)
                 return EmptyQueryResult()
 
+        influx_client = EmptyInfluxClient()
         with patch.object(health_app, "vm_query_range", return_value={}):
             rows = health_app.fetch_and_merge_production_data(
-                EmptyInfluxClient(), dt.date.today().year, dt.date.today().month
+                influx_client, dt.date.today().year, dt.date.today().month
             )
+
+        self.assertTrue(any('"duration"' in query for query in influx_client.queries))
+        self.assertTrue(any('"type"' in query for query in influx_client.queries))
 
         self.assertLessEqual(dt.date.fromisoformat(rows[-1]["date"]), dt.date.today())
         self.assertTrue(all(row["data_status"] == "no-data" for row in rows))

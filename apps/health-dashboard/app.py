@@ -238,8 +238,11 @@ def fetch_and_merge_production_data(
         "FROM DailyStats "
         f"WHERE time >= '{influx_start}' AND time <= '{influx_end}'"
     )
+    # duration is an InfluxQL keyword, so quote ActivitySummary field names.
+    # Quoting all selected fields also protects this query if another field name
+    # becomes reserved in a future InfluxDB version.
     workout_query = (
-        "SELECT type, duration, calories, distance, name FROM ActivitySummary "
+        'SELECT "type", "duration", "calories", "distance", "name" FROM ActivitySummary '
         f"WHERE time >= '{influx_start}' AND time <= '{influx_end}'"
     )
 
