@@ -1,0 +1,36 @@
+# Python / Flask
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+*.dist-info/
+
+# Virtual environment
+.venv/
+env/
+
+# IDE / editor
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs & temporary files
+*.log
+tmp_report.pdf
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Build artifacts
+build/
+/dist/
+*.egg
+
+# Miscellaneous
+*.sqlite3
