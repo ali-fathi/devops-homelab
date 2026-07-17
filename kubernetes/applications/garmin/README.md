@@ -1240,7 +1240,7 @@ Do not commit local secret files.
 Recommended `.gitignore` entries:
 
 ```gitignore
-kubernetes/observability/garmin/secret-garmin.yaml
+kubernetes/applications/garmin/secret-garmin.yaml
 *.env
 .env
 ```

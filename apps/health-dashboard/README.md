@@ -1,6 +1,6 @@
 # Health Dashboard
 
-A **lightweight, privacy‑first** web application that aggregates Garmin and Oura Ring health data, visualises it in a modern glass‑morphic UI, generates a deterministic weekly narrative, and produces a premium PDF monthly report.  The app is designed to run **inside your own K3s homelab** – no third‑party SaaS, no AI, and all data stays private.
+A **lightweight, privacy‑first** web application that aggregates Garmin and Colmi R02 Ring Health Tracker data, visualises it in a modern glass‑morphic UI, generates a deterministic weekly narrative, and produces a premium PDF monthly report. The dashboard, reports, and its two data stores run in your K3s homelab; Garmin collection still depends on Garmin Connect, and Ring ingestion is routed through the configured Cloudflare Tunnel.
 
 ---
 
@@ -26,7 +26,7 @@ A **lightweight, privacy‑first** web application that aggregates Garmin and Ou
 - **Monthly PDF Report** – elegant, vector‑drawn chart, summary tables, and narrative using **ReportLab** (no external binaries like wkhtmltopdf).
 - **Responsive Glass‑morphic UI** – vanilla HTML/CSS/JS, dark mode, custom colour palette, smooth micro‑animations.
 - **Mock‑data fallback** – works out‑of‑the‑box without any external databases (set `MOCK_DATA=true`).
-- **Dockerised & K3s ready** – small (~80 MB) image, health‑checks, and easy Helm/ArgoCD integration.
+- **Dockerised and K3s-ready** – the included Docker image runs with Gunicorn; the deployment example includes Kubernetes probes.
 
 ---
 
@@ -81,6 +81,9 @@ The generated PDF will be ~5 KB (mock data) and open in any PDF viewer.
 ---
 
 ## Running in K3s (Production)
+
+> **Current repository status:** this directory contains the application and Dockerfile only. The manifests below are a deployment reference; they are not yet committed under `kubernetes/applications/`, managed by Argo CD, or built by a dedicated CI workflow.
+
 ### 1️⃣ Build & push the image
 ```bash
 # From the health‑dashboard directory
@@ -90,7 +93,14 @@ docker push <your‑registry>/health-dashboard:latest
 ```
 Replace `<your‑registry>` with e.g. `registry.local:5000`.
 
-### 2️⃣ Create ConfigMap & Secret (replace with your real values)
+### 2️⃣ Create configuration and credentials
+
+Create the `health` namespace first. In this homelab, credentials should be supplied by an `ExternalSecret` backed by Azure Key Vault rather than committed in a plain Kubernetes `Secret`. The `Secret` below is a local/reference example only; replace its values before applying it.
+
+```bash
+kubectl create namespace health
+```
+
 ```yaml
 # config.yaml
 apiVersion: v1
@@ -220,7 +230,7 @@ If your real InfluxDB/VictoriaMetrics are reachable, the banner will show *Verif
 | `MOCK_DATA` | no | `false` | Set to `true` to bypass DB connections and use deterministic mock data.
 | `PYTHONUNBUFFERED` | no | `1` | Ensures logs appear in real‑time (useful for Kubernetes).
 
-All variables can be supplied via a **ConfigMap** (non‑secret) or a **Secret** for credentials.
+Supply non-secret settings through a **ConfigMap**. In the homelab, supply credentials through an Azure Key Vault-backed **ExternalSecret**, which creates the Kubernetes `Secret` consumed by the pod.
 
 ---
 
@@ -233,15 +243,15 @@ All variables can be supplied via a **ConfigMap** (non‑secret) or a **Secret**
 | `GET` | `/api/report/export` | `month=YYYY‑MM`, `format=csv|json` (default=`csv`) | Returns raw month data as CSV or JSON. |
 | `POST` | `/api/report/regenerate` | – | Stub endpoint that would trigger a background refresh in a full system. |
 
-All responses include a boolean `mocked` flag letting the front‑end display **Demo Mode** when real data is unavailable.
+The `/api/health` response includes a boolean `mocked` flag, letting the front end display **Demo Mode** when real data is unavailable.
 
 ---
 
 ## Docker Image
-- **Base**: `python:3.9-slim` (≈ 120 MB).
-- **Multi‑stage** build installs only runtime dependencies (Flask, InfluxDB‑client, ReportLab, etc.).
-- **Entry‑point**: `gunicorn -w 2 -b 0.0.0.0:8080 app:app`
-- **Health checks** are defined in the Kubernetes manifest; the image itself does not need extra scripts.
+- **Base**: `python:3.11-slim`.
+- **Build**: a single-stage image installs dependencies from `requirements.txt`, then copies the application source.
+- **Entrypoint**: `gunicorn --bind 0.0.0.0:8080 app:app`.
+- The image does not define a Docker `HEALTHCHECK`; use the readiness and liveness probes in the Kubernetes deployment example.
 
 You can run the image locally for a quick smoke test:
 ```bash
@@ -264,9 +274,9 @@ Then open **http://localhost:8080**.
 ---
 
 ## CI/CD Integration (GitOps / ArgoCD)
-1. **Repository layout** – the `apps/health-dashboard` folder is a self‑contained microservice.
-2. **GitOps pipeline** – your existing ArgoCD application can target the `health-dashboard.yaml` manifest directory.
-3. **Automated image build** – use a GitHub Actions workflow or a local CI that runs:
+1. **Repository layout** – `apps/health-dashboard` is a self-contained microservice.
+2. **Current status** – no Kubernetes manifests, Argo CD Application, or dedicated GitHub Actions image-build workflow for this app are committed yet.
+3. **Future delivery** – add deployable manifests under `kubernetes/applications/health-dashboard/`, an Argo CD Application under `kubernetes/gitops/argocd/applications/`, and a workflow that builds and publishes the image. A workflow can run:
    ```yaml
    - name: Build & push Docker image
      run: |
@@ -274,8 +284,8 @@ Then open **http://localhost:8080**.
        docker push ${{ env.REGISTRY }}/health-dashboard:${{ github.sha }}
    ```
    The image tag can be injected into the Kubernetes manifest via Kustomize or Helm values.
-4. **Rollback** – because the app is stateless and reads data from your homelab DBs, rolling back simply means redeploying the previous image tag.
-5. **Observability** – the Flask app logs to stdout; collect with Loki/Promtail or the built‑in K3s log aggregation.
+4. **Rollback** – because the app is stateless and reads data from the homelab databases, roll back by redeploying the previous image tag.
+5. **Observability** – the Flask app logs to stdout; collect it with the repository's Grafana Alloy → Loki logging stack.
 
 ---
 
@@ -287,7 +297,7 @@ The UI follows a **premium glass‑morphic design**:
 - Hover states use the `--accent‑*` gradients for a lively feel.
 - Font: **Outfit** from Google Fonts (weights 300‑700).
 
-> *If you need the actual screenshots, see the artifact images `tab1_command_center_…`, `tab2_weekly_narrative_…`, and `tab3_monthly_report_…` stored in the `.gemini` artifact directory.*
+> Screenshots are not stored in this repository; run the application locally with `MOCK_DATA=true` to view each tab.
 
 ---
 
@@ -306,4 +316,4 @@ MIT – feel free to fork, extend, and adapt to your own homelab.
 
 ---
 
-*Happy hacking!  Your private health‑command center is now ready to run locally, docked, and orchestrated in K3s.*
+*Happy hacking! Your private health command center is ready to run locally or as a container. Commit Kubernetes and Argo CD manifests before treating it as GitOps-managed in K3s.*

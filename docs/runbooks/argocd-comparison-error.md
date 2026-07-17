@@ -78,7 +78,7 @@ ls -la kubernetes/applications/ring-health-tracker
 app path does not exist
 ```
 
-Example:
+Example legacy error:
 
 ```text
 kubernetes/observability/garmin: app path does not exist
@@ -86,23 +86,15 @@ kubernetes/observability/garmin: app path does not exist
 
 ### Cause
 
-The Argo CD Application points to an old or incorrect Git path.
+The Argo CD Application points to an old or incorrect Git path. This can happen after moving an application folder.
 
-This often happens after moving an application folder.
-
-Example:
-
-Old path:
-
-```text
-kubernetes/observability/garmin
-```
-
-New path:
+The current Garmin application path in this repository is:
 
 ```text
 kubernetes/applications/garmin
 ```
+
+`kubernetes/observability/garmin` is a legacy path and must not be used in the Garmin Argo CD Application.
 
 ### Fix
 

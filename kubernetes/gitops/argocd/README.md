@@ -708,11 +708,12 @@ spec:
   project: homelab-platform
 
   source:
-    repoURL: https://github.com/YOUR_USER_OR_ORG/devops-homelab.git
+    repoURL: https://github.com/ali-fathi/devops-homelab.git
     targetRevision: main
-    path: kubernetes/observability/garmin
+    path: kubernetes/applications/garmin
 
     directory:
+      include: "{*.yaml,*.yml}"
       recurse: true
 
   destination:
@@ -781,7 +782,7 @@ Standard workflow:
 Example:
 
 ```bash
-nano kubernetes/observability/garmin/namespace.yaml
+nano kubernetes/applications/garmin/namespace.yaml
 ```
 
 Add annotation:
@@ -798,7 +799,7 @@ metadata:
 Commit:
 
 ```bash
-git add kubernetes/observability/garmin/namespace.yaml
+git add kubernetes/applications/garmin/namespace.yaml
 git commit -m "Mark Garmin namespace as GitOps managed"
 git push origin main
 ```
@@ -1101,7 +1102,7 @@ argocd app wait garmin --health --sync
 
 ```bash
 argocd app diff garmin
-argocd app diff garmin --local kubernetes/observability/garmin
+argocd app diff garmin --local kubernetes/applications/garmin
 ```
 
 ### Rollback
