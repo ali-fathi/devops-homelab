@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: health-dashboard-config
+  namespace: health
+data:
+  INFLUXDB_HOST: garmin-influxdb.garmin.svc.cluster.local
+  INFLUXDB_PORT: "8086"
+  INFLUXDB_DATABASE: GarminStats
+  VM_URL: http://victoriametrics.ring-health.svc.cluster.local:8428
+  RING_DEVICE: colmi_r02
+  MOCK_DATA: "false"
+  PYTHONUNBUFFERED: "1"
+  DB_TIMEOUT_SECONDS: "5"

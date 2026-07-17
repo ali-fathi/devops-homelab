@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 concurrency:
@@ -82,8 +82,59 @@ jobs:
             -u "${{ github.actor }}" \
             --password-stdin
 
-      - name: Push container image
+      - name: Push container image and capture digest
         if: github.event_name != 'pull_request'
+        id: push-image
+        shell: bash
         run: |
-          docker push "${IMAGE_NAME}:${{ github.sha }}"
+          set -euo pipefail
+
+          docker push "${IMAGE_NAME}:${{ github.sha }}" | tee /tmp/image-push.log
           docker push "${IMAGE_NAME}:latest"
+
+          digest="$(sed -n 's/.*digest: \(sha256:[0-9a-f]*\).*/\1/p' /tmp/image-push.log | tail -n 1)"
+          test -n "${digest}"
+          echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
+          echo "Published ${IMAGE_NAME}@${digest}"
+
+      - name: Update GitOps image digest
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE_DIGEST: ${{ steps.push-image.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch origin main
+          git checkout -B main origin/main
+
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+
+          path = Path("kubernetes/applications/health-dashboard/kustomization.yaml")
+          text = path.read_text(encoding="utf-8")
+          digest = os.environ["IMAGE_DIGEST"]
+          updated, count = re.subn(
+              r"(?m)^(\s+)(newTag|digest):\s*.*$",
+              lambda match: f"{match.group(1)}digest: {digest}",
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("Could not find the health-dashboard image version in kustomization.yaml")
+          path.write_text(updated, encoding="utf-8")
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add kubernetes/applications/health-dashboard/kustomization.yaml
+
+          if git diff --cached --quiet; then
+            echo "Image digest is already current."
+            exit 0
+          fi
+
+          git commit -m "chore(health-dashboard): deploy image ${{ github.sha }}"
+          git push origin main

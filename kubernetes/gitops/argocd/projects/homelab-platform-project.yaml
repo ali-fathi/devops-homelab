@@ -28,6 +28,9 @@ spec:
     - namespace: ring-health
       server: https://kubernetes.default.svc
 
+    - namespace: health
+      server: https://kubernetes.default.svc
+
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace

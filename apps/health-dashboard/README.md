@@ -108,15 +108,17 @@ The workflow:
 1. runs the unit tests;
 2. builds the image;
 3. scans it with Trivy for HIGH and CRITICAL vulnerabilities;
-4. publishes the image to GHCR on pushes to `main`.
+4. publishes the image to GHCR on pushes to `main`;
+5. captures the immutable registry digest;
+6. updates `kubernetes/applications/health-dashboard/kustomization.yaml` and commits the deployment change automatically.
 
-Image name:
+Images are published as:
 
 ```text
 ghcr.io/ali-fathi/health-dashboard:<commit-sha>
 ```
 
-Kubernetes uses the immutable commit SHA tag rather than `latest`.
+Kustomize uses the immutable image digest for the actual Deployment.
 
 ## Kubernetes deployment
 
@@ -165,13 +167,7 @@ argocd app sync health-dashboard
 argocd app wait health-dashboard --health --sync
 ```
 
-The image in `kubernetes/applications/health-dashboard/deployment.yaml` must be changed from:
-
-```text
-ghcr.io/ali-fathi/health-dashboard:REPLACE_WITH_GITHUB_SHA
-```
-
-to the SHA of a successful GitHub Actions build before syncing.
+Do not manually edit the image for each release. GitHub Actions updates `kubernetes/applications/health-dashboard/kustomization.yaml` with the immutable digest, and Argo CD deploys that Git change.
 
 ## Real-data verification
 

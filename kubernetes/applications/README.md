@@ -29,6 +29,7 @@ future internal services
 ```text
 applications/
 ├── garmin/
+├── health-dashboard/
 ├── nginx-longhorn-metallb/
 └── ring-health-tracker/
 ```
@@ -245,6 +246,38 @@ InfluxDB
 ExternalSecret
 PVCs
 ```
+
+---
+
+### Health Dashboard
+
+Path:
+
+```text
+kubernetes/applications/health-dashboard
+```
+
+Argo CD app:
+
+```text
+kubernetes/gitops/argocd/applications/health-dashboard.yaml
+```
+
+Namespace:
+
+```text
+health
+```
+
+Main components:
+
+```text
+Flask/Gunicorn dashboard
+ExternalSecret for InfluxDB credentials
+LAN-only MetalLB Service at 192.168.178.216
+```
+
+The dashboard reads Garmin InfluxDB and Ring VictoriaMetrics data. It must run with `MOCK_DATA=false` in the cluster.
 
 ---
 
