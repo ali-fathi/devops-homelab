@@ -510,8 +510,9 @@ The Dockerfile:
 
 - uses `python:3.11-slim`;
 - installs only required runtime packages;
-- creates a non-root `app` user;
+- creates the fixed numeric non-root user/group `10001`;
 - runs Gunicorn with two workers and two threads;
+- uses the numeric identity so Kubernetes can verify `runAsNonRoot`;
 - exposes port `8080`;
 - does not contain health data.
 

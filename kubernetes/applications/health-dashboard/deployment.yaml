@@ -36,6 +36,8 @@ spec:
             - secretRef:
                 name: health-dashboard-secrets
           securityContext:
+            runAsUser: 10001
+            runAsGroup: 10001
             runAsNonRoot: true
             allowPrivilegeEscalation: false
             capabilities:

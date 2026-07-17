@@ -67,6 +67,8 @@ kustomization.yaml
 
 The actual file name is `deployment.yaml`; the space before it above is only for alignment.
 
+The image and Deployment both use numeric user/group ID `10001`. Kubernetes requires a numeric image user when `runAsNonRoot: true` is enabled.
+
 ---
 
 ## 3. Prerequisites
