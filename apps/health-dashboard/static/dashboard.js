@@ -15,8 +15,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // Date selector trigger
+    // Build a rolling list of real calendar months instead of hard-coded dates.
     const reportMonthSelect = document.getElementById("report-month");
+    populateMonthSelector(reportMonthSelect);
     if (reportMonthSelect) {
         reportMonthSelect.addEventListener("change", () => {
             fetchHealthData(reportMonthSelect.value);
@@ -64,71 +65,99 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Initial load
-    fetchHealthData(reportMonthSelect.value);
+    if (reportMonthSelect && reportMonthSelect.value) {
+        fetchHealthData(reportMonthSelect.value);
+    }
 });
 
 let recoveryChart = null;
 let sleepChart = null;
 let hrvChart = null;
 
+function populateMonthSelector(select) {
+    if (!select) return;
+
+    const now = new Date();
+    for (let offset = 0; offset < 12; offset += 1) {
+        const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+        const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+        const label = date.toLocaleDateString(undefined, { year: "numeric", month: "long" });
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        select.appendChild(option);
+    }
+}
+
 function fetchHealthData(month) {
     const statusText = document.getElementById("connection-status-text");
     const statusDot = document.getElementById("connection-status-dot");
 
-    fetch(`/api/health?month=${month}`)
-        .then(res => res.json())
+    fetch(`/api/health?month=${encodeURIComponent(month)}`)
+        .then(async res => {
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || `Health API returned ${res.status}`);
+            }
+            return data;
+        })
         .then(data => {
-            // Update status indicator
             if (data.mocked) {
                 statusText.innerText = "Demo / Mock Mode";
+                statusDot.className = "status-dot mock";
+            } else if (data.status === "no_data") {
+                statusText.innerText = "Connected - No Measurements";
                 statusDot.className = "status-dot mock";
             } else {
                 statusText.innerText = "Connected to Homelab Databases";
                 statusDot.className = "status-dot";
             }
 
-            populateCommandCenter(data.daily);
-            populateWeeklyHealth(data.weekly);
-            populateMonthlyReport(data.monthly);
-            renderCharts(data.charts);
+            populateCommandCenter(data.daily || {});
+            populateWeeklyHealth(data.weekly || {});
+            populateMonthlyReport(data.monthly || {});
+            renderCharts(data.charts || { labels: [], recovery: [], sleep_duration: [], sleep_score: [], hrv: [], resting_hr: [] });
         })
         .catch(err => {
             console.error("Error fetching health metrics:", err);
-            statusText.innerText = "Connection Failed";
+            statusText.innerText = `Data Unavailable: ${err.message}`;
             statusDot.className = "status-dot red";
+            populateCommandCenter({});
         });
 }
 
 function populateCommandCenter(daily) {
+    daily = daily || {};
+
     // Current Recovery/Readiness
-    document.getElementById("recovery-score").innerText = daily.recovery_score || "N/A";
+    document.getElementById("recovery-score").innerText = daily.recovery_score ?? "N/A";
     document.getElementById("recovery-change").innerHTML = formatChange(daily.recovery_change);
     
     // Heart Rate / Resting HR
-    document.getElementById("heart-rate").innerText = `${daily.current_hr || "N/A"} / ${daily.resting_hr || "N/A"}`;
+    document.getElementById("heart-rate").innerText = `${daily.current_hr ?? "N/A"} / ${daily.resting_hr ?? "N/A"}`;
     document.getElementById("hr-change").innerHTML = formatChange(daily.hr_change);
     
     // HRV
-    document.getElementById("hrv-value").innerText = daily.hrv || "N/A";
+    document.getElementById("hrv-value").innerText = daily.hrv ?? "N/A";
     document.getElementById("hrv-change").innerHTML = formatChange(daily.hrv_change);
 
     // Sleep
-    document.getElementById("sleep-value").innerText = daily.sleep_duration || "N/A";
+    document.getElementById("sleep-value").innerText = daily.sleep_duration ?? "N/A";
     document.getElementById("sleep-quality").innerText = daily.sleep_quality ? `(${daily.sleep_quality})` : "";
     document.getElementById("sleep-change").innerHTML = formatChange(daily.sleep_change);
 
     // Stress & SpO2
-    document.getElementById("stress-value").innerText = daily.stress || "N/A";
+    document.getElementById("stress-value").innerText = daily.stress ?? "N/A";
     document.getElementById("spo2-value").innerText = daily.spo2 ? `${daily.spo2}%` : "N/A";
 
     // Activity Metrics
-    document.getElementById("steps-value").innerText = daily.steps ? daily.steps.toLocaleString() : "0";
-    document.getElementById("calories-value").innerText = daily.calories || "0";
-    document.getElementById("distance-value").innerText = daily.distance ? `${daily.distance} km` : "0.0 km";
-    document.getElementById("active-min").innerText = daily.active_minutes || "0";
+    document.getElementById("steps-value").innerText = daily.steps != null ? daily.steps.toLocaleString() : "N/A";
+    document.getElementById("calories-value").innerText = daily.calories ?? "N/A";
+    document.getElementById("distance-value").innerText = daily.distance != null ? `${daily.distance} km` : "N/A";
+    document.getElementById("active-min").innerText = daily.active_minutes ?? "N/A";
 
     // Battery / Last Sync
-    document.getElementById("ring-battery").innerText = daily.ring_battery ? `${daily.ring_battery}%` : "N/A";
+    document.getElementById("ring-battery").innerText = daily.ring_battery != null ? `${daily.ring_battery}%` : "N/A";
     document.getElementById("ring-sync").innerText = daily.last_sync || "N/A";
 
     // Garmin Workouts
@@ -140,13 +169,13 @@ function populateCommandCenter(daily) {
             item.className = "activity-item";
             item.innerHTML = `
                 <div class="activity-item-left">
-                    <span class="activity-badge ${w.type.toLowerCase()}">${w.type}</span>
+                    <span class="activity-badge ${escapeHtml(String(w.type || "workout").toLowerCase())}">${escapeHtml(w.type || "Workout")}</span>
                     <div>
-                        <div><strong>${w.name}</strong></div>
-                        <div class="activity-details">${w.duration} min | ${w.calories} kcal ${w.distance ? `| ${w.distance} km` : ""}</div>
+                        <div><strong>${escapeHtml(w.name || "Workout")}</strong></div>
+                        <div class="activity-details">${escapeHtml(w.duration ?? 0)} min | ${escapeHtml(w.calories ?? 0)} kcal ${w.distance != null ? `| ${escapeHtml(w.distance)} km` : ""}</div>
                     </div>
                 </div>
-                <div class="activity-details">${w.time}</div>
+                <div class="activity-details">${escapeHtml(w.time || "")}</div>
             `;
             workoutsList.appendChild(item);
         });
@@ -335,6 +364,15 @@ function getChartOptions(titleText, suggestedRange) {
             }
         }
     };
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 }
 
 function formatChange(val) {

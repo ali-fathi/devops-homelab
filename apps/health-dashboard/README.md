@@ -1,319 +1,251 @@
 # Health Dashboard
 
-A **lightweight, privacy‑first** web application that aggregates Garmin and Colmi R02 Ring Health Tracker data, visualises it in a modern glass‑morphic UI, generates a deterministic weekly narrative, and produces a premium PDF monthly report. The dashboard, reports, and its two data stores run in your K3s homelab; Garmin collection still depends on Garmin Connect, and Ring ingestion is routed through the configured Cloudflare Tunnel.
+A privacy-focused Flask application that combines Garmin data from InfluxDB with Colmi R02 Ring Health Tracker data from VictoriaMetrics.
 
----
+```text
+Garmin watch → Garmin Connect → garmin-fetch-data → InfluxDB
+Colmi R02 ring → Android app → VictoriaMetrics
+                                            ↓
+                                  Health Dashboard
+```
 
-## Table of Contents
-1. [Features](#features)
-2. [Architecture Overview](#architecture-overview)
-3. [Quick Start – Local Development](#quick-start--local-development)
-4. [Running in K3s (Production)](#running-in-k3s-production)
-5. [Configuration & Environment Variables](#configuration--environment-variables)
-6. [API Endpoints](#api-endpoints)
-7. [Docker Image](#docker-image)
-8. [Testing the PDF Export](#testing-the-pdf-export)
-9. [CI/CD Integration (GitOps/ArgoCD)](#cicd-integration-gitopsargocd)
-10. [Screenshots & Design System](#screenshots--design-system)
-11. [Troubleshooting](#troubleshooting)
-12. [License](#license)
-
----
+The dashboard runs inside the homelab. Garmin collection still depends on Garmin Connect, and Ring ingestion uses the configured Cloudflare Tunnel.
 
 ## Features
-- **Unified Dashboard** – shows recovery/readiness, HR, HRV, SpO₂, stress, sleep, steps, calories, distance, active minutes, and latest Garmin stats.
-- **Deterministic Weekly Narrative** – rule‑based health insights that are reproducible (useful for version‑controlled reporting).
-- **Monthly PDF Report** – elegant, vector‑drawn chart, summary tables, and narrative using **ReportLab** (no external binaries like wkhtmltopdf).
-- **Responsive Glass‑morphic UI** – vanilla HTML/CSS/JS, dark mode, custom colour palette, smooth micro‑animations.
-- **Mock‑data fallback** – works out‑of‑the‑box without any external databases (set `MOCK_DATA=true`).
-- **Dockerised and K3s-ready** – the included Docker image runs with Gunicorn; the deployment example includes Kubernetes probes.
 
----
+- Readiness/recovery, HR, HRV, sleep, stress, SpO₂, steps, calories, distance, and workouts.
+- Deterministic weekly narrative based on available measurements.
+- Monthly comparison, CSV/JSON export, and ReportLab PDF export.
+- Responsive vanilla HTML/CSS/JavaScript interface.
+- Explicit deterministic mock mode for local development.
+- Production container running Gunicorn as a non-root user.
 
-## Architecture Overview
+## Data integrity behavior
+
+Production mode is enabled with:
+
 ```text
-+----------------+      +-------------------+      +-------------------+
-|  Browser (UI) | <--> | Flask (app.py)    | <--> | InfluxDB (Garmin) |
-+----------------+      +-------------------+      +-------------------+
-                               |
-                               v
-                     +-------------------+
-                     | VictoriaMetrics    |
-                     | (Ring health)      |
-                     +-------------------+
+MOCK_DATA=false
 ```
-- The **frontend** (`index.html`, `dashboard.js`, `style.css`) calls the Flask API.
-- **Flask** loads data from:
-  - **InfluxDB** (Garmin) via the `influxdb` client.
-  - **VictoriaMetrics** (Ring) via HTTP PromQL.
-- If any connection fails **or** `MOCK_DATA=true`, the app generates deterministic mock data (stable across months for the same seed).
-- The **PDF** endpoint builds a ReportLab document on‑the‑fly, matching the UI colour scheme.
 
----
+In production mode:
 
-## Quick Start – Local Development
+- database failures return HTTP 503;
+- the application never silently converts an outage into mock data;
+- future days are not generated;
+- missing measurements remain `null` rather than being replaced with invented defaults;
+- readiness is calculated only when the measurements required by its formula exist;
+- the API reports `mocked: false` for real data and `mocked: true` only when mock mode was explicitly enabled.
+
+Mock mode is useful for development:
+
 ```bash
-# 1️⃣ Clone the repo (if not already in the workspace)
-cd /Users/alifathi/w/devops-homelab/apps/health-dashboard
+MOCK_DATA=true gunicorn --workers 2 --threads 2 --timeout 60 --bind 0.0.0.0:8080 app:app
+```
 
-# 2️⃣ (Re)create a virtual environment
+## Local development
+
+```bash
+cd apps/health-dashboard
 python3 -m venv .venv
 source .venv/bin/activate
-
-# 3️⃣ Install Python dependencies
 pip install -r requirements.txt
-
-# 4️⃣ Optional – force mock mode (useful when you have no DBs yet)
-export MOCK_DATA=true
-
-# 5️⃣ Run the server (development mode with auto‑reload)
-flask run --host 0.0.0.0 --port 8080   # or use gunicorn for prod
+MOCK_DATA=true gunicorn --workers 2 --threads 2 --timeout 60 --bind 0.0.0.0:8080 app:app
 ```
-Open your browser at **http://localhost:8080/**. You should see the *Health Command Center* banner indicating **Demo / Mock Mode**.
 
-### Verifying the PDF endpoint locally
-```bash
-curl -L "http://localhost:8080/api/report/download?month=$(date +%Y-%m)" -o health_report.pdf
-file health_report.pdf   # should report PDF document
+Open:
+
+```text
+http://localhost:8080
 ```
-The generated PDF will be ~5 KB (mock data) and open in any PDF viewer.
 
----
-
-## Running in K3s (Production)
-
-> **Current repository status:** this directory contains the application and Dockerfile only. The manifests below are a deployment reference; they are not yet committed under `kubernetes/applications/`, managed by Argo CD, or built by a dedicated CI workflow.
-
-### 1️⃣ Build & push the image
-```bash
-# From the health‑dashboard directory
-docker build -t <your‑registry>/health-dashboard:latest .
-# Push to a private registry reachable from your cluster
-docker push <your‑registry>/health-dashboard:latest
-```
-Replace `<your‑registry>` with e.g. `registry.local:5000`.
-
-### 2️⃣ Create configuration and credentials
-
-Create the `health` namespace first. In this homelab, credentials should be supplied by an `ExternalSecret` backed by Azure Key Vault rather than committed in a plain Kubernetes `Secret`. The `Secret` below is a local/reference example only; replace its values before applying it.
+Test the process endpoint:
 
 ```bash
-kubectl create namespace health
+curl http://localhost:8080/healthz
 ```
 
-```yaml
-# config.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: health-dashboard-config
-  namespace: health
-data:
-  INFLUXDB_HOST: "garmin-influxdb.garmin.svc.cluster.local"
-  INFLUXDB_PORT: "8086"
-  INFLUXDB_DATABASE: "GarminStats"
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: health-dashboard-secret
-  namespace: health
-type: Opaque
-stringData:
-  INFLUXDB_USERNAME: "myuser"
-  INFLUXDB_PASSWORD: "mypassword"
-  VM_URL: "http://victoriametrics.ring-health.svc.cluster.local:8428"
-```
-Apply with `kubectl apply -f config.yaml`.
+Test the API:
 
-### 3️⃣ Deploy the application (Deployment + Service + Ingress)
-```yaml
-# health-dashboard.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: health-dashboard
-  namespace: health
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: health-dashboard
-  template:
-    metadata:
-      labels:
-        app: health-dashboard
-    spec:
-      containers:
-        - name: app
-          image: <your‑registry>/health-dashboard:latest
-          ports:
-            - containerPort: 8080
-          envFrom:
-            - configMapRef:
-                name: health-dashboard-config
-            - secretRef:
-                name: health-dashboard-secret
-          env:
-            - name: MOCK_DATA
-              value: "false"   # real data mode
-          readinessProbe:
-            httpGet:
-              path: /api/health
-              port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /
-              port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 30
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: health-dashboard
-  namespace: health
-spec:
-  selector:
-    app: health-dashboard
-  ports:
-    - port: 80
-      targetPort: 8080
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: health-dashboard
-  namespace: health
-  annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
-    traefik.ingress.kubernetes.io/router.tls: "true"
-spec:
-  rules:
-    - host: health.myhomelab.local
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: health-dashboard
-                port:
-                  number: 80
-  tls:
-    - hosts:
-        - health.myhomelab.local
-      secretName: health-dashboard-tls
-```
-Apply: `kubectl apply -f health-dashboard.yaml`.
-
-### 4️⃣ Verify inside the cluster
 ```bash
-kubectl -n health port-forward svc/health-dashboard 8080:80
-# then browse http://localhost:8080
+curl -s http://localhost:8080/api/health | jq
 ```
-If your real InfluxDB/VictoriaMetrics are reachable, the banner will show *Verified Homelab Dataset*.
 
----
+Test a PDF:
 
-## Configuration & Environment Variables
-| Variable | Required? | Default | Description |
-|----------|-----------|---------|-------------|
-| `INFLUXDB_HOST` | yes (prod) | `garmin-influxdb.garmin.svc.cluster.local` |
-| `INFLUXDB_PORT` | yes | `8086` |
-| `INFLUXDB_DATABASE` | yes | `GarminStats` |
-| `INFLUXDB_USERNAME` | no (optional) | empty |
-| `INFLUXDB_PASSWORD` | no (optional) | empty |
-| `VM_URL` | yes (prod) | `http://victoriametrics.ring-health.svc.cluster.local:8428` |
-| `MOCK_DATA` | no | `false` | Set to `true` to bypass DB connections and use deterministic mock data.
-| `PYTHONUNBUFFERED` | no | `1` | Ensures logs appear in real‑time (useful for Kubernetes).
-
-Supply non-secret settings through a **ConfigMap**. In the homelab, supply credentials through an Azure Key Vault-backed **ExternalSecret**, which creates the Kubernetes `Secret` consumed by the pod.
-
----
-
-## API Endpoints
-| Method | Path | Query Params | Description |
-|--------|------|--------------|-------------|
-| `GET` | `/` | – | Serves the HTML UI. |
-| `GET` | `/api/health` | `month=YYYY‑MM` (optional) | Returns JSON with latest daily metrics, chart arrays (last 14 days), weekly narrative, month‑over‑month comparison. |
-| `GET` | `/api/report/download` | `month=YYYY‑MM` (optional) | Streams a PDF report. Content‑Disposition forces download. |
-| `GET` | `/api/report/export` | `month=YYYY‑MM`, `format=csv|json` (default=`csv`) | Returns raw month data as CSV or JSON. |
-| `POST` | `/api/report/regenerate` | – | Stub endpoint that would trigger a background refresh in a full system. |
-
-The `/api/health` response includes a boolean `mocked` flag, letting the front end display **Demo Mode** when real data is unavailable.
-
----
-
-## Docker Image
-- **Base**: `python:3.11-slim`.
-- **Build**: a single-stage image installs dependencies from `requirements.txt`, then copies the application source.
-- **Entrypoint**: `gunicorn --bind 0.0.0.0:8080 app:app`.
-- The image does not define a Docker `HEALTHCHECK`; use the readiness and liveness probes in the Kubernetes deployment example.
-
-You can run the image locally for a quick smoke test:
 ```bash
-docker run -p 8080:8080 \
-  -e MOCK_DATA=true \
-  <your‑registry>/health-dashboard:latest
+curl -L http://localhost:8080/api/report/download -o health-report.pdf
+file health-report.pdf
 ```
-Then open **http://localhost:8080**.
 
----
+Run unit tests:
 
-## Testing the PDF Export
-1. Start the app (local or in‑cluster).
-2. Open the UI and click **Download PDF** → the browser should download `health_report_YYYY-MM.pdf`.
-3. Or use `curl` as shown earlier.  Verify:
-   - HTTP 200
-   - `Content‑Type: application/pdf`
-   - The file size > 1 KB (indicates content).  Open the PDF to see the title banner, summary table, vector chart, and narrative.
+```bash
+python -m unittest discover -s tests -v
+```
 
----
+## Docker
 
-## CI/CD Integration (GitOps / ArgoCD)
-1. **Repository layout** – `apps/health-dashboard` is a self-contained microservice.
-2. **Current status** – no Kubernetes manifests, Argo CD Application, or dedicated GitHub Actions image-build workflow for this app are committed yet.
-3. **Future delivery** – add deployable manifests under `kubernetes/applications/health-dashboard/`, an Argo CD Application under `kubernetes/gitops/argocd/applications/`, and a workflow that builds and publishes the image. A workflow can run:
-   ```yaml
-   - name: Build & push Docker image
-     run: |
-       docker build -t ${{ env.REGISTRY }}/health-dashboard:${{ github.sha }} .
-       docker push ${{ env.REGISTRY }}/health-dashboard:${{ github.sha }}
-   ```
-   The image tag can be injected into the Kubernetes manifest via Kustomize or Helm values.
-4. **Rollback** – because the app is stateless and reads data from the homelab databases, roll back by redeploying the previous image tag.
-5. **Observability** – the Flask app logs to stdout; collect it with the repository's Grafana Alloy → Loki logging stack.
+The Docker image uses Python 3.11, installs the pinned dependencies, runs as a non-root user, and starts Gunicorn with two workers and two threads.
 
----
+```bash
+docker build -t health-dashboard:local .
+docker run --rm -p 8080:8080 -e MOCK_DATA=true health-dashboard:local
+```
 
-## Screenshots & Design System
-The UI follows a **premium glass‑morphic design**:
-- Primary colour palette (`--accent‑*`) generated from cool blues and purples.
-- Dark background with subtle radial gradients (`--bg-color`).
-- Cards have a semi‑transparent background (`--card-bg`) and a faint border (`--card-border`).
-- Hover states use the `--accent‑*` gradients for a lively feel.
-- Font: **Outfit** from Google Fonts (weights 300‑700).
+The image does not contain health data or credentials.
 
-> Screenshots are not stored in this repository; run the application locally with `MOCK_DATA=true` to view each tab.
+## GitHub Actions
 
----
+Workflow:
 
-## Troubleshooting
-| Symptom | Likely Cause | Fix |
-|---------|--------------|-----|
-| UI shows **Demo / Mock Mode** even though `MOCK_DATA=false` | DB host cannot be resolved or connection timeout. Check DNS, service names, and network policies. | Verify `INFLUXDB_HOST` and `VM_URL` point to reachable services. Use `kubectl exec` into the pod and `curl $INFLUXDB_HOST:8086/ping`. |
-| PDF download returns **0 KB** or hangs | Out‑of‑memory in tiny containers (unlikely) or missing `reportlab` library. | Ensure the image built successfully (check Docker build logs). Re‑install `reportlab` in the `requirements.txt`. |
-| `curl` returns *“Failed to resolve host”* | Wrong registry URL or missing `/etc/hosts` entry for intra‑cluster services. | Use the fully qualified service name `garmin-influxdb.garmin.svc.cluster.local`. |
-| Flask logs disappear after a restart | Running with `debug=True` may reload and wipe log buffers. | Use Gunicorn or set `FLASK_ENV=production`. |
+```text
+.github/workflows/health-dashboard-build.yaml
+```
 
----
+The workflow:
 
-## License
-MIT – feel free to fork, extend, and adapt to your own homelab.
+1. runs the unit tests;
+2. builds the image;
+3. scans it with Trivy for HIGH and CRITICAL vulnerabilities;
+4. publishes the image to GHCR on pushes to `main`.
 
----
+Image name:
 
-*Happy hacking! Your private health command center is ready to run locally or as a container. Commit Kubernetes and Argo CD manifests before treating it as GitOps-managed in K3s.*
+```text
+ghcr.io/ali-fathi/health-dashboard:<commit-sha>
+```
+
+Kubernetes uses the immutable commit SHA tag rather than `latest`.
+
+## Kubernetes deployment
+
+Canonical manifests:
+
+```text
+kubernetes/applications/health-dashboard/
+```
+
+Argo CD Application:
+
+```text
+kubernetes/gitops/argocd/applications/health-dashboard.yaml
+```
+
+The application is deployed into namespace `health` and exposed by MetalLB at:
+
+```text
+http://192.168.178.216
+```
+
+Before deployment, confirm the address is unused:
+
+```bash
+kubectl get svc -A -o wide | grep 192.168.178.216 || true
+```
+
+The Kubernetes configuration uses:
+
+```text
+INFLUXDB_HOST=garmin-influxdb.garmin.svc.cluster.local
+INFLUXDB_DATABASE=GarminStats
+VM_URL=http://victoriametrics.ring-health.svc.cluster.local:8428
+RING_DEVICE=colmi_r02
+MOCK_DATA=false
+```
+
+InfluxDB credentials are loaded through an Azure Key Vault-backed ExternalSecret. They must not be committed to Git.
+
+Deploy through Argo CD:
+
+```bash
+kubectl apply -f kubernetes/gitops/argocd/projects/homelab-platform-project.yaml
+kubectl apply -f kubernetes/gitops/argocd/applications/health-dashboard.yaml
+argocd app sync health-dashboard
+argocd app wait health-dashboard --health --sync
+```
+
+The image in `kubernetes/applications/health-dashboard/deployment.yaml` must be changed from:
+
+```text
+ghcr.io/ali-fathi/health-dashboard:REPLACE_WITH_GITHUB_SHA
+```
+
+to the SHA of a successful GitHub Actions build before syncing.
+
+## Real-data verification
+
+Check the application:
+
+```bash
+kubectl get pods,svc -n health
+kubectl get externalsecret -n health
+kubectl logs -n health deployment/health-dashboard --tail=100
+```
+
+Check the Service:
+
+```bash
+curl http://192.168.178.216/healthz
+```
+
+Check the data API:
+
+```bash
+curl -s http://192.168.178.216/api/health \
+  | jq '{status, mocked, daily: {date, recovery_score, hrv, sleep_score, steps}}'
+```
+
+A valid real-data response must contain:
+
+```json
+{
+  "status": "ok",
+  "mocked": false
+}
+```
+
+If data sources are unavailable, the API returns `503` with `status: data_unavailable`. This is intentional and prevents fake values from being presented as real health measurements.
+
+## API endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/` | Web dashboard |
+| `GET` | `/healthz` | Process health endpoint |
+| `GET` | `/api/health?month=YYYY-MM` | Dashboard data and narratives |
+| `GET` | `/api/report/export?format=csv` | CSV export |
+| `GET` | `/api/report/export?format=json` | JSON export |
+| `GET` | `/api/report/download` | PDF report |
+| `POST` | `/api/report/regenerate` | Confirms the next request reads current data |
+
+## Operations
+
+Restart after a configuration or Secret update:
+
+```bash
+kubectl rollout restart deployment health-dashboard -n health
+kubectl rollout status deployment health-dashboard -n health
+```
+
+Force ExternalSecret synchronization after changing Azure Key Vault:
+
+```bash
+kubectl annotate externalsecret health-dashboard-secrets \
+  -n health force-sync="$(date +%s)" --overwrite
+```
+
+Update flow:
+
+```text
+Change application code
+→ push to main
+→ GitHub Actions tests/builds/scans/publishes image
+→ update Deployment to the new SHA
+→ push manifest change
+→ Argo CD syncs the new image
+```
+
+The application is stateless. Garmin and Ring data remain in their existing Longhorn-backed databases and must be backed up independently.
+
+This dashboard is not a medical device and does not provide medical advice.

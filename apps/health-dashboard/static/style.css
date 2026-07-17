@@ -95,6 +95,11 @@ header {
     box-shadow: 0 0 8px var(--accent-orange);
 }
 
+.status-dot.red {
+    background-color: var(--accent-red);
+    box-shadow: 0 0 8px var(--accent-red);
+}
+
 /* Navigation Tabs */
 .tabs-nav {
     display: flex;

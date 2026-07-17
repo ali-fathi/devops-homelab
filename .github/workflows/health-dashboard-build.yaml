@@ -1,0 +1,89 @@
+name: Build Health Dashboard Container
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/health-dashboard/**"
+      - ".github/workflows/health-dashboard-build.yaml"
+
+  pull_request:
+    paths:
+      - "apps/health-dashboard/**"
+      - ".github/workflows/health-dashboard-build.yaml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: health-dashboard-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Run application tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r apps/health-dashboard/requirements.txt
+
+      - name: Run tests
+        run: python -m unittest discover -s apps/health-dashboard/tests -v
+
+  build:
+    needs: test
+    name: Build, scan, and publish image
+    runs-on: ubuntu-latest
+
+    env:
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/health-dashboard
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Build container image
+        run: |
+          docker build \
+            --label org.opencontainers.image.source="https://github.com/${{ github.repository }}" \
+            --label org.opencontainers.image.revision="${{ github.sha }}" \
+            --label org.opencontainers.image.title="health-dashboard" \
+            -t "${IMAGE_NAME}:${{ github.sha }}" \
+            -t "${IMAGE_NAME}:latest" \
+            apps/health-dashboard
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/health-dashboard:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
+            -u "${{ github.actor }}" \
+            --password-stdin
+
+      - name: Push container image
+        if: github.event_name != 'pull_request'
+        run: |
+          docker push "${IMAGE_NAME}:${{ github.sha }}"
+          docker push "${IMAGE_NAME}:latest"
