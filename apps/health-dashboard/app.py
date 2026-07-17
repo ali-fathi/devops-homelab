@@ -51,7 +51,11 @@ UTC = dt.timezone.utc
 
 
 class DataSourceError(RuntimeError):
-    """Raised when production data cannot be read."""
+    """Raised when a production data source cannot be read."""
+
+    def __init__(self, source: str, message: str):
+        super().__init__(message)
+        self.source = source
 
 
 # ==============================================================================
@@ -198,14 +202,22 @@ def get_db_data(year: int, month: int) -> Tuple[List[Dict[str, Any]], bool]:
             timeout=DB_TIMEOUT,
         )
         influx_client.ping()
+    except Exception as exc:
+        app.logger.exception("InfluxDB connection failed: host=%s database=%s", INFLUXDB_HOST, INFLUXDB_DB)
+        raise DataSourceError("influxdb", "InfluxDB is unavailable") from exc
 
+    try:
         vm_test = requests.get(f"{VM_URL}/api/v1/status/tsdb", timeout=DB_TIMEOUT)
         vm_test.raise_for_status()
+    except Exception as exc:
+        app.logger.exception("VictoriaMetrics connection failed: url=%s", VM_URL)
+        raise DataSourceError("victoriametrics", "VictoriaMetrics is unavailable") from exc
 
+    try:
         return fetch_and_merge_production_data(influx_client, year, month), False
     except Exception as exc:
-        app.logger.exception("Production health data read failed")
-        raise DataSourceError("health data sources are unavailable") from exc
+        app.logger.exception("Production data merge failed")
+        raise DataSourceError("data-query", "Production data query failed") from exc
 
 
 def fetch_and_merge_production_data(
@@ -656,7 +668,7 @@ def api_health():
     except ValueError as exc:
         return jsonify({"status": "invalid_request", "error": str(exc)}), 400
     except DataSourceError as exc:
-        return jsonify({"status": "data_unavailable", "mocked": False, "error": str(exc)}), 503
+        return jsonify({"status": "data_unavailable", "mocked": False, "source": exc.source, "error": str(exc)}), 503
 
     populated = [day for day in daily_data if day.get("has_data")]
     latest = populated[-1].copy() if populated else {}
@@ -726,7 +738,7 @@ def api_export():
     except ValueError as exc:
         return jsonify({"status": "invalid_request", "error": str(exc)}), 400
     except DataSourceError as exc:
-        return jsonify({"status": "data_unavailable", "mocked": False, "error": str(exc)}), 503
+        return jsonify({"status": "data_unavailable", "mocked": False, "source": exc.source, "error": str(exc)}), 503
 
     if export_format == "json":
         return jsonify(daily_data)
@@ -759,7 +771,7 @@ def api_download_pdf():
     except ValueError as exc:
         return jsonify({"status": "invalid_request", "error": str(exc)}), 400
     except DataSourceError as exc:
-        return jsonify({"status": "data_unavailable", "mocked": False, "error": str(exc)}), 503
+        return jsonify({"status": "data_unavailable", "mocked": False, "source": exc.source, "error": str(exc)}), 503
 
     populated = [day for day in daily_data if day.get("has_data")]
     if not populated:

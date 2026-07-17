@@ -43,6 +43,7 @@ class HealthDashboardTests(unittest.TestCase):
         payload = response.get_json()
         self.assertFalse(payload["mocked"])
         self.assertEqual(payload["status"], "data_unavailable")
+        self.assertEqual(payload["source"], "influxdb")
 
     def test_real_merge_keeps_missing_values_empty(self):
         class EmptyQueryResult:
