@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in — Health Command Center</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="auth-page">
+    <main class="auth-container">
+        <section class="auth-card" aria-labelledby="login-title">
+            <div class="auth-icon" aria-hidden="true">🛡️</div>
+            <h1 id="login-title">Health Command Center</h1>
+            <p class="auth-subtitle">Sign in to access your private health dashboard.</p>
+
+            {% if error %}
+            <div class="auth-error" role="alert">{{ error }}</div>
+            {% endif %}
+
+            {% if auth_configured %}
+            <form method="post" action="{{ url_for('login') }}" class="auth-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                <label for="username">Username</label>
+                <input
+                    id="username"
+                    name="username"
+                    type="text"
+                    autocomplete="username"
+                    required
+                    autofocus
+                >
+
+                <label for="password">Password</label>
+                <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autocomplete="current-password"
+                    required
+                >
+
+                <button type="submit" class="auth-submit">Sign in</button>
+            </form>
+            {% endif %}
+        </section>
+    </main>
+</body>
+</html>

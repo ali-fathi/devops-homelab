@@ -1,8 +1,20 @@
 import datetime as dt
+import os
 import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+from werkzeug.security import generate_password_hash
+
+TEST_USERNAME = "dashboard-test-user"
+TEST_PASSWORD = "correct-horse-battery-staple"
+os.environ.setdefault("DASHBOARD_USERNAME", TEST_USERNAME)
+os.environ.setdefault(
+    "DASHBOARD_PASSWORD_HASH",
+    generate_password_hash(TEST_PASSWORD, method="pbkdf2:sha256:1000000"),
+)
+os.environ.setdefault("FLASK_SECRET_KEY", "test-only-secret-key-with-at-least-32-bytes")
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 import app as health_app
@@ -12,9 +24,67 @@ class HealthDashboardTests(unittest.TestCase):
     def setUp(self):
         self.client = health_app.app.test_client()
         self.original_mock_mode = health_app.MOCK_DATA_ENV
+        self.login(self.client)
 
     def tearDown(self):
         health_app.MOCK_DATA_ENV = self.original_mock_mode
+
+    def login(self, client, username=TEST_USERNAME, password=TEST_PASSWORD):
+        client.get("/login")
+        with client.session_transaction() as session_data:
+            csrf_token = session_data["csrf_token"]
+        return client.post(
+            "/login",
+            data={
+                "username": username,
+                "password": password,
+                "csrf_token": csrf_token,
+            },
+        )
+
+    def test_login_is_required_for_dashboard_and_api(self):
+        anonymous_client = health_app.app.test_client()
+        dashboard_response = anonymous_client.get("/")
+        api_response = anonymous_client.get("/api/health")
+
+        self.assertEqual(dashboard_response.status_code, 302)
+        self.assertEqual(dashboard_response.headers["Location"], "/login")
+        self.assertEqual(api_response.status_code, 401)
+        self.assertEqual(api_response.get_json()["status"], "unauthorized")
+
+    def test_valid_login_creates_authenticated_session(self):
+        client = health_app.app.test_client()
+        response = self.login(client)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/")
+        with client.session_transaction() as session_data:
+            self.assertTrue(session_data["authenticated"])
+            self.assertEqual(session_data["username"], TEST_USERNAME)
+
+        dashboard_response = client.get("/")
+        self.assertEqual(dashboard_response.status_code, 200)
+        self.assertIn(b"Sign out", dashboard_response.data)
+
+    def test_invalid_login_is_rejected(self):
+        client = health_app.app.test_client()
+        response = self.login(client, password="wrong-password")
+
+        self.assertEqual(response.status_code, 401)
+        with client.session_transaction() as session_data:
+            self.assertNotIn("authenticated", session_data)
+
+    def test_missing_authentication_configuration_fails_closed(self):
+        client = health_app.app.test_client()
+        with patch.object(health_app, "AUTH_CONFIGURED", False):
+            login_response = client.get("/login")
+            api_response = client.get("/api/health")
+
+        self.assertEqual(login_response.status_code, 503)
+        self.assertEqual(api_response.status_code, 503)
+        self.assertEqual(
+            api_response.get_json()["status"], "authentication_unavailable"
+        )
 
     def test_process_health_endpoint(self):
         response = self.client.get("/healthz")

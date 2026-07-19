@@ -115,9 +115,28 @@ Azure Key Vault must contain:
 ```text
 garmin-influxdb-username
 garmin-influxdb-password
+health-dashboard-auth-username
+health-dashboard-auth-password-hash
+health-dashboard-flask-secret-key
 ```
 
-These are referenced by `external-secret.yaml`. Real values must never be committed to Git.
+Create the authentication values without committing a plaintext password:
+
+```bash
+PASSWORD_HASH="$(python3 -c 'from getpass import getpass; from werkzeug.security import generate_password_hash; print(generate_password_hash(getpass("Dashboard password: "), method="pbkdf2:sha256:1000000"))')"
+FLASK_SECRET_KEY="$(openssl rand -hex 32)"
+
+az keyvault secret set --vault-name "$KEY_VAULT_NAME" \
+  --name health-dashboard-auth-username --value "ali" --output none
+az keyvault secret set --vault-name "$KEY_VAULT_NAME" \
+  --name health-dashboard-auth-password-hash --value "$PASSWORD_HASH" --output none
+az keyvault secret set --vault-name "$KEY_VAULT_NAME" \
+  --name health-dashboard-flask-secret-key --value "$FLASK_SECRET_KEY" --output none
+
+unset PASSWORD_HASH FLASK_SECRET_KEY
+```
+
+Run the password-hash command from the application virtual environment where Werkzeug is installed. These values are referenced by `external-secret.yaml`; real values must never be committed to Git.
 
 ---
 
@@ -323,6 +342,9 @@ Expected keys:
 ```text
 INFLUXDB_USERNAME
 INFLUXDB_PASSWORD
+DASHBOARD_USERNAME
+DASHBOARD_PASSWORD_HASH
+FLASK_SECRET_KEY
 ```
 
 If synchronization fails:
@@ -583,17 +605,17 @@ loadBalancerSourceRanges:
   - 192.168.178.0/24
 ```
 
-The Dashboard currently has no login system and no TLS. Do not expose it publicly.
+The Dashboard requires a username and password. Passwords are verified against a Werkzeug password hash from Azure Key Vault; the plaintext password is not stored in Kubernetes or Git. `/healthz` remains public for Kubernetes probes, while the dashboard and all `/api/` endpoints require a valid session.
 
-Before public exposure, add:
+The LAN endpoint still uses plain HTTP. Do not expose it publicly, and remember that HTTP does not protect credentials from network interception. Before public exposure, add:
 
 ```text
 HTTPS through Traefik
-Authentication
-Authorization
 Cloudflare Access or VPN restriction
 Audit logging
 ```
+
+After HTTPS is enabled, set `SESSION_COOKIE_SECURE=true` in `configmap.yaml`.
 
 Never commit:
 

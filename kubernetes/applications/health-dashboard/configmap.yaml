@@ -12,3 +12,8 @@ data:
   MOCK_DATA: "false"
   PYTHONUNBUFFERED: "1"
   DB_TIMEOUT_SECONDS: "5"
+  SESSION_LIFETIME_HOURS: "8"
+  AUTH_MAX_ATTEMPTS: "5"
+  AUTH_ATTEMPT_WINDOW_SECONDS: "300"
+  # Change to true after the dashboard is served to browsers over HTTPS.
+  SESSION_COOKIE_SECURE: "true"

@@ -1,15 +1,29 @@
-from flask import Flask, jsonify, render_template, request, send_file
+from flask import (
+    Flask,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
 import csv
 import datetime as dt
+import hmac
 import io
 import math
 import os
 import random
 import re
+import secrets
+import threading
+import time
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import requests
 from influxdb import InfluxDBClient
+from werkzeug.security import check_password_hash
 
 from reportlab.graphics.shapes import Circle, Drawing, PolyLine, Rect, String
 from reportlab.lib import colors
@@ -20,13 +34,130 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 app = Flask(__name__)
 
+# Authentication values are injected by Kubernetes from Azure Key Vault. The
+# application intentionally fails closed when any value is missing.
+DASHBOARD_USERNAME = os.environ.get("DASHBOARD_USERNAME", "")
+DASHBOARD_PASSWORD_HASH = os.environ.get("DASHBOARD_PASSWORD_HASH", "")
+FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "")
+AUTH_CONFIGURED = bool(
+    DASHBOARD_USERNAME and DASHBOARD_PASSWORD_HASH and FLASK_SECRET_KEY
+)
+
+app.config.update(
+    SECRET_KEY=FLASK_SECRET_KEY or None,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Strict",
+    SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "false").lower()
+    == "true",
+    PERMANENT_SESSION_LIFETIME=dt.timedelta(
+        hours=int(os.environ.get("SESSION_LIFETIME_HOURS", "8"))
+    ),
+    MAX_CONTENT_LENGTH=16 * 1024,
+)
+
+AUTH_MAX_ATTEMPTS = int(os.environ.get("AUTH_MAX_ATTEMPTS", "5"))
+AUTH_ATTEMPT_WINDOW_SECONDS = int(
+    os.environ.get("AUTH_ATTEMPT_WINDOW_SECONDS", "300")
+)
+_login_attempts: Dict[str, List[float]] = {}
+_login_attempts_lock = threading.Lock()
+
+
+def _login_client_key() -> str:
+    """Use Flask's direct peer address without trusting spoofable proxy headers."""
+    return request.remote_addr or "unknown"
+
+
+def _recent_login_attempts(client_key: str, now: float) -> List[float]:
+    cutoff = now - AUTH_ATTEMPT_WINDOW_SECONDS
+    return [attempt for attempt in _login_attempts.get(client_key, []) if attempt >= cutoff]
+
+
+def login_is_rate_limited(client_key: str) -> bool:
+    now = time.monotonic()
+    with _login_attempts_lock:
+        recent = _recent_login_attempts(client_key, now)
+        if recent:
+            _login_attempts[client_key] = recent
+        else:
+            _login_attempts.pop(client_key, None)
+        return len(recent) >= AUTH_MAX_ATTEMPTS
+
+
+def record_failed_login(client_key: str) -> None:
+    now = time.monotonic()
+    with _login_attempts_lock:
+        recent = _recent_login_attempts(client_key, now)
+        recent.append(now)
+        _login_attempts[client_key] = recent
+
+
+def clear_failed_logins(client_key: str) -> None:
+    with _login_attempts_lock:
+        _login_attempts.pop(client_key, None)
+
+
+def get_csrf_token() -> str:
+    token = session.get("csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["csrf_token"] = token
+    return token
+
+
+def csrf_token_is_valid(candidate: Optional[str]) -> bool:
+    expected = session.get("csrf_token", "")
+    return bool(
+        candidate
+        and expected
+        and hmac.compare_digest(
+            str(candidate).encode("utf-8"), str(expected).encode("utf-8")
+        )
+    )
+
+
+@app.before_request
+def require_dashboard_login():
+    if request.endpoint in {"healthz", "login", "static"}:
+        return None
+
+    if not AUTH_CONFIGURED:
+        if request.path.startswith("/api/"):
+            return jsonify(
+                {
+                    "status": "authentication_unavailable",
+                    "error": "dashboard authentication is not configured",
+                }
+            ), 503
+        return redirect(url_for("login"))
+
+    if not session.get("authenticated"):
+        if request.path.startswith("/api/"):
+            return jsonify(
+                {"status": "unauthorized", "error": "authentication required"}
+            ), 401
+        return redirect(url_for("login"))
+    return None
+
 
 @app.after_request
 def add_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
-    if request.path.startswith("/api/"):
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    )
+    if request.path.startswith("/api/") or request.path in {"/", "/login"}:
         response.headers["Cache-Control"] = "private, no-store"
     return response
 
@@ -650,9 +781,78 @@ def comparison_metrics(current: List[Dict[str, Any]], previous: List[Dict[str, A
 # ==============================================================================
 
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if not AUTH_CONFIGURED:
+        return render_template(
+            "login.html",
+            csrf_token="",
+            error="Dashboard authentication is not configured. Contact the administrator.",
+            auth_configured=False,
+        ), 503
+
+    if session.get("authenticated"):
+        return redirect(url_for("index"))
+
+    error = None
+    status_code = 200
+    client_key = _login_client_key()
+
+    if request.method == "POST":
+        if not csrf_token_is_valid(request.form.get("csrf_token")):
+            error = "The login form expired. Refresh the page and try again."
+            status_code = 400
+        elif login_is_rate_limited(client_key):
+            error = "Too many login attempts. Try again in a few minutes."
+            status_code = 429
+        else:
+            supplied_username = request.form.get("username", "")
+            supplied_password = request.form.get("password", "")
+            username_matches = hmac.compare_digest(
+                supplied_username.encode("utf-8"),
+                DASHBOARD_USERNAME.encode("utf-8"),
+            )
+            try:
+                password_matches = check_password_hash(
+                    DASHBOARD_PASSWORD_HASH, supplied_password
+                )
+            except (TypeError, ValueError):
+                password_matches = False
+
+            if username_matches and password_matches:
+                clear_failed_logins(client_key)
+                session.clear()
+                session["authenticated"] = True
+                session["username"] = DASHBOARD_USERNAME
+                session.permanent = True
+                get_csrf_token()
+                return redirect(url_for("index"))
+
+            record_failed_login(client_key)
+            error = "Invalid username or password."
+            status_code = 401
+
+    return render_template(
+        "login.html",
+        csrf_token=get_csrf_token(),
+        error=error,
+        auth_configured=True,
+    ), status_code
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    if not csrf_token_is_valid(request.form.get("csrf_token")):
+        return jsonify({"status": "invalid_request", "error": "invalid CSRF token"}), 400
+    session.clear()
+    return redirect(url_for("login"))
+
+
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template(
+        "index.html", csrf_token=get_csrf_token(), username=session.get("username")
+    )
 
 
 @app.route("/healthz")

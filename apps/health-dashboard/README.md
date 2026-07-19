@@ -138,6 +138,7 @@ apps/health-dashboard/
 ├── .dockerignore          Files excluded from image build context
 ├── tests/test_app.py      Unit and safety tests
 ├── templates/index.html   Dashboard HTML
+├── templates/login.html   Username/password login form
 └── static/
     ├── dashboard.js       Browser API calls and charts
     ├── style.css          UI styling
@@ -430,10 +431,15 @@ cd apps/health-dashboard
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+
+export DASHBOARD_USERNAME="ali"
+export DASHBOARD_PASSWORD_HASH="$(python3 -c 'from getpass import getpass; from werkzeug.security import generate_password_hash; print(generate_password_hash(getpass("Dashboard password: "), method="pbkdf2:sha256:1000000"))')"
+export FLASK_SECRET_KEY="$(openssl rand -hex 32)"
+
 MOCK_DATA=true gunicorn --workers 2 --threads 2 --timeout 60 --bind 0.0.0.0:8080 app:app
 ```
 
-Open:
+Open and sign in with the username and password configured above:
 
 ```text
 http://localhost:8080
@@ -445,14 +451,7 @@ http://localhost:8080
 curl http://localhost:8080/healthz
 ```
 
-```bash
-curl -s http://localhost:8080/api/health | jq
-```
-
-```bash
-curl -L http://localhost:8080/api/report/download -o health-report.pdf
-file health-report.pdf
-```
+The dashboard and `/api/` routes require an authenticated session. Test them through the browser, or use a cookie-aware HTTP client that first submits `/login`. `/healthz` intentionally remains unauthenticated for Kubernetes probes.
 
 ### Run tests
 
@@ -462,7 +461,10 @@ python -m unittest discover -s tests -v
 
 The tests verify:
 
-- `/healthz` works;
+- anonymous dashboard and API requests are denied;
+- valid credentials create an authenticated session;
+- invalid credentials are rejected;
+- `/healthz` works without authentication;
 - mock mode is explicit;
 - current-month data does not extend into the future;
 - production failures return `503` rather than mock data;
@@ -890,6 +892,9 @@ The Dashboard needs:
 ```text
 INFLUXDB_USERNAME
 INFLUXDB_PASSWORD
+DASHBOARD_USERNAME
+DASHBOARD_PASSWORD_HASH
+FLASK_SECRET_KEY
 ```
 
 The ExternalSecret reads:
@@ -897,7 +902,12 @@ The ExternalSecret reads:
 ```text
 garmin-influxdb-username
 garmin-influxdb-password
+health-dashboard-auth-username
+health-dashboard-auth-password-hash
+health-dashboard-flask-secret-key
 ```
+
+`DASHBOARD_PASSWORD_HASH` is a Werkzeug password hash, not a plaintext password. `FLASK_SECRET_KEY` must be a random value of at least 32 bytes and must remain stable across pod restarts.
 
 Verify the controller:
 
@@ -1372,6 +1382,9 @@ Check that these Azure Key Vault names exist:
 ```text
 garmin-influxdb-username
 garmin-influxdb-password
+health-dashboard-auth-username
+health-dashboard-auth-password-hash
+health-dashboard-flask-secret-key
 ```
 
 ### API returns HTTP 503
@@ -1458,6 +1471,11 @@ The dashboard cannot display data that has not been collected into the source da
 
 Current protections:
 
+- the dashboard and all health-data APIs require username/password authentication;
+- passwords are checked against a Werkzeug password hash;
+- login forms and logout requests use CSRF tokens;
+- failed login attempts are rate-limited per application worker and client address;
+- session cookies are HTTP-only and use `SameSite=Strict`;
 - credentials are not stored in Git;
 - credentials come from Azure Key Vault through External Secrets;
 - the container runs as non-root;
@@ -1471,17 +1489,17 @@ Current protections:
 
 Current limitations:
 
-- the dashboard has no user authentication;
-- the LAN HTTP endpoint is not encrypted with TLS;
-- users on the permitted LAN can access health data;
+- the LAN HTTP endpoint is not encrypted with TLS, so credentials and session cookies are not protected from network interception;
+- login rate limiting is in-memory per Gunicorn worker rather than shared across replicas;
+- the application has one configured account and no role-based authorization;
 - the GHCR package may be public for easier cluster pulls.
 
 Before exposing the Dashboard outside the trusted LAN, add:
 
 ```text
-HTTPS
-Authentication or Cloudflare Access
-Authorization
+HTTPS and SESSION_COOKIE_SECURE=true
+Cloudflare Access or VPN restriction
+Centralized rate limiting
 Audit logging
 NetworkPolicy where compatible with the cluster networking design
 ```

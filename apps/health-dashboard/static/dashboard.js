@@ -47,7 +47,13 @@ document.addEventListener("DOMContentLoaded", () => {
         btn.innerHTML = "⏳ Regenerating...";
         
         fetch(`/api/report/regenerate?month=${month}`, { method: "POST" })
-            .then(res => res.json())
+            .then(res => {
+                if (res.status === 401) {
+                    window.location.href = "/login";
+                    throw new Error("Authentication required");
+                }
+                return res.json();
+            })
             .then(data => {
                 btn.disabled = false;
                 btn.innerHTML = "🔄 Regenerate Report";
@@ -95,6 +101,10 @@ function fetchHealthData(month) {
 
     fetch(`/api/health?month=${encodeURIComponent(month)}`)
         .then(async res => {
+            if (res.status === 401) {
+                window.location.href = "/login";
+                throw new Error("Authentication required");
+            }
             const data = await res.json();
             if (!res.ok) {
                 throw new Error(data.error || `Health API returned ${res.status}`);

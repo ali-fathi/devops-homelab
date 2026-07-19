@@ -16,9 +16,17 @@
                 <h1>🛡️ Health Command Center</h1>
                 <p>Private Self-Hosted Garmin & Ring Biometrics Tracker</p>
             </div>
-            <div class="status-badge">
-                <span class="status-dot" id="connection-status-dot"></span>
-                <span id="connection-status-text">Connecting...</span>
+            <div class="header-actions">
+                <div class="status-badge">
+                    <span class="status-dot" id="connection-status-dot"></span>
+                    <span id="connection-status-text">Connecting...</span>
+                </div>
+                <form method="post" action="{{ url_for('logout') }}" class="logout-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="logout-button" title="Signed in as {{ username }}">
+                        Sign out
+                    </button>
+                </form>
             </div>
         </header>
 
