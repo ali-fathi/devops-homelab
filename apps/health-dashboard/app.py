@@ -39,8 +39,14 @@ app = Flask(__name__)
 DASHBOARD_USERNAME = os.environ.get("DASHBOARD_USERNAME", "")
 DASHBOARD_PASSWORD_HASH = os.environ.get("DASHBOARD_PASSWORD_HASH", "")
 FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "")
+_password_hash_parts = DASHBOARD_PASSWORD_HASH.split("$")
+PASSWORD_HASH_IS_VALID = bool(
+    len(_password_hash_parts) == 3 and all(_password_hash_parts)
+)
 AUTH_CONFIGURED = bool(
-    DASHBOARD_USERNAME and DASHBOARD_PASSWORD_HASH and FLASK_SECRET_KEY
+    DASHBOARD_USERNAME
+    and PASSWORD_HASH_IS_VALID
+    and FLASK_SECRET_KEY
 )
 
 app.config.update(
