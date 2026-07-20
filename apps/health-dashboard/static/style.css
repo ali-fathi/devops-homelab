@@ -634,3 +634,282 @@ table.comparison-table tr:hover td {
     font-size: 0.9rem;
     outline: none;
 }
+
+/* Colmi R02 VictoriaMetrics tab */
+.ring-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(120deg, rgba(59, 130, 246, 0.12), rgba(139, 92, 246, 0.08));
+}
+
+.ring-title-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.ring-device-icon {
+    display: grid;
+    width: 52px;
+    height: 52px;
+    place-items: center;
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    border-radius: 16px;
+    background: rgba(59, 130, 246, 0.12);
+    font-size: 1.65rem;
+}
+
+.ring-title-row h2 {
+    margin-bottom: 0.25rem;
+    font-size: 1.35rem;
+}
+
+.ring-title-row p,
+.ring-chart-card > p,
+.ring-section-heading > p {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.ring-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    white-space: nowrap;
+}
+
+.ring-controls label {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.ring-controls select {
+    padding: 0.58rem 0.8rem;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    outline: none;
+    background: #151b2c;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 0.88rem;
+}
+
+.ring-source-status {
+    margin-bottom: 1.25rem;
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.025);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.ring-source-status.connected { border-color: rgba(16, 185, 129, 0.3); color: #6ee7b7; }
+.ring-source-status.loading,
+.ring-source-status.mock { border-color: rgba(245, 158, 11, 0.3); color: #fbbf24; }
+.ring-source-status.error { border-color: rgba(239, 68, 68, 0.35); color: #fca5a5; }
+.ring-source-status.empty { border-color: rgba(156, 163, 175, 0.25); }
+
+.ring-vitals-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 2.4rem;
+}
+
+.ring-stat {
+    position: relative;
+    min-height: 142px;
+    overflow: hidden;
+}
+
+.ring-stat::before {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 3px;
+    background: var(--stat-color, var(--text-secondary));
+    content: "";
+}
+
+.ring-stat.red { --stat-color: var(--accent-red); }
+.ring-stat.green { --stat-color: var(--accent-green); }
+.ring-stat.blue { --stat-color: var(--accent-blue); }
+.ring-stat.orange { --stat-color: var(--accent-orange); }
+.ring-stat.purple { --stat-color: var(--accent-purple); }
+
+.ring-stat-label {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.ring-stat > div {
+    margin: 0.8rem 0 0.45rem;
+}
+
+.ring-stat strong {
+    font-size: 2rem;
+    line-height: 1;
+}
+
+.ring-stat div > span {
+    margin-left: 0.3rem;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+}
+
+.ring-stat small {
+    color: var(--text-secondary);
+    font-size: 0.76rem;
+}
+
+.ring-stat .ring-sync-value strong {
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+.ring-section-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    margin: 2.3rem 0 0.9rem;
+    padding-bottom: 0.65rem;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.ring-section-heading > div {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.ring-section-heading > div > span {
+    color: #60a5fa;
+    font-size: 1.1rem;
+}
+
+.ring-section-heading h2 {
+    font-size: 1.18rem;
+}
+
+.ring-charts-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1rem;
+}
+
+.ring-chart-card {
+    min-width: 0;
+}
+
+.ring-chart-card h3 {
+    margin-bottom: 0.2rem;
+    font-size: 1rem;
+}
+
+.ring-chart-container {
+    position: relative;
+    height: 310px;
+    margin-top: 1rem;
+}
+
+.ring-full-chart {
+    margin-bottom: 1rem;
+}
+
+.ring-compact-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.ring-compact-stats .card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.2rem;
+}
+
+.ring-compact-stats span {
+    color: var(--text-secondary);
+    font-size: 0.84rem;
+}
+
+.ring-compact-stats strong {
+    font-size: 1.15rem;
+}
+
+.ring-sleep-stats {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 1200px) {
+    .ring-vitals-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 800px) {
+    .app-container {
+        padding: 1rem;
+    }
+
+    header,
+    .ring-toolbar,
+    .ring-section-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .header-actions,
+    .ring-controls,
+    .action-buttons {
+        flex-wrap: wrap;
+    }
+
+    .tabs-nav {
+        max-width: 100%;
+        overflow-x: auto;
+    }
+
+    .tab-btn {
+        flex: 0 0 auto;
+        padding-right: 1rem;
+        padding-left: 1rem;
+    }
+
+    .ring-vitals-grid,
+    .ring-charts-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ring-compact-stats,
+    .ring-sleep-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .ring-vitals-grid,
+    .ring-compact-stats,
+    .ring-sleep-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .ring-controls {
+        width: 100%;
+    }
+
+    .ring-controls select {
+        flex: 1;
+    }
+}

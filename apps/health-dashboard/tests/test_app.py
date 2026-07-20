@@ -115,6 +115,61 @@ class HealthDashboardTests(unittest.TestCase):
         self.assertEqual(payload["status"], "data_unavailable")
         self.assertEqual(payload["source"], "influxdb")
 
+    def test_ring_endpoint_returns_only_stored_victoriametrics_metrics(self):
+        health_app.MOCK_DATA_ENV = False
+        now_ms = int(dt.datetime.now(tz=dt.timezone.utc).timestamp() * 1000)
+        series = {name: [] for name in health_app.RING_METRICS}
+        series.update(
+            {
+                "biometric_hr_bpm": [(now_ms - 300_000, 61.0), (now_ms, 72.0)],
+                "biometric_steps": [(now_ms, 840.0)],
+                "biometric_sleep_total_min": [(now_ms, 450.0)],
+                "biometric_sleep_deep_min": [(now_ms, 90.0)],
+                "ring_battery_pct": [(now_ms, 77.0)],
+                "ring_charging": [(now_ms, 0.0)],
+            }
+        )
+
+        with patch.object(health_app, "vm_export_ring_metrics", return_value=series):
+            response = self.client.get("/api/ring?range=24h")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertFalse(payload["mocked"])
+        self.assertEqual(payload["device"], "colmi_r02")
+        self.assertEqual(payload["summary"]["latest_hr"], 72)
+        self.assertEqual(payload["summary"]["resting_hr_24h"], 61)
+        self.assertEqual(payload["summary"]["period_steps"], 840)
+        self.assertEqual(payload["summary"]["sleep_total_min"], 450)
+        self.assertEqual(payload["summary"]["battery"], 77)
+        self.assertFalse(payload["summary"]["charging"])
+
+    def test_ring_endpoint_rejects_unsupported_ranges(self):
+        response = self.client.get("/api/ring?range=1y")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["status"], "invalid_request")
+
+    def test_victoriametrics_export_parser_keeps_original_timestamps(self):
+        class ExportResponse:
+            def raise_for_status(self):
+                return None
+
+            def iter_lines(self, decode_unicode=False):
+                return [
+                    b'{"metric":{"__name__":"biometric_hr_bpm","device":"colmi_r02"},'
+                    b'"values":[65,71],"timestamps":[1700000000000,1700000300]}'
+                ]
+
+        start = dt.datetime(2023, 11, 14, tzinfo=dt.timezone.utc)
+        end = start + dt.timedelta(days=1)
+        with patch.object(health_app.requests, "get", return_value=ExportResponse()):
+            series = health_app.vm_export_ring_metrics(start, end)
+
+        self.assertEqual(
+            series["biometric_hr_bpm"],
+            [(1700000000000, 65.0), (1700000300000, 71.0)],
+        )
+
     def test_real_merge_keeps_missing_values_empty(self):
         class EmptyQueryResult:
             def get_points(self):

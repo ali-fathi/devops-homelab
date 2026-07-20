@@ -12,6 +12,7 @@ import csv
 import datetime as dt
 import hmac
 import io
+import json
 import math
 import os
 import random
@@ -181,6 +182,24 @@ VM_URL = os.environ.get(
 RING_DEVICE = os.environ.get("RING_DEVICE", "colmi_r02")
 if not re.fullmatch(r"[A-Za-z0-9_.:-]+", RING_DEVICE):
     raise RuntimeError("RING_DEVICE contains unsupported characters")
+
+RING_METRICS = (
+    "biometric_hr_bpm",
+    "biometric_hrv_rmssd",
+    "biometric_spo2_pct",
+    "biometric_stress",
+    "biometric_steps",
+    "biometric_calories",
+    "biometric_distance_meters",
+    "biometric_sleep_total_min",
+    "biometric_sleep_deep_min",
+    "biometric_sleep_rem_min",
+    "biometric_sleep_light_min",
+    "ring_battery_pct",
+    "ring_charging",
+)
+RING_RANGE_DAYS = {"24h": 1, "7d": 7, "30d": 30}
+
 MOCK_DATA_ENV = os.environ.get("MOCK_DATA", "false").lower() == "true"
 DB_TIMEOUT = float(os.environ.get("DB_TIMEOUT_SECONDS", "5"))
 
@@ -299,7 +318,9 @@ def vm_query_range(
     response.raise_for_status()
     payload = response.json()
     if payload.get("status") != "success":
-        raise DataSourceError(f"VictoriaMetrics query failed for {expression}")
+        raise DataSourceError(
+            "victoriametrics", f"VictoriaMetrics query failed for {expression}"
+        )
 
     result = payload.get("data", {}).get("result", [])
     by_day: Dict[dt.date, List[float]] = {}
@@ -312,6 +333,220 @@ def vm_query_range(
             by_day.setdefault(day, []).append(number)
 
     return {day: sum(values) / len(values) for day, values in by_day.items()}
+
+
+def vm_export_ring_metrics(
+    start: dt.datetime, end: dt.datetime
+) -> Dict[str, List[Tuple[int, float]]]:
+    """Export stored Ring samples without contacting the Bluetooth device.
+
+    VictoriaMetrics' export endpoint returns the original sample timestamps,
+    unlike an evaluated range query which can repeat sparse hourly samples due
+    to Prometheus lookback behavior.
+    """
+    metric_pattern = "|".join(re.escape(name) for name in RING_METRICS)
+    selector = (
+        f'{{device="{RING_DEVICE}",'
+        f'__name__=~"^({metric_pattern})$"}}'
+    )
+    try:
+        response = requests.get(
+            f"{VM_URL}/api/v1/export",
+            params={
+                "match[]": selector,
+                "start": start.isoformat().replace("+00:00", "Z"),
+                "end": end.isoformat().replace("+00:00", "Z"),
+            },
+            timeout=DB_TIMEOUT,
+        )
+        response.raise_for_status()
+    except Exception as exc:
+        app.logger.exception("VictoriaMetrics Ring export failed: url=%s", VM_URL)
+        raise DataSourceError(
+            "victoriametrics", "VictoriaMetrics Ring data is unavailable"
+        ) from exc
+
+    samples: Dict[str, Dict[int, float]] = {name: {} for name in RING_METRICS}
+    try:
+        for raw_line in response.iter_lines(decode_unicode=True):
+            if not raw_line:
+                continue
+            if isinstance(raw_line, bytes):
+                raw_line = raw_line.decode("utf-8")
+            series = json.loads(raw_line)
+            metric_name = series.get("metric", {}).get("__name__")
+            if metric_name not in samples:
+                continue
+            for timestamp, value in zip(
+                series.get("timestamps", []), series.get("values", [])
+            ):
+                number = as_number(value)
+                numeric_timestamp = as_number(timestamp)
+                if number is None or numeric_timestamp is None:
+                    continue
+                # The VM JSON export format normally uses milliseconds. Accept
+                # seconds as well to keep this parser compatible across setups.
+                timestamp_ms = int(
+                    numeric_timestamp
+                    if numeric_timestamp >= 100_000_000_000
+                    else numeric_timestamp * 1000
+                )
+                samples[metric_name][timestamp_ms] = number
+    except (AttributeError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise DataSourceError(
+            "victoriametrics", "VictoriaMetrics returned invalid Ring data"
+        ) from exc
+
+    return {
+        name: sorted(values.items())
+        for name, values in samples.items()
+    }
+
+
+def downsample_points(
+    points: List[Tuple[int, float]], maximum: int = 1500
+) -> List[Tuple[int, float]]:
+    """Bound browser chart payloads while retaining the first and last sample."""
+    if len(points) <= maximum:
+        return points
+    stride = math.ceil(len(points) / maximum)
+    reduced = points[::stride]
+    if reduced[-1] != points[-1]:
+        reduced.append(points[-1])
+    return reduced
+
+
+def latest_ring_value(
+    series: Dict[str, List[Tuple[int, float]]], metric: str
+) -> Optional[float]:
+    points = series.get(metric, [])
+    return points[-1][1] if points else None
+
+
+def build_ring_payload(
+    series: Dict[str, List[Tuple[int, float]]],
+    range_key: str,
+    start: dt.datetime,
+    end: dt.datetime,
+    mocked: bool = False,
+) -> Dict[str, Any]:
+    last_day_start_ms = int((end - dt.timedelta(hours=24)).timestamp() * 1000)
+    recent_hr = [
+        value
+        for timestamp, value in series.get("biometric_hr_bpm", [])
+        if timestamp >= last_day_start_ms
+    ]
+
+    sleep_total = series.get("biometric_sleep_total_min", [])
+    latest_sleep_timestamp = sleep_total[-1][0] if sleep_total else None
+
+    def sleep_stage(metric: str) -> Optional[float]:
+        if latest_sleep_timestamp is None:
+            return None
+        return dict(series.get(metric, [])).get(latest_sleep_timestamp)
+
+    sync_candidates = [
+        timestamp
+        for metric in ("ring_battery_pct", "ring_charging")
+        for timestamp, _ in series.get(metric, [])
+    ]
+    if not sync_candidates:
+        sync_candidates = [
+            timestamp for points in series.values() for timestamp, _ in points
+        ]
+
+    summary = {
+        "latest_hr": as_int(latest_ring_value(series, "biometric_hr_bpm")),
+        "resting_hr_24h": as_int(min(recent_hr)) if recent_hr else None,
+        "latest_hrv": as_int(latest_ring_value(series, "biometric_hrv_rmssd")),
+        "latest_spo2": as_int(latest_ring_value(series, "biometric_spo2_pct")),
+        "latest_stress": as_int(latest_ring_value(series, "biometric_stress")),
+        "battery": as_int(latest_ring_value(series, "ring_battery_pct")),
+        "charging": (
+            latest_ring_value(series, "ring_charging") >= 0.5
+            if latest_ring_value(series, "ring_charging") is not None
+            else None
+        ),
+        "last_sync_ms": max(sync_candidates) if sync_candidates else None,
+        "period_steps": as_int(
+            sum(value for _, value in series.get("biometric_steps", []))
+        ),
+        "period_calories": as_int(
+            sum(value for _, value in series.get("biometric_calories", []))
+        ),
+        "period_distance_m": as_int(
+            sum(value for _, value in series.get("biometric_distance_meters", []))
+        ),
+        "sleep_total_min": as_int(sleep_total[-1][1]) if sleep_total else None,
+        "sleep_deep_min": as_int(sleep_stage("biometric_sleep_deep_min")),
+        "sleep_rem_min": as_int(sleep_stage("biometric_sleep_rem_min")),
+        "sleep_light_min": as_int(sleep_stage("biometric_sleep_light_min")),
+        "sample_count": sum(len(points) for points in series.values()),
+    }
+
+    chart_series = {
+        name: [[timestamp, value] for timestamp, value in downsample_points(points)]
+        for name, points in series.items()
+    }
+    return {
+        "status": "ok" if summary["sample_count"] else "no_data",
+        "mocked": mocked,
+        "device": RING_DEVICE,
+        "range": {
+            "key": range_key,
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+        },
+        "summary": summary,
+        "series": chart_series,
+    }
+
+
+def generate_mock_ring_series(
+    start: dt.datetime, end: dt.datetime
+) -> Dict[str, List[Tuple[int, float]]]:
+    """Deterministic Ring-only fixtures for explicit local demo mode."""
+    rng = random.Random(int(start.timestamp()) // 86400)
+    series: Dict[str, List[Tuple[int, float]]] = {
+        name: [] for name in RING_METRICS
+    }
+    cursor = start.replace(second=0, microsecond=0)
+    cursor -= dt.timedelta(minutes=cursor.minute % 5)
+    index = 0
+    while cursor <= end:
+        timestamp = int(cursor.timestamp() * 1000)
+        hour_phase = math.sin((cursor.hour + cursor.minute / 60) * math.pi / 12)
+        series["biometric_hr_bpm"].append(
+            (timestamp, round(67 + 10 * hour_phase + rng.uniform(-4, 4)))
+        )
+        if index % 6 == 0:
+            series["biometric_hrv_rmssd"].append(
+                (timestamp, round(48 - 5 * hour_phase + rng.uniform(-5, 5)))
+            )
+            series["biometric_stress"].append(
+                (timestamp, round(35 + 14 * hour_phase + rng.uniform(-6, 6)))
+            )
+        if index % 12 == 0:
+            awake_hour = 7 <= cursor.hour <= 22
+            steps = rng.randint(80, 850) if awake_hour else 0
+            series["biometric_steps"].append((timestamp, steps))
+            series["biometric_calories"].append((timestamp, round(steps * 0.04)))
+            series["biometric_distance_meters"].append((timestamp, round(steps * 0.76)))
+            series["biometric_spo2_pct"].append((timestamp, rng.choice([96, 97, 98, 99])))
+        if cursor.hour == 8 and cursor.minute == 0:
+            total = rng.randint(390, 500)
+            deep = rng.randint(70, 110)
+            rem = rng.randint(75, 115)
+            series["biometric_sleep_total_min"].append((timestamp, total))
+            series["biometric_sleep_deep_min"].append((timestamp, deep))
+            series["biometric_sleep_rem_min"].append((timestamp, rem))
+            series["biometric_sleep_light_min"].append((timestamp, total - deep - rem))
+        if index % 12 == 0:
+            series["ring_battery_pct"].append((timestamp, max(12, 88 - index // 72)))
+            series["ring_charging"].append((timestamp, 0))
+        cursor += dt.timedelta(minutes=5)
+        index += 1
+    return series
 
 
 # ==============================================================================
@@ -928,6 +1163,42 @@ def api_health():
                 "metrics": comparison_metrics(daily_data, previous_data),
             },
         }
+    )
+
+
+@app.route("/api/ring")
+def api_ring():
+    range_key = request.args.get("range", "24h")
+    if range_key not in RING_RANGE_DAYS:
+        return jsonify(
+            {
+                "status": "invalid_request",
+                "error": "range must be one of: 24h, 7d, 30d",
+            }
+        ), 400
+
+    end = dt.datetime.now(tz=UTC)
+    start = end - dt.timedelta(days=RING_RANGE_DAYS[range_key])
+    try:
+        series = (
+            generate_mock_ring_series(start, end)
+            if MOCK_DATA_ENV
+            else vm_export_ring_metrics(start, end)
+        )
+    except DataSourceError as exc:
+        return jsonify(
+            {
+                "status": "data_unavailable",
+                "mocked": False,
+                "source": exc.source,
+                "error": str(exc),
+            }
+        ), 503
+
+    return jsonify(
+        build_ring_payload(
+            series, range_key, start, end, mocked=MOCK_DATA_ENV
+        )
     )
 
 

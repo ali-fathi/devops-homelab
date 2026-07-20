@@ -54,7 +54,7 @@ Colmi R02 ring
   → VictoriaMetrics
 ```
 
-The Health Dashboard is a read-only consumer of those two data stores.
+The Health Dashboard is a read-only consumer of those two data stores. Its dedicated **R02 Ring** tab reads historical samples from VictoriaMetrics and displays vitals, activity, stress/SpO₂, sleep stages, battery, and charging history. It never scans for, pairs with, or connects to the Ring over Bluetooth.
 
 ---
 
@@ -365,7 +365,7 @@ Results are grouped by calendar date and merged with Ring values.
 
 ### VictoriaMetrics queries
 
-The application uses the range query API and PromQL functions:
+The combined Command Center uses the range query API and PromQL functions:
 
 ```promql
 avg_over_time(biometric_hrv_rmssd{device="colmi_r02"}[24h])
@@ -375,7 +375,31 @@ avg_over_time(biometric_stress{device="colmi_r02"}[24h])
 last_over_time(ring_battery_pct{device="colmi_r02"}[24h])
 ```
 
-The values are mapped to UTC calendar dates.
+The dedicated R02 Ring tab calls the authenticated endpoint below:
+
+```text
+GET /api/ring?range=24h|7d|30d
+```
+
+That endpoint reads original stored samples through VictoriaMetrics `/api/v1/export`. Using export rather than polling the physical Ring preserves native sample timestamps and avoids requiring Bluetooth access from the Dashboard. The exported metric allowlist is:
+
+```text
+biometric_hr_bpm
+biometric_hrv_rmssd
+biometric_spo2_pct
+biometric_stress
+biometric_steps
+biometric_calories
+biometric_distance_meters
+biometric_sleep_total_min
+biometric_sleep_deep_min
+biometric_sleep_rem_min
+biometric_sleep_light_min
+ring_battery_pct
+ring_charging
+```
+
+The combined daily values are mapped to UTC calendar dates. Ring-tab timestamps are returned as epoch milliseconds and formatted in the browser's local timezone.
 
 ### Recovery calculation
 

@@ -33,6 +33,7 @@
         <!-- Tabs Navigation -->
         <nav class="tabs-nav">
             <button class="tab-btn active" data-tab="tab-command-center">Command Center</button>
+            <button class="tab-btn" data-tab="tab-ring-health">💍 R02 Ring</button>
             <button class="tab-btn" data-tab="tab-weekly-health">Weekly Narrative</button>
             <button class="tab-btn" data-tab="tab-monthly-report">Monthly Report</button>
         </nav>
@@ -156,7 +157,133 @@
             </div>
         </div>
 
-        <!-- TAB 2: Weekly Health Narrative -->
+        <!-- TAB 2: Colmi R02 data stored in VictoriaMetrics -->
+        <div id="tab-ring-health" class="tab-pane">
+            <div class="ring-toolbar card">
+                <div>
+                    <div class="ring-title-row">
+                        <span class="ring-device-icon">💍</span>
+                        <div>
+                            <h2>Colmi R02 Ring</h2>
+                            <p>Historical measurements read from VictoriaMetrics. No direct Bluetooth connection is used.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="ring-controls">
+                    <label for="ring-range">Time range</label>
+                    <select id="ring-range" aria-label="Ring chart time range">
+                        <option value="24h">Last 24 hours</option>
+                        <option value="7d">Last 7 days</option>
+                        <option value="30d">Last 30 days</option>
+                    </select>
+                    <button class="btn btn-secondary" id="btn-refresh-ring" type="button">↻ Refresh data</button>
+                </div>
+            </div>
+
+            <div class="ring-source-status" id="ring-source-status">
+                Open this tab to load stored Ring measurements.
+            </div>
+
+            <div class="ring-vitals-grid">
+                <div class="card ring-stat red">
+                    <span class="ring-stat-label">Latest Heart Rate</span>
+                    <div><strong id="ring-latest-hr">N/A</strong><span>bpm</span></div>
+                    <small>24h resting minimum: <b id="ring-resting-hr">N/A</b> bpm</small>
+                </div>
+                <div class="card ring-stat green">
+                    <span class="ring-stat-label">Latest HRV</span>
+                    <div><strong id="ring-latest-hrv">N/A</strong><span>ms</span></div>
+                    <small>RMSSD measurement</small>
+                </div>
+                <div class="card ring-stat blue">
+                    <span class="ring-stat-label">Latest SpO₂</span>
+                    <div><strong id="ring-latest-spo2">N/A</strong><span>%</span></div>
+                    <small>Blood oxygen estimate</small>
+                </div>
+                <div class="card ring-stat orange">
+                    <span class="ring-stat-label">Latest Stress</span>
+                    <div><strong id="ring-latest-stress">N/A</strong><span>/ 100</span></div>
+                    <small>Ring-computed level</small>
+                </div>
+                <div class="card ring-stat purple">
+                    <span class="ring-stat-label">Ring Battery</span>
+                    <div><strong id="ring-latest-battery">N/A</strong><span>%</span></div>
+                    <small id="ring-charging-state">Charging state unavailable</small>
+                </div>
+                <div class="card ring-stat neutral">
+                    <span class="ring-stat-label">Last Stored Sync</span>
+                    <div class="ring-sync-value"><strong id="ring-last-sync">N/A</strong></div>
+                    <small id="ring-sample-count">0 samples in range</small>
+                </div>
+            </div>
+
+            <div class="ring-section-heading">
+                <div><span>◉</span><h2>Vitals</h2></div>
+                <p>Raw samples at the Ring's native collection intervals</p>
+            </div>
+            <div class="ring-charts-grid ring-charts-vitals">
+                <div class="card ring-chart-card ring-chart-wide">
+                    <h3>❤️ Heart Rate</h3>
+                    <p>Five-minute samples with a rolling one-hour minimum</p>
+                    <div class="ring-chart-container"><canvas id="ringHeartRateChart"></canvas></div>
+                </div>
+                <div class="card ring-chart-card">
+                    <h3>📈 Heart Rate Variability</h3>
+                    <p>RMSSD samples in milliseconds</p>
+                    <div class="ring-chart-container"><canvas id="ringHrvChart"></canvas></div>
+                </div>
+            </div>
+
+            <div class="ring-section-heading">
+                <div><span>◎</span><h2>Activity</h2></div>
+                <p>Hourly activity buckets recorded by the R02</p>
+            </div>
+            <div class="ring-compact-stats">
+                <div class="card"><span>Steps in range</span><strong id="ring-period-steps">N/A</strong></div>
+                <div class="card"><span>Calories in range</span><strong id="ring-period-calories">N/A</strong></div>
+                <div class="card"><span>Distance in range</span><strong id="ring-period-distance">N/A</strong></div>
+            </div>
+            <div class="card ring-chart-card ring-full-chart">
+                <h3>🚶 Activity over time</h3>
+                <p>Steps, calories and distance from stored hourly samples</p>
+                <div class="ring-chart-container"><canvas id="ringActivityChart"></canvas></div>
+            </div>
+
+            <div class="ring-section-heading">
+                <div><span>◌</span><h2>Stress &amp; Oxygen</h2></div>
+                <p>Thirty-minute stress and hourly SpO₂ measurements</p>
+            </div>
+            <div class="card ring-chart-card ring-full-chart">
+                <h3>⚖️ Stress and SpO₂</h3>
+                <div class="ring-chart-container"><canvas id="ringStressSpo2Chart"></canvas></div>
+            </div>
+
+            <div class="ring-section-heading">
+                <div><span>☾</span><h2>Sleep</h2></div>
+                <p>Last sleep session and historical stage composition</p>
+            </div>
+            <div class="ring-compact-stats ring-sleep-stats">
+                <div class="card"><span>Total sleep</span><strong id="ring-sleep-total">N/A</strong></div>
+                <div class="card"><span>Deep</span><strong id="ring-sleep-deep">N/A</strong></div>
+                <div class="card"><span>REM</span><strong id="ring-sleep-rem">N/A</strong></div>
+                <div class="card"><span>Light</span><strong id="ring-sleep-light">N/A</strong></div>
+            </div>
+            <div class="card ring-chart-card ring-full-chart">
+                <h3>🌙 Sleep stages</h3>
+                <div class="ring-chart-container"><canvas id="ringSleepChart"></canvas></div>
+            </div>
+
+            <div class="ring-section-heading">
+                <div><span>⌁</span><h2>Ring Status</h2></div>
+                <p>Battery and charging telemetry written during Android syncs</p>
+            </div>
+            <div class="card ring-chart-card ring-full-chart">
+                <h3>🔋 Battery history</h3>
+                <div class="ring-chart-container"><canvas id="ringBatteryChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- TAB 3: Weekly Health Narrative -->
         <div id="tab-weekly-health" class="tab-pane">
             <div class="weekly-container">
                 <!-- Detailed narrative cards -->
@@ -215,7 +342,7 @@
             </div>
         </div>
 
-        <!-- TAB 3: Monthly Health Report -->
+        <!-- TAB 4: Monthly Health Report -->
         <div id="tab-monthly-report" class="tab-pane">
             <div class="monthly-actions-bar">
                 <div class="date-selector">

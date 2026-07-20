@@ -12,8 +12,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
             btn.classList.add("active");
             document.getElementById(targetTab).classList.add("active");
+
+            if (targetTab === "tab-ring-health" && !ringDataLoaded) {
+                fetchRingData();
+            }
         });
     });
+
+    const ringRange = document.getElementById("ring-range");
+    const ringRefresh = document.getElementById("btn-refresh-ring");
+    if (ringRange) {
+        ringRange.addEventListener("change", fetchRingData);
+    }
+    if (ringRefresh) {
+        ringRefresh.addEventListener("click", fetchRingData);
+    }
 
     // Build a rolling list of real calendar months instead of hard-coded dates.
     const reportMonthSelect = document.getElementById("report-month");
@@ -79,6 +92,8 @@ document.addEventListener("DOMContentLoaded", () => {
 let recoveryChart = null;
 let sleepChart = null;
 let hrvChart = null;
+let ringDataLoaded = false;
+let ringCharts = [];
 
 function populateMonthSelector(select) {
     if (!select) return;
@@ -134,6 +149,278 @@ function fetchHealthData(month) {
             statusDot.className = "status-dot red";
             populateCommandCenter({});
         });
+}
+
+function fetchRingData() {
+    const rangeSelect = document.getElementById("ring-range");
+    const refreshButton = document.getElementById("btn-refresh-ring");
+    const status = document.getElementById("ring-source-status");
+    if (!rangeSelect || !status) return;
+
+    const range = rangeSelect.value;
+    status.className = "ring-source-status loading";
+    status.innerText = "Loading stored R02 measurements from VictoriaMetrics…";
+    if (refreshButton) {
+        refreshButton.disabled = true;
+        refreshButton.innerText = "⏳ Loading…";
+    }
+
+    fetch(`/api/ring?range=${encodeURIComponent(range)}`)
+        .then(async response => {
+            if (response.status === 401) {
+                window.location.href = "/login";
+                throw new Error("Authentication required");
+            }
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || `Ring API returned ${response.status}`);
+            }
+            return data;
+        })
+        .then(data => {
+            ringDataLoaded = true;
+            if (data.status === "no_data") {
+                status.className = "ring-source-status empty";
+                status.innerText = `VictoriaMetrics is available, but no ${data.device || "R02"} samples were found in this range.`;
+            } else if (data.mocked) {
+                status.className = "ring-source-status mock";
+                status.innerText = "Showing explicit demo data. Production reads only stored VictoriaMetrics samples.";
+            } else {
+                status.className = "ring-source-status connected";
+                status.innerText = `Connected to VictoriaMetrics · device=${data.device} · ${formatNumber(data.summary?.sample_count)} stored samples`;
+            }
+            populateRingSummary(data.summary || {});
+            renderRingCharts(data.series || {});
+        })
+        .catch(error => {
+            console.error("Error fetching Ring data:", error);
+            status.className = "ring-source-status error";
+            status.innerText = `Ring data unavailable: ${error.message}`;
+            populateRingSummary({});
+            renderRingCharts({});
+        })
+        .finally(() => {
+            if (refreshButton) {
+                refreshButton.disabled = false;
+                refreshButton.innerText = "↻ Refresh data";
+            }
+        });
+}
+
+function populateRingSummary(summary) {
+    setText("ring-latest-hr", summary.latest_hr);
+    setText("ring-resting-hr", summary.resting_hr_24h);
+    setText("ring-latest-hrv", summary.latest_hrv);
+    setText("ring-latest-spo2", summary.latest_spo2);
+    setText("ring-latest-stress", summary.latest_stress);
+    setText("ring-latest-battery", summary.battery);
+    setText("ring-last-sync", formatSyncTime(summary.last_sync_ms));
+    setText("ring-sample-count", `${formatNumber(summary.sample_count)} samples in range`);
+
+    const charging = summary.charging === true
+        ? "⚡ Charging"
+        : summary.charging === false
+            ? "On battery"
+            : "Charging state unavailable";
+    setText("ring-charging-state", charging);
+    setText("ring-period-steps", formatNumber(summary.period_steps));
+    setText("ring-period-calories", summary.period_calories == null ? "N/A" : `${formatNumber(summary.period_calories)} kcal`);
+    setText("ring-period-distance", summary.period_distance_m == null ? "N/A" : `${(summary.period_distance_m / 1000).toFixed(2)} km`);
+    setText("ring-sleep-total", formatMinutes(summary.sleep_total_min));
+    setText("ring-sleep-deep", formatMinutes(summary.sleep_deep_min));
+    setText("ring-sleep-rem", formatMinutes(summary.sleep_rem_min));
+    setText("ring-sleep-light", formatMinutes(summary.sleep_light_min));
+}
+
+function setText(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.innerText = value === undefined || value === null ? "N/A" : value;
+}
+
+function formatNumber(value) {
+    return value === undefined || value === null ? "N/A" : Number(value).toLocaleString();
+}
+
+function formatMinutes(value) {
+    if (value === undefined || value === null) return "N/A";
+    const minutes = Number(value);
+    return `${Math.floor(minutes / 60)}h ${Math.round(minutes % 60)}m`;
+}
+
+function formatSyncTime(timestamp) {
+    if (!timestamp) return "N/A";
+    const date = new Date(Number(timestamp));
+    const ageMinutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000));
+    const relative = ageMinutes < 1
+        ? "just now"
+        : ageMinutes < 60
+            ? `${ageMinutes}m ago`
+            : ageMinutes < 1440
+                ? `${Math.floor(ageMinutes / 60)}h ago`
+                : `${Math.floor(ageMinutes / 1440)}d ago`;
+    return `${date.toLocaleString()} (${relative})`;
+}
+
+function formatRingTimestamp(timestamp, dateOnly = false) {
+    const options = dateOnly
+        ? { month: "short", day: "numeric" }
+        : { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" };
+    return new Date(Number(timestamp)).toLocaleString(undefined, options);
+}
+
+function ringPoints(series, metric, transform = value => value) {
+    return (series[metric] || []).map(point => ({
+        x: Number(point[0]),
+        y: transform(Number(point[1]))
+    }));
+}
+
+function rollingMinimum(points, windowMs) {
+    return points.map((point, index) => {
+        let minimum = point.y;
+        for (let cursor = index - 1; cursor >= 0 && point.x - points[cursor].x <= windowMs; cursor -= 1) {
+            minimum = Math.min(minimum, points[cursor].y);
+        }
+        return { x: point.x, y: minimum };
+    });
+}
+
+function ringTimeChartOptions(yTitle, suggestedMin, suggestedMax) {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: "nearest", intersect: false },
+        plugins: {
+            legend: { labels: { color: "#9ca3af", usePointStyle: true } },
+            tooltip: {
+                callbacks: {
+                    title: items => items.length ? formatRingTimestamp(items[0].parsed.x) : ""
+                }
+            }
+        },
+        scales: {
+            x: {
+                type: "linear",
+                grid: { color: "rgba(255,255,255,0.04)" },
+                ticks: { color: "#9ca3af", maxTicksLimit: 8, callback: value => formatRingTimestamp(value) }
+            },
+            y: {
+                title: { display: true, text: yTitle, color: "#9ca3af" },
+                grid: { color: "rgba(255,255,255,0.06)" },
+                ticks: { color: "#9ca3af" },
+                suggestedMin,
+                suggestedMax
+            }
+        }
+    };
+}
+
+function renderRingCharts(series) {
+    ringCharts.forEach(chart => chart.destroy());
+    ringCharts = [];
+
+    const heartRate = ringPoints(series, "biometric_hr_bpm");
+    const heartContext = document.getElementById("ringHeartRateChart").getContext("2d");
+    ringCharts.push(new Chart(heartContext, {
+        type: "line",
+        data: { datasets: [
+            {
+                label: "Heart rate (bpm)", data: heartRate, borderColor: "#ef4444",
+                backgroundColor: "rgba(239,68,68,0.14)", borderWidth: 2, pointRadius: 0,
+                pointHoverRadius: 4, tension: 0.22, fill: true
+            },
+            {
+                label: "1h minimum", data: rollingMinimum(heartRate, 3600000),
+                borderColor: "#60a5fa", borderDash: [6, 5], borderWidth: 2,
+                pointRadius: 0, tension: 0.15
+            }
+        ] },
+        options: ringTimeChartOptions("bpm", 45, 120)
+    }));
+
+    const hrvContext = document.getElementById("ringHrvChart").getContext("2d");
+    ringCharts.push(new Chart(hrvContext, {
+        type: "line",
+        data: { datasets: [{
+            label: "HRV (RMSSD)", data: ringPoints(series, "biometric_hrv_rmssd"),
+            borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.15)",
+            borderWidth: 2, pointRadius: 2, pointHoverRadius: 5, tension: 0.3, fill: true
+        }] },
+        options: ringTimeChartOptions("milliseconds", 20, 90)
+    }));
+
+    const activityOptions = ringTimeChartOptions("steps / kcal", 0, undefined);
+    activityOptions.scales.y1 = {
+        position: "right", grid: { drawOnChartArea: false }, ticks: { color: "#a78bfa" },
+        title: { display: true, text: "distance (km)", color: "#a78bfa" }, beginAtZero: true
+    };
+    const activityContext = document.getElementById("ringActivityChart").getContext("2d");
+    ringCharts.push(new Chart(activityContext, {
+        type: "bar",
+        data: { datasets: [
+            { label: "Steps", data: ringPoints(series, "biometric_steps"), backgroundColor: "rgba(16,185,129,0.72)", borderRadius: 3 },
+            { label: "Calories", data: ringPoints(series, "biometric_calories"), backgroundColor: "rgba(245,158,11,0.72)", borderRadius: 3 },
+            { type: "line", label: "Distance (km)", data: ringPoints(series, "biometric_distance_meters", value => value / 1000), borderColor: "#a78bfa", pointRadius: 1, borderWidth: 2, tension: 0.2, yAxisID: "y1" }
+        ] },
+        options: activityOptions
+    }));
+
+    const stressOptions = ringTimeChartOptions("stress (0–100)", 0, 100);
+    stressOptions.scales.y1 = {
+        position: "right", min: 85, max: 100, grid: { drawOnChartArea: false },
+        ticks: { color: "#60a5fa" }, title: { display: true, text: "SpO₂ (%)", color: "#60a5fa" }
+    };
+    const stressContext = document.getElementById("ringStressSpo2Chart").getContext("2d");
+    ringCharts.push(new Chart(stressContext, {
+        type: "line",
+        data: { datasets: [
+            { label: "Stress", data: ringPoints(series, "biometric_stress"), borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.14)", borderWidth: 2, pointRadius: 2, tension: 0.3, fill: true },
+            { label: "SpO₂", data: ringPoints(series, "biometric_spo2_pct"), borderColor: "#3b82f6", borderWidth: 2, pointRadius: 3, tension: 0.2, yAxisID: "y1" }
+        ] },
+        options: stressOptions
+    }));
+
+    const sleepMetrics = [
+        ["biometric_sleep_deep_min", "Deep", "#7c3aed"],
+        ["biometric_sleep_rem_min", "REM", "#3b82f6"],
+        ["biometric_sleep_light_min", "Light", "#10b981"]
+    ];
+    const sleepTimestamps = [...new Set(sleepMetrics.flatMap(([metric]) => (series[metric] || []).map(point => Number(point[0]))))].sort((a, b) => a - b);
+    const sleepContext = document.getElementById("ringSleepChart").getContext("2d");
+    ringCharts.push(new Chart(sleepContext, {
+        type: "bar",
+        data: {
+            labels: sleepTimestamps.map(timestamp => formatRingTimestamp(timestamp, true)),
+            datasets: sleepMetrics.map(([metric, label, color]) => {
+                const values = new Map((series[metric] || []).map(point => [Number(point[0]), Number(point[1]) / 60]));
+                return { label, data: sleepTimestamps.map(timestamp => values.get(timestamp) ?? null), backgroundColor: color, borderRadius: 3 };
+            })
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, animation: false,
+            plugins: { legend: { labels: { color: "#9ca3af" } } },
+            scales: {
+                x: { stacked: true, grid: { display: false }, ticks: { color: "#9ca3af", maxTicksLimit: 12 } },
+                y: { stacked: true, beginAtZero: true, title: { display: true, text: "hours", color: "#9ca3af" }, grid: { color: "rgba(255,255,255,0.06)" }, ticks: { color: "#9ca3af" } }
+            }
+        }
+    }));
+
+    const batteryOptions = ringTimeChartOptions("battery (%)", 0, 100);
+    batteryOptions.scales.y1 = {
+        position: "right", min: 0, max: 1, grid: { drawOnChartArea: false },
+        ticks: { color: "#34d399", stepSize: 1, callback: value => value === 1 ? "charging" : "battery" }
+    };
+    const batteryContext = document.getElementById("ringBatteryChart").getContext("2d");
+    ringCharts.push(new Chart(batteryContext, {
+        type: "line",
+        data: { datasets: [
+            { label: "Battery", data: ringPoints(series, "ring_battery_pct"), borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.17)", borderWidth: 2, pointRadius: 2, stepped: true, fill: true },
+            { label: "Charging", data: ringPoints(series, "ring_charging"), borderColor: "#fbbf24", borderWidth: 2, pointRadius: 0, stepped: true, yAxisID: "y1" }
+        ] },
+        options: batteryOptions
+    }));
 }
 
 function populateCommandCenter(daily) {
