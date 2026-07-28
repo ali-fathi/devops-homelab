@@ -124,7 +124,11 @@ class HealthDashboardTests(unittest.TestCase):
                 "biometric_hr_bpm": [(now_ms - 300_000, 61.0), (now_ms, 72.0)],
                 "biometric_steps": [(now_ms, 840.0)],
                 "biometric_sleep_total_min": [(now_ms, 450.0)],
-                "biometric_sleep_deep_min": [(now_ms, 90.0)],
+                # Importers can write stages a few milliseconds apart from
+                # the total session sample; the summary must still join them.
+                "biometric_sleep_deep_min": [(now_ms + 1_000, 90.0)],
+                "biometric_sleep_rem_min": [(now_ms - 1_000, 110.0)],
+                "biometric_sleep_light_min": [(now_ms + 2_000, 250.0)],
                 "ring_battery_pct": [(now_ms, 77.0)],
                 "ring_charging": [(now_ms, 0.0)],
             }
@@ -141,6 +145,9 @@ class HealthDashboardTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["resting_hr_24h"], 61)
         self.assertEqual(payload["summary"]["period_steps"], 840)
         self.assertEqual(payload["summary"]["sleep_total_min"], 450)
+        self.assertEqual(payload["summary"]["sleep_deep_min"], 90)
+        self.assertEqual(payload["summary"]["sleep_rem_min"], 110)
+        self.assertEqual(payload["summary"]["sleep_light_min"], 250)
         self.assertEqual(payload["summary"]["battery"], 77)
         self.assertFalse(payload["summary"]["charging"])
 

@@ -1019,7 +1019,7 @@
             "uid": "ring-health-victoriametrics"
           },
           "editorMode": "code",
-          "expr": "last_over_time(biometric_sleep_total_min{device=~\"$device\"}[$__range])",
+          "expr": "last_over_time(biometric_sleep_total_min{device=~\"$device\"}[48h])",
           "format": "time_series",
           "legendFormat": "",
           "range": false,
@@ -1085,7 +1085,7 @@
             "uid": "ring-health-victoriametrics"
           },
           "editorMode": "code",
-          "expr": "last_over_time(biometric_sleep_deep_min{device=~\"$device\"}[$__range])",
+          "expr": "last_over_time(biometric_sleep_deep_min{device=~\"$device\"}[48h])",
           "format": "time_series",
           "legendFormat": "",
           "range": false,
@@ -1151,7 +1151,7 @@
             "uid": "ring-health-victoriametrics"
           },
           "editorMode": "code",
-          "expr": "last_over_time(biometric_sleep_rem_min{device=~\"$device\"}[$__range])",
+          "expr": "last_over_time(biometric_sleep_rem_min{device=~\"$device\"}[48h])",
           "format": "time_series",
           "legendFormat": "",
           "range": false,
@@ -1217,7 +1217,7 @@
             "uid": "ring-health-victoriametrics"
           },
           "editorMode": "code",
-          "expr": "last_over_time(biometric_sleep_light_min{device=~\"$device\"}[$__range])",
+          "expr": "last_over_time(biometric_sleep_light_min{device=~\"$device\"}[48h])",
           "format": "time_series",
           "legendFormat": "",
           "range": false,
@@ -1903,7 +1903,7 @@
   "tags": [
     "ring-health",
     "biometrics",
-    "colmi-r02",
+    "colmi-r0x",
     "victoriametrics",
     "homelab"
   ],
@@ -1937,7 +1937,7 @@
     ]
   },
   "time": {
-    "from": "now-24h",
+    "from": "now-48h",
     "to": "now"
   },
   "timepicker": {
@@ -1951,8 +1951,8 @@
     ]
   },
   "timezone": "browser",
-  "title": "Biometrics - Colmi R02 - Ring Health",
+  "title": "Biometrics - Colmi R0x - Ring Health",
   "uid": "ring-health-biometrics-colmi-r02",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

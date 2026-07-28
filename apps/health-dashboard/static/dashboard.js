@@ -159,7 +159,7 @@ function fetchRingData() {
 
     const range = rangeSelect.value;
     status.className = "ring-source-status loading";
-    status.innerText = "Loading stored R02 measurements from VictoriaMetrics…";
+    status.innerText = "Loading stored Ring measurements from VictoriaMetrics…";
     if (refreshButton) {
         refreshButton.disabled = true;
         refreshButton.innerText = "⏳ Loading…";
@@ -181,7 +181,7 @@ function fetchRingData() {
             ringDataLoaded = true;
             if (data.status === "no_data") {
                 status.className = "ring-source-status empty";
-                status.innerText = `VictoriaMetrics is available, but no ${data.device || "R02"} samples were found in this range.`;
+                status.innerText = `VictoriaMetrics is available, but no ${data.device || "Ring"} samples were found in this range.`;
             } else if (data.mocked) {
                 status.className = "ring-source-status mock";
                 status.innerText = "Showing explicit demo data. Production reads only stored VictoriaMetrics samples.";

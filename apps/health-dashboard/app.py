@@ -198,7 +198,11 @@ RING_METRICS = (
     "ring_battery_pct",
     "ring_charging",
 )
+RING_SLEEP_METRICS = tuple(name for name in RING_METRICS if name.startswith("biometric_sleep_"))
 RING_RANGE_DAYS = {"24h": 1, "7d": 7, "30d": 30}
+# A session is timestamped at sleep start, so keep it visible through the day
+# after waking even when the vitals view is limited to 24 hours.
+RING_SLEEP_LOOKBACK_HOURS = 48
 
 MOCK_DATA_ENV = os.environ.get("MOCK_DATA", "false").lower() == "true"
 DB_TIMEOUT = float(os.environ.get("DB_TIMEOUT_SECONDS", "5"))
@@ -336,7 +340,9 @@ def vm_query_range(
 
 
 def vm_export_ring_metrics(
-    start: dt.datetime, end: dt.datetime
+    start: dt.datetime,
+    end: dt.datetime,
+    metrics: Tuple[str, ...] = RING_METRICS,
 ) -> Dict[str, List[Tuple[int, float]]]:
     """Export stored Ring samples without contacting the Bluetooth device.
 
@@ -344,7 +350,7 @@ def vm_export_ring_metrics(
     unlike an evaluated range query which can repeat sparse hourly samples due
     to Prometheus lookback behavior.
     """
-    metric_pattern = "|".join(re.escape(name) for name in RING_METRICS)
+    metric_pattern = "|".join(re.escape(name) for name in metrics)
     selector = (
         f'{{device="{RING_DEVICE}",'
         f'__name__=~"^({metric_pattern})$"}}'
@@ -366,7 +372,7 @@ def vm_export_ring_metrics(
             "victoriametrics", "VictoriaMetrics Ring data is unavailable"
         ) from exc
 
-    samples: Dict[str, Dict[int, float]] = {name: {} for name in RING_METRICS}
+    samples: Dict[str, Dict[int, float]] = {name: {} for name in metrics}
     try:
         for raw_line in response.iter_lines(decode_unicode=True):
             if not raw_line:
@@ -443,7 +449,16 @@ def build_ring_payload(
     def sleep_stage(metric: str) -> Optional[float]:
         if latest_sleep_timestamp is None:
             return None
-        return dict(series.get(metric, [])).get(latest_sleep_timestamp)
+        # Exported stage samples normally share the session timestamp, but use
+        # the closest sample as a safeguard for importers that write each
+        # stage a few milliseconds apart.
+        points = series.get(metric, [])
+        if not points:
+            return None
+        timestamp, value = min(
+            points, key=lambda point: abs(point[0] - latest_sleep_timestamp)
+        )
+        return value if abs(timestamp - latest_sleep_timestamp) <= 5 * 60 * 1000 else None
 
     sync_candidates = [
         timestamp
@@ -1185,6 +1200,15 @@ def api_ring():
             if MOCK_DATA_ENV
             else vm_export_ring_metrics(start, end)
         )
+        if range_key == "24h":
+            sleep_start = end - dt.timedelta(hours=RING_SLEEP_LOOKBACK_HOURS)
+            sleep_series = (
+                generate_mock_ring_series(sleep_start, end)
+                if MOCK_DATA_ENV
+                else vm_export_ring_metrics(sleep_start, end, RING_SLEEP_METRICS)
+            )
+            for metric in RING_SLEEP_METRICS:
+                series[metric] = sleep_series[metric]
     except DataSourceError as exc:
         return jsonify(
             {

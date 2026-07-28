@@ -33,7 +33,7 @@
         <!-- Tabs Navigation -->
         <nav class="tabs-nav">
             <button class="tab-btn active" data-tab="tab-command-center">Command Center</button>
-            <button class="tab-btn" data-tab="tab-ring-health">💍 R02 Ring</button>
+            <button class="tab-btn" data-tab="tab-ring-health">Ring Health</button>
             <button class="tab-btn" data-tab="tab-weekly-health">Weekly Narrative</button>
             <button class="tab-btn" data-tab="tab-monthly-report">Monthly Report</button>
         </nav>
@@ -157,14 +157,14 @@
             </div>
         </div>
 
-        <!-- TAB 2: Colmi R02 data stored in VictoriaMetrics -->
+        <!-- TAB 2: Colmi R0x data stored in VictoriaMetrics -->
         <div id="tab-ring-health" class="tab-pane">
             <div class="ring-toolbar card">
                 <div>
                     <div class="ring-title-row">
                         <span class="ring-device-icon">💍</span>
                         <div>
-                            <h2>Colmi R02 Ring</h2>
+                            <h2>Colmi Ring Health</h2>
                             <p>Historical measurements read from VictoriaMetrics. No direct Bluetooth connection is used.</p>
                         </div>
                     </div>
@@ -172,7 +172,7 @@
                 <div class="ring-controls">
                     <label for="ring-range">Time range</label>
                     <select id="ring-range" aria-label="Ring chart time range">
-                        <option value="24h">Last 24 hours</option>
+                        <option value="24h">Last 24 hours (sleep: latest 48h)</option>
                         <option value="7d">Last 7 days</option>
                         <option value="30d">Last 30 days</option>
                     </select>
@@ -236,7 +236,7 @@
 
             <div class="ring-section-heading">
                 <div><span>◎</span><h2>Activity</h2></div>
-                <p>Hourly activity buckets recorded by the R02</p>
+                <p>Hourly activity buckets recorded by the Ring</p>
             </div>
             <div class="ring-compact-stats">
                 <div class="card"><span>Steps in range</span><strong id="ring-period-steps">N/A</strong></div>

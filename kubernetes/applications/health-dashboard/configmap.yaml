@@ -8,6 +8,7 @@ data:
   INFLUXDB_PORT: "8086"
   INFLUXDB_DATABASE: GarminStats
   VM_URL: http://victoriametrics.ring-health.svc.cluster.local:8428
+  # This is the Android tracker's compatibility label; it may be colmi_r02 for an R03.
   RING_DEVICE: colmi_r02
   MOCK_DATA: "false"
   PYTHONUNBUFFERED: "1"
