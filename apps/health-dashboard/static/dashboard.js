@@ -275,29 +275,44 @@ function ringPoints(series, metric, transform = value => value) {
     }));
 }
 
-function dailySleepTotalPoints(series) {
-    const totalsByDay = new Map();
+function primarySleepSessions(series) {
+    // Some R0x firmware versions return more than one record for the same
+    // night. Use the longest record as that day's main sleep session so a
+    // duplicate record cannot inflate a nightly trend to an impossible value.
+    const sessionsByDay = new Map();
     for (const [timestamp, minutes] of series.biometric_sleep_total_min || []) {
         const sampleTime = new Date(Number(timestamp));
         const dayStart = new Date(
             sampleTime.getFullYear(), sampleTime.getMonth(), sampleTime.getDate()
         ).getTime();
-        totalsByDay.set(dayStart, (totalsByDay.get(dayStart) || 0) + Number(minutes));
+        const candidate = { timestamp: Number(timestamp), minutes: Number(minutes) };
+        const current = sessionsByDay.get(dayStart);
+        if (!current || candidate.minutes > current.minutes ||
+            (candidate.minutes === current.minutes && candidate.timestamp > current.timestamp)) {
+            sessionsByDay.set(dayStart, candidate);
+        }
     }
-    return [...totalsByDay.entries()]
+    return [...sessionsByDay.entries()]
         .sort(([left], [right]) => left - right)
-        .map(([timestamp, minutes]) => ({ x: timestamp, y: minutes / 60 }));
+        .map(([dayStart, session]) => ({ dayStart, ...session }));
+}
+
+function dailySleepTotalPoints(series) {
+    return primarySleepSessions(series).map(session => ({
+        x: session.dayStart,
+        y: session.minutes / 60
+    }));
 }
 
 function monthlySleepAveragePoints(series) {
     const totalsByMonth = new Map();
-    for (const [timestamp, minutes] of series.biometric_sleep_total_min || []) {
-        const sampleTime = new Date(Number(timestamp));
+    for (const session of primarySleepSessions(series)) {
+        const sampleTime = new Date(session.dayStart);
         const monthStart = new Date(
             sampleTime.getFullYear(), sampleTime.getMonth(), 1
         ).getTime();
         const month = totalsByMonth.get(monthStart) || { minutes: 0, sessions: 0 };
-        month.minutes += Number(minutes);
+        month.minutes += session.minutes;
         month.sessions += 1;
         totalsByMonth.set(monthStart, month);
     }
@@ -427,11 +442,11 @@ function renderRingCharts(series) {
     const sleepTotalOptions = ringTimeChartOptions("hours", 0, 12);
     sleepTotalOptions.scales.x.ticks.callback = value => formatRingTimestamp(value, true);
     sleepTotalOptions.plugins.tooltip.callbacks.label = context =>
-        `Total sleep: ${formatMinutes(context.parsed.y * 60)}`;
+        `Nightly sleep: ${formatMinutes(context.parsed.y * 60)}`;
     ringCharts.push(new Chart(sleepTotalContext, {
         type: "line",
         data: { datasets: [{
-            label: "Total sleep", data: dailySleepTotalPoints(series),
+            label: "Nightly sleep", data: dailySleepTotalPoints(series),
             borderColor: "#8b5cf6", backgroundColor: "rgba(139,92,246,0.16)",
             borderWidth: 3, pointRadius: 4, pointHoverRadius: 6, tension: 0.25, fill: true
         }] },
@@ -466,7 +481,7 @@ function renderRingCharts(series) {
     ringCharts.push(new Chart(sleepContext, {
         type: "bar",
         data: {
-            labels: sleepTimestamps.map(timestamp => formatRingTimestamp(timestamp, true)),
+            labels: sleepTimestamps.map(timestamp => formatRingTimestamp(timestamp)),
             datasets: sleepMetrics.map(([metric, label, color]) => {
                 const values = new Map((series[metric] || []).map(point => [Number(point[0]), Number(point[1]) / 60]));
                 return { label, data: sleepTimestamps.map(timestamp => values.get(timestamp) ?? null), backgroundColor: color, borderRadius: 3 };
