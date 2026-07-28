@@ -11,4 +11,4 @@ resources:
 images:
   - name: ghcr.io/ali-fathi/health-dashboard
     newName: ghcr.io/ali-fathi/health-dashboard
-    digest: sha256:90429cb2d6f4e2dcc5f5e9eb938ca308e07cd5d01bd80d99865de6be2a85fa8d
+    digest: sha256:484f54c1db1d87384f5da9b4bc1d46c28b56757c44847cf2e7d4bb4acaab4a97
