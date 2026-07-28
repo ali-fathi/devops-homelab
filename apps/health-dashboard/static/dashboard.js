@@ -366,19 +366,26 @@ function renderRingCharts(series) {
         options: activityOptions
     }));
 
-    const stressOptions = ringTimeChartOptions("stress (0–100)", 0, 100);
-    stressOptions.scales.y1 = {
-        position: "right", min: 85, max: 100, grid: { drawOnChartArea: false },
-        ticks: { color: "#60a5fa" }, title: { display: true, text: "SpO₂ (%)", color: "#60a5fa" }
-    };
-    const stressContext = document.getElementById("ringStressSpo2Chart").getContext("2d");
+    const stressContext = document.getElementById("ringStressChart").getContext("2d");
     ringCharts.push(new Chart(stressContext, {
         type: "line",
-        data: { datasets: [
-            { label: "Stress", data: ringPoints(series, "biometric_stress"), borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.14)", borderWidth: 2, pointRadius: 2, tension: 0.3, fill: true },
-            { label: "SpO₂", data: ringPoints(series, "biometric_spo2_pct"), borderColor: "#3b82f6", borderWidth: 2, pointRadius: 3, tension: 0.2, yAxisID: "y1" }
-        ] },
-        options: stressOptions
+        data: { datasets: [{
+            label: "Stress", data: ringPoints(series, "biometric_stress"),
+            borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.14)",
+            borderWidth: 2, pointRadius: 2, tension: 0.3, fill: true
+        }] },
+        options: ringTimeChartOptions("stress (0–100)", 0, 100)
+    }));
+
+    const spo2Context = document.getElementById("ringSpo2Chart").getContext("2d");
+    ringCharts.push(new Chart(spo2Context, {
+        type: "line",
+        data: { datasets: [{
+            label: "SpO₂", data: ringPoints(series, "biometric_spo2_pct"),
+            borderColor: "#3b82f6", backgroundColor: "rgba(59,130,246,0.14)",
+            borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.2, fill: true
+        }] },
+        options: ringTimeChartOptions("SpO₂ (%)", 85, 100)
     }));
 
     const sleepMetrics = [

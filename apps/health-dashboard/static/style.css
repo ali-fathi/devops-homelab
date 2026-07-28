@@ -806,6 +806,11 @@ table.comparison-table tr:hover td {
     gap: 1rem;
 }
 
+.ring-charts-grid.ring-charts-equal {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 1rem;
+}
+
 .ring-chart-card {
     min-width: 0;
 }

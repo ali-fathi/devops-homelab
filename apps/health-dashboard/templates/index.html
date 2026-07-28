@@ -253,9 +253,17 @@
                 <div><span>◌</span><h2>Stress &amp; Oxygen</h2></div>
                 <p>Thirty-minute stress and hourly SpO₂ measurements</p>
             </div>
-            <div class="card ring-chart-card ring-full-chart">
-                <h3>⚖️ Stress and SpO₂</h3>
-                <div class="ring-chart-container"><canvas id="ringStressSpo2Chart"></canvas></div>
+            <div class="ring-charts-grid ring-charts-equal">
+                <div class="card ring-chart-card">
+                    <h3>⚖️ Stress</h3>
+                    <p>Ring-computed stress score (0–100)</p>
+                    <div class="ring-chart-container"><canvas id="ringStressChart"></canvas></div>
+                </div>
+                <div class="card ring-chart-card">
+                    <h3>🫁 Blood Oxygen (SpO₂)</h3>
+                    <p>Hourly blood-oxygen estimate</p>
+                    <div class="ring-chart-container"><canvas id="ringSpo2Chart"></canvas></div>
+                </div>
             </div>
 
             <div class="ring-section-heading">
