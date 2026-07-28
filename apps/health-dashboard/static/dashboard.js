@@ -399,7 +399,14 @@ function renderRingCharts(series) {
         },
         options: {
             responsive: true, maintainAspectRatio: false, animation: false,
-            plugins: { legend: { labels: { color: "#9ca3af" } } },
+            plugins: {
+                legend: { labels: { color: "#9ca3af" } },
+                tooltip: {
+                    callbacks: {
+                        label: context => `${context.dataset.label}: ${formatMinutes(context.parsed.y * 60)}`
+                    }
+                }
+            },
             scales: {
                 x: { stacked: true, grid: { display: false }, ticks: { color: "#9ca3af", maxTicksLimit: 12 } },
                 y: { stacked: true, beginAtZero: true, title: { display: true, text: "hours", color: "#9ca3af" }, grid: { color: "rgba(255,255,255,0.06)" }, ticks: { color: "#9ca3af" } }
