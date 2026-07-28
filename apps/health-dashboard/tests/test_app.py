@@ -151,6 +151,15 @@ class HealthDashboardTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["battery"], 77)
         self.assertFalse(payload["summary"]["charging"])
 
+    def test_ring_endpoint_supports_12_month_sleep_trend(self):
+        series = {name: [] for name in health_app.RING_METRICS}
+        with patch.object(health_app, "vm_export_ring_metrics", return_value=series) as export:
+            response = self.client.get("/api/ring?range=365d")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(export.call_count, 2)
+        self.assertEqual(export.call_args_list[1].args[2], health_app.RING_SLEEP_METRICS)
+
     def test_ring_endpoint_rejects_unsupported_ranges(self):
         response = self.client.get("/api/ring?range=1y")
         self.assertEqual(response.status_code, 400)

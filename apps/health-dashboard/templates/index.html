@@ -175,6 +175,7 @@
                         <option value="24h">Last 24 hours (sleep: latest 48h)</option>
                         <option value="7d">Last 7 days</option>
                         <option value="30d">Last 30 days</option>
+                        <option value="365d">Last 12 months (sleep trend)</option>
                     </select>
                     <button class="btn btn-secondary" id="btn-refresh-ring" type="button">↻ Refresh data</button>
                 </div>
@@ -275,6 +276,16 @@
                 <div class="card"><span>Deep</span><strong id="ring-sleep-deep">N/A</strong></div>
                 <div class="card"><span>REM</span><strong id="ring-sleep-rem">N/A</strong></div>
                 <div class="card"><span>Light</span><strong id="ring-sleep-light">N/A</strong></div>
+            </div>
+            <div class="card ring-chart-card ring-full-chart">
+                <h3>📈 Total sleep per day</h3>
+                <p>Daily sleep-duration trend based on each session's start date</p>
+                <div class="ring-chart-container"><canvas id="ringSleepTotalChart"></canvas></div>
+            </div>
+            <div class="card ring-chart-card ring-full-chart">
+                <h3>🗓️ Monthly average sleep</h3>
+                <p>Average sleep per recorded night; select Last 12 months for the monthly trend</p>
+                <div class="ring-chart-container"><canvas id="ringSleepMonthlyChart"></canvas></div>
             </div>
             <div class="card ring-chart-card ring-full-chart">
                 <h3>🌙 Sleep stages</h3>

@@ -199,10 +199,13 @@ RING_METRICS = (
     "ring_charging",
 )
 RING_SLEEP_METRICS = tuple(name for name in RING_METRICS if name.startswith("biometric_sleep_"))
-RING_RANGE_DAYS = {"24h": 1, "7d": 7, "30d": 30}
+RING_RANGE_DAYS = {"24h": 1, "7d": 7, "30d": 30, "365d": 365}
 # A session is timestamped at sleep start, so keep it visible through the day
 # after waking even when the vitals view is limited to 24 hours.
 RING_SLEEP_LOOKBACK_HOURS = 48
+# A year of high-frequency vitals is unnecessarily expensive for the Ring tab.
+# The 12-month view keeps the full sleep history and limits other charts to 30d.
+RING_NON_SLEEP_MAX_DAYS = 30
 
 MOCK_DATA_ENV = os.environ.get("MOCK_DATA", "false").lower() == "true"
 DB_TIMEOUT = float(os.environ.get("DB_TIMEOUT_SECONDS", "5"))
@@ -1188,27 +1191,35 @@ def api_ring():
         return jsonify(
             {
                 "status": "invalid_request",
-                "error": "range must be one of: 24h, 7d, 30d",
+                "error": "range must be one of: 24h, 7d, 30d, 365d",
             }
         ), 400
 
     end = dt.datetime.now(tz=UTC)
     start = end - dt.timedelta(days=RING_RANGE_DAYS[range_key])
+    # Keep responsive raw-vital charts for the 12-month sleep trend without
+    # exporting a year of five-minute heart-rate data.
+    non_sleep_start = max(
+        start, end - dt.timedelta(days=RING_NON_SLEEP_MAX_DAYS)
+    )
+    sleep_start = (
+        end - dt.timedelta(hours=RING_SLEEP_LOOKBACK_HOURS)
+        if range_key == "24h"
+        else start
+    )
     try:
         series = (
-            generate_mock_ring_series(start, end)
+            generate_mock_ring_series(non_sleep_start, end)
             if MOCK_DATA_ENV
-            else vm_export_ring_metrics(start, end)
+            else vm_export_ring_metrics(non_sleep_start, end)
         )
-        if range_key == "24h":
-            sleep_start = end - dt.timedelta(hours=RING_SLEEP_LOOKBACK_HOURS)
-            sleep_series = (
-                generate_mock_ring_series(sleep_start, end)
-                if MOCK_DATA_ENV
-                else vm_export_ring_metrics(sleep_start, end, RING_SLEEP_METRICS)
-            )
-            for metric in RING_SLEEP_METRICS:
-                series[metric] = sleep_series[metric]
+        sleep_series = (
+            generate_mock_ring_series(sleep_start, end)
+            if MOCK_DATA_ENV
+            else vm_export_ring_metrics(sleep_start, end, RING_SLEEP_METRICS)
+        )
+        for metric in RING_SLEEP_METRICS:
+            series[metric] = sleep_series[metric]
     except DataSourceError as exc:
         return jsonify(
             {

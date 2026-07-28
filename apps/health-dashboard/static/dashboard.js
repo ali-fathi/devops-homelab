@@ -275,6 +275,41 @@ function ringPoints(series, metric, transform = value => value) {
     }));
 }
 
+function dailySleepTotalPoints(series) {
+    const totalsByDay = new Map();
+    for (const [timestamp, minutes] of series.biometric_sleep_total_min || []) {
+        const sampleTime = new Date(Number(timestamp));
+        const dayStart = new Date(
+            sampleTime.getFullYear(), sampleTime.getMonth(), sampleTime.getDate()
+        ).getTime();
+        totalsByDay.set(dayStart, (totalsByDay.get(dayStart) || 0) + Number(minutes));
+    }
+    return [...totalsByDay.entries()]
+        .sort(([left], [right]) => left - right)
+        .map(([timestamp, minutes]) => ({ x: timestamp, y: minutes / 60 }));
+}
+
+function monthlySleepAveragePoints(series) {
+    const totalsByMonth = new Map();
+    for (const [timestamp, minutes] of series.biometric_sleep_total_min || []) {
+        const sampleTime = new Date(Number(timestamp));
+        const monthStart = new Date(
+            sampleTime.getFullYear(), sampleTime.getMonth(), 1
+        ).getTime();
+        const month = totalsByMonth.get(monthStart) || { minutes: 0, sessions: 0 };
+        month.minutes += Number(minutes);
+        month.sessions += 1;
+        totalsByMonth.set(monthStart, month);
+    }
+    return [...totalsByMonth.entries()]
+        .sort(([left], [right]) => left - right)
+        .map(([timestamp, month]) => ({
+            x: timestamp,
+            y: month.minutes / month.sessions / 60,
+            sessions: month.sessions
+        }));
+}
+
 function rollingMinimum(points, windowMs) {
     return points.map((point, index) => {
         let minimum = point.y;
@@ -386,6 +421,39 @@ function renderRingCharts(series) {
             borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.2, fill: true
         }] },
         options: ringTimeChartOptions("SpO₂ (%)", 85, 100)
+    }));
+
+    const sleepTotalContext = document.getElementById("ringSleepTotalChart").getContext("2d");
+    const sleepTotalOptions = ringTimeChartOptions("hours", 0, 12);
+    sleepTotalOptions.scales.x.ticks.callback = value => formatRingTimestamp(value, true);
+    sleepTotalOptions.plugins.tooltip.callbacks.label = context =>
+        `Total sleep: ${formatMinutes(context.parsed.y * 60)}`;
+    ringCharts.push(new Chart(sleepTotalContext, {
+        type: "line",
+        data: { datasets: [{
+            label: "Total sleep", data: dailySleepTotalPoints(series),
+            borderColor: "#8b5cf6", backgroundColor: "rgba(139,92,246,0.16)",
+            borderWidth: 3, pointRadius: 4, pointHoverRadius: 6, tension: 0.25, fill: true
+        }] },
+        options: sleepTotalOptions
+    }));
+
+    const sleepMonthlyContext = document.getElementById("ringSleepMonthlyChart").getContext("2d");
+    const sleepMonthlyOptions = ringTimeChartOptions("average hours per night", 0, 12);
+    const monthFormatter = new Intl.DateTimeFormat(undefined, { month: "short", year: "numeric" });
+    sleepMonthlyOptions.scales.x.ticks.callback = value => monthFormatter.format(new Date(value));
+    sleepMonthlyOptions.plugins.tooltip.callbacks = {
+        title: items => items.length ? monthFormatter.format(new Date(items[0].parsed.x)) : "",
+        label: context => `Average sleep: ${formatMinutes(context.parsed.y * 60)} (${context.raw.sessions} nights)`
+    };
+    ringCharts.push(new Chart(sleepMonthlyContext, {
+        type: "line",
+        data: { datasets: [{
+            label: "Monthly average sleep", data: monthlySleepAveragePoints(series),
+            borderColor: "#ec4899", backgroundColor: "rgba(236,72,153,0.15)",
+            borderWidth: 3, pointRadius: 5, pointHoverRadius: 7, tension: 0.25, fill: true
+        }] },
+        options: sleepMonthlyOptions
     }));
 
     const sleepMetrics = [
