@@ -107,7 +107,7 @@ ansible/
 ├── ansible.cfg
 │
 ├── inventory/
-│   └── hosts.ini
+│   └── hosts.yml
 │
 ├── group_vars/
 │   └── k3s_cluster.yml
@@ -413,20 +413,33 @@ F1
 File:
 
 ```text
-ansible/inventory/hosts.ini
+ansible/inventory/hosts.yml
 ```
 
-```ini
-[k3s_master]
-k3s-master ansible_host=192.168.178.80
+```yaml
+---
+all:
+  children:
+    k3s_cluster:
+      children:
+        k3s_master:
+          hosts:
+            k3s-master:
+              ansible_host: 192.168.178.80
+        k3s_workers:
+          hosts:
+            k3s-worker1:
+              ansible_host: 192.168.178.81
+            k3s-worker2:
+              ansible_host: 192.168.178.82
+```
 
-[k3s_workers]
-k3s-worker1 ansible_host=192.168.178.81
-k3s-worker2 ansible_host=192.168.178.82
+Visualize the effective inventory:
 
-[k3s_cluster:children]
-k3s_master
-k3s_workers
+```bash
+cd ansible
+ansible-inventory --graph
+ansible-inventory --list
 ```
 
 ---
@@ -465,7 +478,7 @@ ansible/ansible.cfg
 ```ini
 [defaults]
 
-inventory = inventory/hosts.ini
+inventory = inventory/hosts.yml
 
 host_key_checking = False
 

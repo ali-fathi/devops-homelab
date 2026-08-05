@@ -174,7 +174,7 @@ DevContainer
 Inventory:
 
 ```text
-ansible/inventory/hosts.ini
+ansible/inventory/hosts.yml
 ```
 
 Group variables:

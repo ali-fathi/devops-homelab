@@ -34,11 +34,13 @@ docs/homelab-study-guide.md
 `devcontainer.json` defines:
 
 - the image build;
-- mounted kubeconfig;
-- mounted SSH directory;
+- mounted kubeconfig (**read-only**);
+- mounted SSH directory (**read-only**);
 - `KUBECONFIG` environment variable;
 - VS Code extensions;
-- the `vscode` remote user.
+- the `vscode` remote user;
+- `postCreateCommand` (backup reminder on create/rebuild);
+- `postStartCommand` (cluster verification on every start).
 
 `Dockerfile` installs the operator tools.
 
@@ -102,7 +104,7 @@ The DevContainer expects:
 ~/.kube/k3s-config
 ```
 
-The file is mounted as:
+The file is mounted as (**read-only** — the container can read your kubeconfig but never modify or delete it):
 
 ```text
 /home/vscode/.kube/config
@@ -139,7 +141,7 @@ kubectl --kubeconfig ~/.kube/k3s-config get nodes
 
 ## SSH mount
 
-The DevContainer mounts:
+The DevContainer mounts (**read-only** — the container can read your SSH keys but never modify or delete them):
 
 ```text
 ~/.ssh → /home/vscode/.ssh
@@ -192,6 +194,30 @@ kubectl get nodes
 ```bash
 cd ansible
 ansible k3s_cluster -m ping
+```
+
+---
+
+## Startup hooks
+
+The DevContainer runs two hooks:
+
+```text
+postCreateCommand  →  on first create / rebuild:
+                      reminder to run ./scripts/backup-kubeconfig.sh
+
+postStartCommand   →  on EVERY container start:
+                      ./scripts/verify-cluster.sh
+                      (reports cluster reachability + tool versions)
+```
+
+The `postStart` hook exits 0 even when the cluster is unreachable — it is a **notification**, not a startup blocker. If you see `[WARN] Kubernetes cluster NOT reachable`, check:
+
+```text
+kubeconfig exists on host          ls -l ~/.kube/k3s-config
+server address correct             https://192.168.178.80:6443
+VPN/LAN reachable                  ping 192.168.178.80
+K3s API running                    curl -k https://192.168.178.80:6443
 ```
 
 ---

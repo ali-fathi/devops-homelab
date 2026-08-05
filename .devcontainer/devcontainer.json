@@ -6,8 +6,8 @@
   },
 
   "mounts": [
-    "source=${env:HOME}/.kube/k3s-config,target=/home/vscode/.kube/config,type=bind",
-    "source=${env:HOME}/.ssh,target=/home/vscode/.ssh,type=bind"
+    "source=${localEnv:HOME}/.kube/k3s-config,target=/home/vscode/.kube/config,type=bind,readonly",
+    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,readonly"
   ],
 
   "remoteEnv": {
@@ -27,5 +27,9 @@
     }
   },
 
-  "remoteUser": "vscode"
+  "remoteUser": "vscode",
+
+  "postCreateCommand": "bash -c 'echo \"Homelab DevContainer ready. Run ./scripts/backup-kubeconfig.sh to back up your kubeconfig.\"'",
+
+  "postStartCommand": "bash -c './scripts/verify-cluster.sh; exit 0'"
 }
