@@ -25,16 +25,21 @@ provider "azurerm" {
   features {}
 }
 
+# Kubeconfig path — use an absolute path, not ~ (tilde doesn't expand
+# in all providers). Default: ~/.kube/k3s-config resolved via env var
+# KUBECONFIG_PATH (set it to your absolute path), or fall back to
+# $HOME/.kube/k3s-config.
+
 provider "kubernetes" {
-  config_path = "~/.kube/k3s-config"
+  config_path = var.kubeconfig_path
 }
 
 provider "helm" {
   kubernetes {
-    config_path = "~/.kube/k3s-config"
+    config_path = var.kubeconfig_path
   }
 }
 
 provider "kubectl" {
-  config_path = "~/.kube/k3s-config"
+  config_path = var.kubeconfig_path
 }
