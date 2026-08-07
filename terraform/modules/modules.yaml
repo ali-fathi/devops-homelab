@@ -1,0 +1,32 @@
+# Terraform module catalog
+#
+# Each entry documents one reusable module: its purpose and ownership scope.
+# Modules are implemented incrementally across Phase 2:
+#   metallb (2.3), longhorn (2.4), argocd (2.5), k3s-bootstrap (2.1),
+#   external-secrets (deferred).
+
+modules:
+  k3s-bootstrap:
+    purpose: "Cluster bootstrap resources (namespaces) for platform services"
+    ownership: "Terraform owns bootstrap namespaces"
+    status: scaffolded
+
+  metallb:
+    purpose: "MetalLB IP address pool + L2 advertisement configuration"
+    ownership: "Terraform owns MetalLB CRs (imported from kubectl manifests)"
+    status: scaffolded
+
+  longhorn:
+    purpose: "Longhorn storage platform installation via Helm"
+    ownership: "Terraform owns the longhorn Helm release"
+    status: scaffolded
+
+  argocd:
+    purpose: "Argo CD AppProject bootstrap; helm_release adoption deferred"
+    ownership: "Terraform owns the AppProject CR; Argo CD owns Applications"
+    status: scaffolded
+
+  external-secrets:
+    purpose: "External Secrets Operator integration (ClusterSecretStore)"
+    ownership: "Deferred — secrets pipeline is fragile; adopt later"
+    status: deferred
