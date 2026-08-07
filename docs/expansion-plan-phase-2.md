@@ -33,7 +33,7 @@ Phase 2 goal:
 | **2.6** | `terraform plan` CI check | `.github/workflows/terraform-validate.yaml` | Plan as PR comment with read-only access |
 | **2.7** | Documentation | `docs/expansion-plan-phase-2.md` | This document — records what actually happened |
 
-> Implementation status: 2.1 ✅ implemented · 2.2–2.6 🟡 designed (built next) · 2.7 ✅ (this doc).
+> Implementation status: 2.1 ✅ implemented · 2.2 ✅ implemented · 2.3 ✅ implemented · 2.4–2.6 🟡 designed (built next) · 2.7 ✅ (this doc).
 
 ---
 
@@ -137,7 +137,7 @@ Verified: all 15 module files format clean, validation passes.
 
 ---
 
-# Task 2.2 — Remote State with Locking (designed)
+# Task 2.2 — Remote State with Locking ✅ (implemented)
 
 ## The problem
 
@@ -222,17 +222,93 @@ terraform init -migrate-state
 - Encrypted snapshot in Key Vault as a second copy
 - Never `terraform state rm` without understanding; never edit state by hand
 
+## What was implemented
+
+| File | Change |
+|------|--------|
+| `terraform/backend.tf` | **New** — azurerm backend (RG homelab, storage homelabtf, container tfstate, key homelab.tfstate) |
+| `terraform/providers.tf` | Pinned `required_providers`: azurerm `~>4.0`, kubernetes `~>3.2`, helm `~>2.17` |
+| `.gitignore` | Removed `.terraform.lock.hcl` so the lock file is committed (reproducible CI init) |
+
+## Troubleshooting log — real issues hit during implementation
+
+### Issue 1: `ARM_ACCESS_KEY` must be set in the SAME shell
+
+```text
+terraform state list → "No state file was found!"
+```
+
+Each terminal is its own world — an `export` in one shell dies with it. The key must be exported **in the same terminal** as the terraform commands:
+
+```bash
+export ARM_ACCESS_KEY="$(az keyvault secret show --vault-name kv-homelab-k3s --name terraform-state-key --query value -o tsv)"
+echo "KEY LENGTH: ${#ARM_ACCESS_KEY}"   # must print > 0
+terraform init
+```
+
+### Issue 2: `terraform init` sometimes silently skips the backend handshake
+
+```text
+"Initializing the backend..." then jumps to providers — no "Backend configured!"
+```
+
+The definitive fix is **explicit `-backend-config` flags**, which force a real Azure connection:
+
+```bash
+terraform init -reconfigure \
+  -backend-config="storage_account_name=homelabtf" \
+  -backend-config="container_name=tfstate" \
+  -backend-config="key=homelab.tfstate" \
+  -backend-config="resource_group_name=homelab"
+```
+
+→ `Successfully configured the backend "azurerm"!` ← the proof it connected.
+
+### Issue 3: `illegal base64 data at input byte 0`
+
+```text
+Error: Failed to get existing workspaces: ... decoding accountKey:
+       illegal base64 data at input byte 0
+```
+
+Root cause: a **Unicode smart-quote `“` got copied into the Key Vault secret** alongside the real key (`“P9ZWBz...`). The azurerm backend needs the storage key as base64; the leading `“` breaks decoding.
+
+**Fix — re-store the clean key via variables, never paste by hand:**
+
+```bash
+CLEAN_KEY=$(az storage account keys list --account-name homelabtf \
+  --resource-group homelab --query "[0].value" -o tsv)
+az keyvault secret set --vault-name kv-homelab-k3s \
+  --name terraform-state-key --value "$CLEAN_KEY"
+```
+
+**Lessons:**
+1. Never paste secrets by hand — pipe them via shell variables (`az ... -o tsv | az keyvault ... --value "$VAR"`)
+2. Always verify a stored secret decodes: `az keyvault secret show ... | base64 -d`
+3. "illegal base64 at byte 0" almost always = a mangled/extra character
+
+### Issue 4: The locking proof
+
+After a successful init, `terraform plan` shows:
+
+```text
+Acquiring state lock. This may take a few moments...
+... Releasing state lock. This may take a few moments...
+```
+
+The "Acquiring/Releasing state lock" lines are the **proof the blob lease works**. A second concurrent `terraform plan` errors with `Error acquiring the state lock`.
+
 ## Learning verification (2.2)
 
-- [ ] I can explain what state is and why it's sensitive.
-- [ ] I understand blob-lease locking (one apply at a time).
-- [ ] I created the storage account + container via az CLI.
-- [ ] I stored the access key in Key Vault (not git).
-- [ ] I ran `terraform init -migrate-state` and saw "Backend configured".
+- [x] I can explain what state is and why it's sensitive.
+- [x] I understand blob-lease locking (one apply at a time).
+- [x] I created the storage account + container via az CLI.
+- [x] I stored the access key in Key Vault (not git).
+- [x] I ran `terraform init` and saw the backend configured (via `-backend-config` fix).
 
 ---
 
-# Task 2.3 — MetalLB via Terraform (designed)
+# Task 2.3 — MetalLB via Terraform ✅ (implemented)
 
 ## The problem
 
@@ -242,28 +318,134 @@ MetalLB config (IPAddressPool `homelab-pool`, L2Advertisement `homelab-advertise
 
 The cluster already has live MetalLB CRs. Creating them with Terraform would **destroy and recreate** (Terraform doesn't know them). The correct pattern:
 
-1. Declare resources in Terraform (`terraform/metallb.tf` → `modules/metallb`)
-2. `terraform import` the live resources into state
-3. `terraform plan` must show **zero changes** (adoption, not recreation)
-4. Only then `apply`
+```text
+1. Declare the resources in Terraform (module)
+2. terraform import   → adopt the LIVE resources into state
+3. terraform plan     → must show ZERO destroy (the safety gate)
+4. terraform apply    → adoption, not recreation
+```
+
+## What was created (implemented files)
+
+| File | Change |
+|------|--------|
+| `terraform/modules/metallb/main.tf` | Rewritten to `kubectl_manifest` (alekc/kubectl provider) + module's own `required_providers` |
+| `terraform/providers.tf` | Added `alekc/kubectl ~> 2.1` provider + block |
+| `terraform/metallb.tf` | **New** — root module call with live values |
+| `terraform/variables.tf` | Added `kubeconfig_path` variable |
+
+## Provider choice — `kubectl_manifest` (alekc/kubectl)
+
+To manage MetalLB CRDs, Terraform needs a provider. Two options:
+
+| Provider | How it handles CRDs | Verdict |
+|----------|--------------------|---------|
+| `hashicorp/kubernetes_manifest` | Requires the full CRD **schema** (huge, version-fragile for MetalLB) | Painful for CRDs |
+| `alekc/kubectl_manifest` | Treats manifest **opaquely** — just applies YAML | ✅ **Chosen** |
 
 ```hcl
-resource "kubernetes_manifest" "ip_address_pool" {
-  manifest = {
-    apiVersion = "metallb.io/v1beta1"
-    kind       = "IPAddressPool"
-    metadata = { name = "homelab-pool", namespace = "metallb-system" }
-    spec = { addresses = ["192.168.178.210-192.168.178.220"] }
+terraform {
+  required_providers {
+    kubectl = { source = "alekc/kubectl", version = "~> 2.1" }
   }
 }
-# + l2_advertisement resource
+
+resource "kubectl_manifest" "ip_address_pool" {
+  yaml_body = <<-EOT
+    apiVersion: metallb.io/v1beta1
+    kind: IPAddressPool
+    metadata:
+      name: ${var.pool_name}
+      namespace: ${var.namespace}
+    spec:
+      addresses:
+        - ${var.pool_addresses[0]}
+  EOT
+}
 ```
 
-```bash
-terraform import <resource> <import-id>   # adopt live state
-terraform plan                            # must show 0 changes
-terraform apply                           # adopt, not recreate
+> **Bug hit:** without the module's own `required_providers` block, Terraform resolved `kubectl_manifest` to nonexistent `hashicorp/kubectl`. Each module that uses a provider must declare its own `required_providers` to pin the source.
+
+## Root wiring (`terraform/metallb.tf`)
+
+```hcl
+module "metallb" {
+  source = "./modules/metallb"
+
+  namespace          = "metallb-system"
+  pool_name          = "homelab-pool"
+  pool_addresses     = ["192.168.178.210-192.168.178.220"]
+  advertisement_name = "homelab-advertisement"
+}
 ```
+
+Values must match the live cluster **exactly** so the import shows zero functional diff.
+
+## Troubleshooting log — real issues hit during implementation
+
+### Issue 1: `~` (tilde) does NOT expand in all providers
+
+```text
+Error: invalid provider configuration: stat /config/.kube/k3s-config:
+       no such file or directory
+```
+
+The hashicorp `kubernetes` provider expands `~`, but `alekc/kubectl` treats it as a literal path relative to CWD (`/config/` in the DevContainer).
+
+**Fix:** expose the kubeconfig path as a **variable**:
+
+```hcl
+variable "kubeconfig_path" {
+  description = "Absolute path to the kubeconfig (tilde does NOT expand in all providers)"
+  type        = string
+  default     = "~/.kube/k3s-config"
+}
+```
+
+```hcl
+provider "kubectl" {
+  config_path = var.kubeconfig_path
+}
+```
+
+Set at runtime: `export TF_VAR_kubeconfig_path="/home/vscode/.kube/config"`
+
+### Issue 2: Wrong import ID format
+
+```text
+Error: expected ID in format apiVersion//kind//name//namespace,
+       received: api/v1/namespaces/metallb-system/ipaddresspool/homelab-pool
+```
+
+The kubectl provider's import ID is **`<apiVersion>//<kind>//<name>//<namespace>`** — the error message IS the documentation.
+
+**Corrected commands:**
+
+```bash
+terraform import 'module.metallb.kubectl_manifest.ip_address_pool' \
+  'metallb.io/v1beta1//IPAddressPool//homelab-pool//metallb-system'
+
+terraform import 'module.metallb.kubectl_manifest.l2_advertisement' \
+  'metallb.io/v1beta1//L2Advertisement//homelab-advertisement//metallb-system'
+```
+
+### Issue 3: The danger of applying a "+ create" plan before import
+
+```text
+Plan: 2 to add, 0 to change, 0 to destroy   ← DANGER
+```
+
+Before import, Terraform saw the live resources as "unmanaged" and wanted to **create** them — which would conflict/duplicate. **Never apply a plan that shows `to add` for resources that already exist.** Import first; the plan must show `0 to add`.
+
+## The successful adoption — what "in-place update" means
+
+After import, the plan showed:
+
+```text
+Plan: 0 to add, 2 to change, 0 to destroy
+```
+
+The `~` (in-place change) is **safe** — it strips `generation`/`managedFields`/`last-applied-configuration` metadata and lets Terraform claim ownership. The **functional spec is unchanged** (addresses, autoAssign, avoidBuggyIPs identical). Zero destroy = the safety gate passed.
 
 ## Verify
 
@@ -278,10 +460,13 @@ argocd app list                                 # still Synced (nothing Argo-man
 
 ## Learning verification (2.3)
 
-- [ ] I can explain why import-first is safer than create.
-- [ ] I can explain why `plan` is a *read*.
-- [ ] I adopted the MetalLB CRs with zero destroy in the plan.
-- [ ] I know the kubectl YAML stays as rollback artifact.
+- [x] I can explain why import-first is safer than create.
+- [x] I can explain why `plan` is a *read*.
+- [x] I adopted the MetalLB CRs with zero destroy in the plan.
+- [x] I know the kubectl YAML stays as rollback artifact.
+- [x] I know why `~` doesn't expand in all providers and the variable fix.
+- [x] I know the kubectl import ID format (`apiVersion//kind//name//namespace`).
+- [x] I know never to apply a `+ create` plan for existing resources.
 
 ---
 
@@ -437,8 +622,8 @@ This document. Records the ownership boundary, the risk assessment, the remote-s
 ## Phase 2 — Master Checklist
 
 - [x] **2.1** Module structure created (5 modules + modules.yaml), fmt/validate green
-- [ ] **2.2** Storage account + container created, backend.tf, init -migrate-state, key in KV
-- [ ] **2.3** MetalLB CRs imported (zero-destroy plan), kubectl files annotated
+- [x] **2.2** Storage account + container created, backend.tf, init -migrate-state, key in KV
+- [x] **2.3** MetalLB CRs imported (zero-destroy plan), kubectl files annotated
 - [ ] **2.4** Longhorn adopted (documented migration) OR documented as deferred
 - [ ] **2.5** AppProject bootstrap via Terraform; helm take-over documented as deferred
 - [ ] **2.6** CI plan step + read-only SA token + PR comment
