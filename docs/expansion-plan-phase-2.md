@@ -33,7 +33,7 @@ Phase 2 goal:
 | **2.6** | `terraform plan` CI check | `.github/workflows/terraform-validate.yaml` | Plan as PR comment with read-only access |
 | **2.7** | Documentation | `docs/expansion-plan-phase-2.md` | This document — records what actually happened |
 
-> Implementation status: 2.1 ✅ implemented · 2.2 ✅ implemented · 2.3 ✅ implemented · 2.4–2.6 🟡 designed (built next) · 2.7 ✅ (this doc).
+> Implementation status: 2.1 ✅ implemented · 2.2 ✅ implemented · 2.3 ✅ implemented · 2.4 ✅ implemented (with incident — see runbook) · 2.5–2.6 🟡 designed (built next) · 2.7 ✅ (this doc).
 
 ---
 
@@ -470,7 +470,7 @@ argocd app list                                 # still Synced (nothing Argo-man
 
 ---
 
-# Task 2.4 — Longhorn via Terraform (designed)
+# Task 2.4 — Longhorn via Terraform ✅ (implemented — with a full incident)
 
 ## The problem
 
@@ -478,29 +478,112 @@ Longhorn is installed via unpinned `helm install longhorn longhorn/longhorn` —
 
 ## The solution — `helm_release` with documented migration
 
-**Critical:** `helm_release` has **no import** for existing releases (provider limitation). Adoption requires a safe, documented migration:
+**Critical:** `helm_release` has **no import** for existing releases (provider limitation). Adoption requires a migration (record → uninstall → apply).
+
+**What was implemented:**
+
+| File | Change |
+|------|--------|
+| `terraform/modules/longhorn/main.tf` | `helm_release` (name/repo/chart/version/namespace, `create_namespace=false`, `wait=true`, `timeout=600`) |
+| `terraform/longhorn.tf` | Root module call, chart pinned to live `1.12.0` |
+| `scripts/recover-longhorn-volumes.sh` | Recovery script (re-creates Volume CRs matching orphaned data) |
+
+**Verified:** `terraform apply` → `helm_release.longhorn: Creation complete (21s)`, `Apply complete! Resources: 1 added`. Longhorn is now Terraform-owned.
+
+---
+
+## 🚨 THE FULL INCIDENT — uninstall cascade → data recovery (Option C)
+
+This is the most important learning experience in the project. Read it carefully.
+
+### What happened (chronological)
+
+1. **The migration started as planned** — recorded values (`null`, no custom values), recorded PVC/volume inventory (7 PVCs, 6 volumes, all healthy).
+
+2. **First `helm uninstall` FAILED** with `job longhorn-uninstall failed: BackoffLimitExceeded`.
+
+3. **Root cause (learned from logs):** Longhorn has a `deleting-confirmation-flag` setting (default `false`) that REFUSES uninstall. The log:
+   ```
+   level=fatal msg="cannot uninstall Longhorn because deleting-confirmation-flag is set to `false`. Please set it to `true`..."
+   ```
+   This is Longhorn's **data-safety interlock** — it refuses to uninstall unless explicitly confirmed.
+
+4. **The mistake:** we set `deleting-confirmation-flag=true` and re-ran uninstall. The uninstall **succeeded** — but the Longhorn uninstall job **cascaded and deleted the Volume CRDs AND the PVCs** (they entered `Terminating`).
+
+5. **The discovery:** the replica DATA was still on disk (`/var/lib/longhorn/replicas/pvc-*`), but Longhorn **v1.12 has NO "Adopt" button** in the UI — orphaned replicas can only be *deleted*.
+
+6. **Attempted manual recovery:** created new Volume CRs with EXACT matching names → they attached but created **FRESH EMPTY replicas** (different hashes), NOT re-claiming the on-disk data. The `du -sh` proved the old data (400–500MB/replica) sat untouched in the old dirs.
+
+7. **User decision: Option C** — accept the data loss and re-initialize cleanly (data was re-fetchable from Garmin/Ring/etc.).
+
+### The recovery that followed (what was done to restore the cluster)
+
+1. Detached + deleted the empty fresh volumes we created.
+2. Deleted the orphaned replica data via the Longhorn UI (reclaimed disk).
+3. Removed PVC/PV finalizers to clear the stuck `Terminating` objects.
+4. Scaled the PVC-owning Deployments to 0, deleted PVCs, scaled back up (fresh volumes created automatically).
+5. Re-created the `GarminStats` database in InfluxDB:
+   ```bash
+   kubectl exec -n garmin deployment/garmin-influxdb -- influx -execute 'CREATE DATABASE GarminStats'
+   ```
+6. Re-ran `helm upgrade` (NOT install — releases still existed) for the observability stack:
+   ```bash
+   helm upgrade monitoring prometheus-community/kube-prometheus-stack -n monitoring -f kubernetes/observability/monitoring/values.yaml
+   helm upgrade loki grafana/loki -n logging -f kubernetes/observability/logging/loki-values.yaml
+   helm upgrade alloy grafana/alloy -n logging -f kubernetes/observability/logging/alloy-values.yaml
+   ```
+7. Restarted `garmin-fetch-data` — it recovered and resumed polling.
+
+### Final state — fully recovered
 
 ```text
-1. helm get values longhorn -n longhorn-system > /tmp/longhorn-values-backup.yaml
-2. kubectl get pvc -A && kubectl get volume -n longhorn-system   # record inventory
-3. kubectl get volumesnapshot -A                                  # confirm no active snapshots
-4. helm uninstall longhorn -n longhorn-system
-   ⚠️ DESTRUCTIVE — but PVCs/PVs/volume data are CRs, NOT Helm-managed → survive
-5. kubectl get pvc -A          # verify volumes untouched
-6. terraform apply             # recreates operator from same chart
-7. Verify: pods, storageclass, PVCs, UI at 192.168.178.211
+All 7 Longhorn volumes: attached + healthy ✅
+All 3 nodes: ready ✅
+All apps Running (garmin, ring, observability, health-dashboard) ✅
+All PVCs Bound (garmin 10+1Gi, loki 20Gi, prometheus 20Gi, grafana+alertmanager+vm 5Gi each) ✅
+All MetalLB IPs back (.210-.216) ✅
+Garmin fetcher healthy (re-fetching) ✅
 ```
 
-**Key learning point:** a Helm release is *metadata* (what chart, what values); the CRs it manages (PVCs, PVs, volumes) are *data* owned by the namespace — they survive uninstall.
+### ⚠️ The Longhorn "error" explained (cosmetic, not a bug)
 
-**Alternative (if uncomfortable):** keep Longhorn Helm-managed outside Terraform and only document the boundary + pattern. The module exists either way.
+```text
+"Failed to get filesystem device type of /var/lib/longhorn/"
+error="lstat /sys/class/block/ubuntu--vg-ubuntu--lv: no such file or directory"
+
+Longhorn is on an LVM logical volume (ubuntu--vg-ubuntu--lv). It can't
+resolve the block-device TYPE for UI disk accounting only. Does not
+affect volumes, replicas, or data. No fix needed.
+```
+
+### The hard-won learning points (this is the gold)
+
+1. **`deleting-confirmation-flag` is Longhorn's data-safety interlock.** Setting it `true` is the explicit "yes, I accept the consequences" — and those consequences include cascade-deleting volume CRDs/PVCs on uninstall.
+
+2. **A Helm release is metadata; its CRs are the entry point for cascade deletion.** The uninstall job doesn't just remove the operator — it deletes the Volume CRs, which is what triggered the PVC `Terminating` cascade.
+
+3. **Longhorn v1.12 has NO "Adopt" UI.** Orphaned on-disk replicas can only be deleted, not re-adopted by matching-named volumes (the new volume creates fresh replicas). Manual block-level restore or backup-restore is the only real recovery.
+
+4. **The data WAS recoverable on disk** — the replica dirs survived. But without the volume CRs + no Adopt feature, Longhorn wouldn't re-claim them.
+
+5. **A StatefulSet/Deployment with a PVC template is a self-healing loop** — it re-creates a deleted PVC instantly. To clean-slate: **scale to 0 FIRST, delete PVCs, then scale back up.** Order matters.
+
+6. **`helm upgrade` vs `helm install`:** after workloads are deleted, the Helm *release* record may still exist → `install` fails ("cannot re-use a name"), `upgrade` re-applies. Check `helm list -A` first.
+
+7. **Fresh InfluxDB needs its database re-created** (`GarminStats`) after a storage wipe — it's not auto-created.
+
+8. **Never `terraform destroy` / rethink `helm uninstall` on a storage platform.** The safest path is the "defer" option: keep the storage platform Helm-managed until tested on a scratch cluster.
 
 ## Learning verification (2.4)
 
-- [ ] I understand why `helm_release` can't import.
-- [ ] I know the difference between a Helm release (metadata) and its CRs (data).
-- [ ] I understand the `create_namespace=false` guard (never recreate the namespace).
-- [ ] I backed up values + inventory before any destructive step.
+- [x] I understand why `helm_release` can't import.
+- [x] I know the difference between a Helm release (metadata) and its CRs (data).
+- [x] I understand the `create_namespace=false` guard (never recreate the namespace).
+- [x] I backed up values + inventory before any destructive step.
+- [x] I now understand Longhorn's `deleting-confirmation-flag` safety interlock.
+- [x] I learned why uninstall cascades to Volume CRDs/PVCs.
+- [x] I learned the scale-to-0-first clean-slate order.
+- [x] I learned the `helm upgrade` vs `install` distinction.
 
 ---
 
@@ -624,7 +707,7 @@ This document. Records the ownership boundary, the risk assessment, the remote-s
 - [x] **2.1** Module structure created (5 modules + modules.yaml), fmt/validate green
 - [x] **2.2** Storage account + container created, backend.tf, init -migrate-state, key in KV
 - [x] **2.3** MetalLB CRs imported (zero-destroy plan), kubectl files annotated
-- [ ] **2.4** Longhorn adopted (documented migration) OR documented as deferred
+- [x] **2.4** Longhorn adopted (documented migration + full incident runbook)
 - [ ] **2.5** AppProject bootstrap via Terraform; helm take-over documented as deferred
 - [ ] **2.6** CI plan step + read-only SA token + PR comment
 - [ ] **2.7** Phase 2 doc complete (this file) + README updates
