@@ -77,7 +77,11 @@ This is the **least-privilege CI identity**. It can read the cluster (which `pla
 
 ### 3.4 The Tailscale side
 
-The `tailscale/github-action@v2` step uses `version: stable` so the ephemeral CI runner devices use the **latest stable Tailscale** (an old pinned version shows "update available" warnings in the tailnet admin). Set `version:` to `stable` or a specific `vX.Y.Z`.
+The `tailscale/github-action@v2` step:
+- Uses `authkey: ${{ secrets.TS_AUTHKEY }}` (Free-plan friendly). `authkey` is **deprecated** in favor of OAuth clients — the warning is benign but noted; revisit OAuth later if wanted.
+- Pins `version: "1.102.2"` (an explicit version). **Do NOT use `version: stable`** — that keyword broke the action's download+checksum step (`sha256sum: standard input: no properly formatted checksum lines`). Pin an explicit stable version.
+
+Note: `authkey` deprecation warning + the version-pin gotcha are both documented in Task 2.6 of the phase-2 doc.
 
 ```text
 Policy (admin console):

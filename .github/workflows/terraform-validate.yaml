@@ -72,7 +72,8 @@ jobs:
 
       # Join the tailnet so the runner can reach the homelab cluster API.
       # Uses an auth key (Free-plan friendly) instead of an OAuth client.
-      # version: stable tracks the latest stable release (not a pinned older version).
+      # Pin an explicit version (v1.102.2 = latest stable, 2026-08). Using
+      # "stable" as the version broke the action's download+checksum step.
       - name: Connect to Tailscale
         id: tailscale
         if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
@@ -80,7 +81,7 @@ jobs:
         with:
           authkey: ${{ secrets.TS_AUTHKEY }}
           tags: tag:ci
-          version: stable
+          version: "1.102.2"
 
       - name: Terraform init (backend)
         if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
