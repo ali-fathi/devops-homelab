@@ -632,6 +632,8 @@ argocd app list                     # all three still Synced/Healthy
 
 # Task 2.6 — `terraform plan` as CI Check ✅ (implemented)
 
+> **Dedicated troubleshooting reference:** see [Terraform CI Runbook](terraform-ci-runbook.md) for the complete architecture, the 5-step thread, and symptom→cause→fix for every error (i/o timeout, x509, credentials, yamllint, PR comment 404).
+
 ## The problem
 
 Phase 1 CI runs `fmt`/`validate` only. `plan` (the read that shows what *would* change) needs cluster access — which the GitHub runner doesn't have.
