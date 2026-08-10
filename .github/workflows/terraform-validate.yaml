@@ -20,6 +20,11 @@ permissions:
 jobs:
   terraform:
     name: Terraform fmt, validate, and plan
+    # Cloud runner + Tailscale. The cloud runner cannot reach the cluster API
+    # at 192.168.178.80:6443 (private LAN), so the tailscale/github-action joins
+    # the tailnet and routes to the cluster through the homelab subnet router.
+    # This keeps CI on GitHub's sandboxed runner (no self-hosted security risk
+    # on a public repo) while reaching the cluster securely (WireGuard, E2E).
     runs-on: ubuntu-latest
 
     defaults:
@@ -62,7 +67,19 @@ jobs:
 
       # ─── Plan gate (PR + manual only — read-only cluster access) ─────
       # Runs ONLY on pull_request or workflow_dispatch — NEVER push to main.
-      # Uses the shared Azure backend + a read-only kubeconfig.
+      # Uses the shared Azure backend + a read-only kubeconfig, reached via
+      # Tailscale (the cloud runner joins the tailnet to reach 192.168.178.80).
+
+      # Join the tailnet so the runner can reach the homelab cluster API.
+      # Uses an auth key (Free-plan friendly) instead of an OAuth client.
+      - name: Connect to Tailscale
+        id: tailscale
+        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TS_AUTHKEY }}
+          tags: tag:ci
+
       - name: Terraform init (backend)
         if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
         env:

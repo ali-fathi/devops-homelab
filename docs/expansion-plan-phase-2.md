@@ -33,7 +33,7 @@ Phase 2 goal:
 | **2.6** | `terraform plan` CI check | `.github/workflows/terraform-validate.yaml` | Plan as PR comment with read-only access |
 | **2.7** | Documentation | `docs/expansion-plan-phase-2.md` | This document — records what actually happened |
 
-> Implementation status: 2.1 ✅ implemented · 2.2 ✅ implemented · 2.3 ✅ implemented · 2.4 ✅ implemented (with incident — see runbook) · 2.5–2.6 🟡 designed (built next) · 2.7 ✅ (this doc).
+> Implementation status: 2.1 ✅ · 2.2 ✅ · 2.3 ✅ · 2.4 ✅ (with incident — see runbook) · 2.5 ✅ · 2.6 ✅ (implemented, pending the 4-test verification) · 2.7 ✅ (this doc).
 
 ---
 
@@ -630,7 +630,7 @@ argocd app list                     # all three still Synced/Healthy
 
 ---
 
-# Task 2.6 — `terraform plan` as CI Check (designed)
+# Task 2.6 — `terraform plan` as CI Check ✅ (implemented)
 
 ## The problem
 
@@ -639,39 +639,150 @@ Phase 1 CI runs `fmt`/`validate` only. `plan` (the read that shows what *would* 
 ## The solution — extend the Phase 1 workflow
 
 ```text
-fmt → init(-backend=false) → validate → init(backend) → plan(-lock=false) → PR comment
+fmt → init(-backend=false) → validate     ← ALWAYS (no creds needed)
+→ init(backend) → plan(-lock=false) → PR comment   ← PR + manual only
 ```
 
-- Plan step runs only on `pull_request` + `workflow_dispatch` (never on push to main)
-- `-lock=false` — CI plans are read-only and must not hold the state lock
-- **No apply step exists anywhere in CI** — operators are the only entities that apply
-- PR comment via `tfcmt` / `github-script` with the plan output
+## What was implemented
 
-## Read-only cluster access (recommendation)
+| File | Change |
+|------|--------|
+| `.github/workflows/terraform-validate.yaml` | Added gated plan path + PR comment step |
+| `kubernetes/ci/terraform-ci/rbac.yaml` | **New** — read-only ServiceAccount/ClusterRole/Binding |
 
-**Read-only ServiceAccount token** in a GitHub secret:
+### The workflow (key steps)
+
+1. **Validation gate (always):** `fmt` + `init -backend=false` + `validate` — no secrets needed, catches style/syntax.
+2. **Plan gate (PR + workflow_dispatch only):** reconstructs a read-only kubeconfig from `KUBECONFIG_CI`, runs `terraform plan -no-color -lock=false`, captures output to `$GITHUB_OUTPUT`.
+3. **PR comment:** `github-script` posts the plan as a `## Terraform Plan` comment.
+4. **No `terraform apply` anywhere** — CI only plans, operators apply.
+
+**Key gates:**
+- `if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'` on the plan steps → **never runs on push to main**
+- `-lock=false` → CI plans are read-only and must NOT hold the state blob lease
+- `permissions: pull-requests: write` → needed for the comment
+
+### The RBAC (read-only identity)
+
+```yaml
+ServiceAccount terraform-ci (kube-system)
+  → ClusterRole terraform-ci-readonly
+      verbs: ["get", "list", "watch"]   ← READ-ONLY, no create/update/delete
+  → ClusterRoleBinding terraform-ci-readonly
+```
+
+### The two GitHub secrets
+
+| Secret | Value | Used by |
+|--------|-------|---------|
+| `ARM_ACCESS_KEY` | Azure storage key (from Key Vault `terraform-state-key`) | Backend init |
+| `KUBECONFIG_CI` | base64 of a minimal kubeconfig with the SA token | Cluster access |
+
+## ⚠️ The network problem discovered (and the Tailscale solution)
+
+**The problem:** the first CI run failed with:
+```text
+dial tcp 192.168.178.80:6443: i/o timeout
+```
+The GitHub cloud runner cannot reach the cluster API — `192.168.178.80:6443` is a **private homelab LAN IP** with no route from Microsoft's cloud. The RBAC, secrets, and kubeconfig were all valid; only **network reachability** was broken.
+
+**Options considered:**
+| Option | Verdict |
+|--------|---------|
+| Self-hosted runner in homelab | ❌ Risky on a public repo — a fork's PR can run arbitrary code on your LAN runner |
+| Cloudflare Tunnel for the K8s API | ❌ Exposes the crown-jewel admin API to the internet — too dangerous |
+| **Tailscale** | ✅ **Chosen** — WireGuard E2E, zero open ports, free, first-party GH Action |
+
+**The Tailscale architecture (industry standard):**
+```text
+GitHub cloud runner (ubuntu-latest — SAFE sandbox)
+   ├── tailscale/github-action@v2  →  joins the tailnet over WireGuard
+   └── reaches 192.168.178.80:6443 THROUGH the tailnet (no public exposure)
+
+Homelab (Proxmox LXC, like the Cloudflare agent pattern)
+   └── tailscaled →  subnet router advertising 192.168.178.0/24
+```
+
+**Why Tailscale is the answer:** the runner stays on GitHub's sandbox (no self-hosted PR risk), the cluster API is never exposed (unlike CF Tunnel), and the connection is encrypted + free.
+
+**The workflow change:** revert `runs-on` to `ubuntu-latest` + add before the plan:
+```yaml
+- name: Connect to Tailscale
+  uses: tailscale/github-action@v2
+  with:
+    authkey: ${{ secrets.TS_AUTHKEY }}   # auth key (Free-plan friendly, simpler than OAuth)
+    tags: tag:ci
+```
+The `KUBECONFIG_CI` secret still points at `192.168.178.80:6443` — the runner reaches it *through* the subnet-router-advertised route.
+
+### The Tailscale setup (one-time)
+
+1. **Create a free Tailscale account** → https://tailscale.com (free: 3 users, 100 devices).
+2. **Policy:** in the admin console, set `tagOwners` for `tag:ci` + an `acls` rule (`tag:ci → tag:ci`). (On the Free plan, omit `srcPosture`/`dstPosture` — those are paid features.)
+3. **Generate an auth key** (Keys → Generate auth key) with tag `tag:ci`, and add it as a GitHub secret:
+   ```bash
+   gh secret set TS_AUTHKEY --repo ali-fathi/devops-homelab --body "tskey-auth-..."
+   ```
+4. **Install `tailscaled` on a Proxmox LXC** (same pattern as the Cloudflare agent), as a **subnet router** advertising `192.168.178.0/24`:
+   ```bash
+   curl -fsSL https://tailscale.com/install.sh | sh
+   sudo tailscale up --advertise-routes=192.168.178.0/24 --accept-routes=true
+   ```
+   In the Tailscale admin console: **approve the subnet route** on the LXC machine.
+
+## Bug fixed during implementation
+
+The first version had the PR-comment step read `steps.plan.outputs.stdout` — but GitHub doesn't auto-expose stdout as an output. Fixed by having the plan step write its output to `$GITHUB_OUTPUT` (`plan<<EOF ... EOF`) and the comment reads `steps.plan.outputs.plan`.
+
+## Testing — how to confirm 2.6 works (4 tests)
+
+### Test 0 — Prereq: secrets configured
 
 ```bash
-# Create SA with get/list/watch only (no create/update/delete)
-kubectl create serviceaccount terraform-ci -n kube-system
-# + ClusterRoleBinding with resources: ["*"], verbs: ["get","list","watch"]
+gh secret list --repo ali-fathi/devops-homelab
+# Must show: ARM_ACCESS_KEY, KUBECONFIG_CI,
+#            TS_OAUTH_CLIENT_ID, TS_OAUTH_CLIENT_SECRET
 ```
 
-```text
-KUBECONFIG_CI = base64 of a minimal kubeconfig with the SA token
-ARM_ACCESS_KEY = blob-only access key (Key Vault value)
+**And the tailnet must be up:** the homelab subnet router (LXC) is running `tailscaled`, and the `tag:ci` OAuth client exists.
+
+### Test 1 — `workflow_dispatch` (quickest proof)
+
+GitHub → Actions → "Terraform Validation" → **Run workflow** → main → Run.
+**Expected steps:**
+- `Connect to Tailscale` → green (runner joins the tailnet)
+- `plan (read-only)` → green (reaches the cluster through the tailnet)
+All steps green (the comment step may skip — no PR to comment on).
+
+**If `Connect to Tailscale` fails** → check the OAuth secrets / `tag:ci` tag.
+**If `plan` fails with `i/o timeout`** → the subnet router route `192.168.178.0/24` isn't approved or isn't running.
+
+### Test 2 — Real PR (the actual gate)
+
+Make a trivial change under `terraform/` on a branch, open a PR. The workflow runs plan and **posts a `## Terraform Plan` comment** on the PR.
+
+### Test 3 — Push to main (negative test)
+
+Push/merge to `main`. The plan + comment steps must show **skipped** (only fmt+validate run).
+
+### Test 4 — Read-only proof
+
+```bash
+kubectl --kubeconfig /tmp/kubeconfig-ci.yaml auth can-i create deployments   # → NO
+kubectl --kubeconfig /tmp/kubeconfig-ci.yaml auth can-i get nodes            # → YES
 ```
-
-CI decodes → temp file → `export KUBECONFIG=/tmp/kubeconfig-ci` → `terraform plan -lock=false`.
-
-**The operator always runs the authoritative `terraform plan` locally before any apply.** CI plan is a *watchdog*, not a gate. If secrets can't be configured, the plan step degrades gracefully to skipped (documented, not silent).
+Confirms the CI token can only read.
 
 ## Learning verification (2.6)
 
-- [ ] I can explain why CI never applies.
-- [ ] I can explain `-lock=false` on CI plans.
-- [ ] I can explain the read-only SA token model.
-- [ ] I know the operator still plans locally before applying.
+- [x] I can explain why CI never applies.
+- [x] I can explain `-lock=false` on CI plans.
+- [x] I can explain the read-only SA token model.
+- [x] I know the operator still plans locally before applying.
+- [x] I can run the 4 tests to confirm the workflow works.
+- [x] I understand why a cloud runner can't reach a private homelab LAN.
+- [x] I understand why Tailscale (WireGuard, E2E, zero open ports) is the secure bridge.
+- [x] I know the subnet-router + OAuth `tag:ci` model for CI connections.
 
 ---
 
@@ -708,8 +819,8 @@ This document. Records the ownership boundary, the risk assessment, the remote-s
 - [x] **2.2** Storage account + container created, backend.tf, init -migrate-state, key in KV
 - [x] **2.3** MetalLB CRs imported (zero-destroy plan), kubectl files annotated
 - [x] **2.4** Longhorn adopted (documented migration + full incident runbook)
-- [ ] **2.5** AppProject bootstrap via Terraform; helm take-over documented as deferred
-- [ ] **2.6** CI plan step + read-only SA token + PR comment
+- [x] **2.5** AppProject bootstrap via Terraform; helm take-over documented as deferred
+- [x] **2.6** CI plan step + read-only SA token + PR comment
 - [ ] **2.7** Phase 2 doc complete (this file) + README updates
 
 ## Recommended sequence
