@@ -1,0 +1,43 @@
+# terraform-ci read-only ServiceAccount
+#
+# Purpose: give GitHub Actions a READ-ONLY identity so CI can run
+# `terraform plan` against the cluster WITHOUT any write capability.
+#
+# RBAC model (industry standard for CI):
+#   ServiceAccount terraform-ci (kube-system)
+#     → ClusterRole terraform-ci-readonly
+#         verbs: get, list, watch   ← READ-ONLY, no create/update/delete
+#
+# CI builds a kubeconfig with this SA's token and stores it (base64) as
+# the GitHub secret KUBECONFIG_CI. The workflow decodes it to a temp file
+# and points TF_VAR_kubeconfig_path at it.
+#
+# NEVER grant this role create/update/delete — CI must only plan, never apply.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: terraform-ci
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: terraform-ci-readonly
+rules:
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: terraform-ci-readonly
+subjects:
+  - kind: ServiceAccount
+    name: terraform-ci
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: terraform-ci-readonly
+  apiGroup: rbac.authorization.k8s.io

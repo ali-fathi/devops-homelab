@@ -15,10 +15,11 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write   # needed to post the plan as a PR comment
 
 jobs:
   terraform:
-    name: Terraform fmt and validate
+    name: Terraform fmt, validate, and plan
     runs-on: ubuntu-latest
 
     defaults:
@@ -35,6 +36,7 @@ jobs:
           terraform_version: "1.9.8"
           terraform_wrapper: true
 
+      # ─── Validation gate (always — no credentials needed) ────────────
       - name: Terraform fmt check
         id: fmt
         run: |
@@ -57,3 +59,52 @@ jobs:
       - name: Terraform validate output
         if: steps.validate.outcome == 'failure'
         run: echo "::error::Terraform validation failed. Fix the reported issues and re-push."
+
+      # ─── Plan gate (PR + manual only — read-only cluster access) ─────
+      # Runs ONLY on pull_request or workflow_dispatch — NEVER push to main.
+      # Uses the shared Azure backend + a read-only kubeconfig.
+      - name: Terraform init (backend)
+        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+        env:
+          ARM_ACCESS_KEY: ${{ secrets.ARM_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          terraform init
+
+      - name: Terraform plan (read-only)
+        id: plan
+        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+        env:
+          ARM_ACCESS_KEY: ${{ secrets.ARM_ACCESS_KEY }}
+          TF_VAR_kubeconfig_path: /tmp/kubeconfig-ci
+        run: |
+          set -euo pipefail
+
+          # Decode the read-only kubeconfig from the GitHub secret
+          echo "${{ secrets.KUBECONFIG_CI }}" | base64 -d > /tmp/kubeconfig-ci
+          chmod 600 /tmp/kubeconfig-ci
+
+          # -lock=false: CI plans are read-only and must NOT hold the state blob lease
+          terraform plan -no-color -lock=false 2>&1 | tee plan.txt
+
+          # Capture the plan output into a GitHub Actions output for the comment
+          {
+            echo "plan<<EOF"
+            cat plan.txt
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # ─── Post the plan as a PR comment (tfcmt-style gate, simpler) ────
+      - name: Post plan to PR
+        if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && steps.plan.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { repo, owner } = context.repo;
+            const plan = `${{ steps.plan.outputs.plan }}`.slice(0, 60000);
+            const body = `## Terraform Plan\n\n\`\`\`hcl\n${plan}\n\`\`\``;
+            await github.rest.issues.createComment({
+              owner, repo,
+              issue_number: (context.payload.pull_request && context.payload.pull_request.number) || context.issue.number,
+              body
+            });
