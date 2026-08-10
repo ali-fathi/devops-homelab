@@ -7,3 +7,5 @@ variable "kubeconfig_path" {
   type        = string
   default     = "~/.kube/k3s-config"
 }
+#
+#
