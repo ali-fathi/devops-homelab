@@ -9,7 +9,7 @@ spec:
   source:
     repoURL: https://prometheus-community.github.io/helm-charts
     chart: kube-prometheus-stack
-    targetRevision: 87.10.1   # pinned from live release (helm list -n monitoring)
+    targetRevision: 88.2.0   # matches the live release shown by Argo diff (chart 88.2.0)
     helm:
       valueFiles:
         - https://raw.githubusercontent.com/ali-fathi/devops-homelab/main/kubernetes/observability/monitoring/values.yaml
