@@ -492,7 +492,7 @@ alertmanager:
 
             bot_token_file: /etc/alertmanager/secrets/telegram-alerts/bot-token
 
-            chat_id: 12345
+            chat_id_file: /etc/alertmanager/secrets/telegram-alerts/chat-id
 
             send_resolved: true
 
