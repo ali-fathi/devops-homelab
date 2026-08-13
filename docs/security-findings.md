@@ -171,6 +171,7 @@ Use this table for findings that were fixed or closed.
 
 | Date | Tool | Severity | Finding | Path | Resolution | Notes |
 |------|------|----------|---------|------|------------|-------|
+| 2026-08-13 | Trivy | CRITICAL | KSV-0046: ClusterRole could manage all resources through wildcard API groups and resources | `kubernetes/ci/terraform-ci/rbac.yaml` | Replaced wildcard ClusterRole permissions with exact MetalLB and AppProject read permissions plus a namespace-scoped Longhorn Helm Secret read Role | Validate required permissions are `yes`, unrelated/write permissions are `no`, then confirm the Terraform CI plan succeeds. |
 | YYYY-MM-DD | Gitleaks | HIGH | Example secret finding | path/to/file | Secret rotated and removed | Replace this example with real resolved findings. |
 
 ---

@@ -1,18 +1,16 @@
-# terraform-ci read-only ServiceAccount
+# terraform-ci least-privilege ServiceAccount
 #
-# Purpose: give GitHub Actions a READ-ONLY identity so CI can run
-# `terraform plan` against the cluster WITHOUT any write capability.
+# Purpose: GitHub Actions runs `terraform plan` with this identity. CI is
+# read-only: it refreshes Terraform state but must never apply changes.
 #
-# RBAC model (industry standard for CI):
-#   ServiceAccount terraform-ci (kube-system)
-#     → ClusterRole terraform-ci-readonly
-#         verbs: get, list, watch   ← READ-ONLY, no create/update/delete
+# All Terraform-managed Kubernetes resources are namespaced, so CI uses Roles
+# and RoleBindings rather than an active ClusterRole. The legacy ClusterRole
+# and ClusterRoleBinding are retained empty so `kubectl apply` removes the
+# former wildcard access in place.
 #
-# CI builds a kubeconfig with this SA's token and stores it (base64) as
-# the GitHub secret KUBECONFIG_CI. The workflow decodes it to a temp file
-# and points TF_VAR_kubeconfig_path at it.
-#
-# NEVER grant this role create/update/delete — CI must only plan, never apply.
+# Do NOT add wildcard apiGroups or resources. Add a resource only after a
+# documented Terraform plan failure proves that the provider requires it.
+# See docs/terraform-ci-runbook.md for the resource-to-permission mapping.
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -20,15 +18,15 @@ metadata:
   name: terraform-ci
   namespace: kube-system
 ---
+# Compatibility object: this preserves the existing name but grants nothing.
+# It replaces the previous wildcard ClusterRole when the manifest is applied.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: terraform-ci-readonly
-rules:
-  - apiGroups: ["*"]
-    resources: ["*"]
-    verbs: ["get", "list", "watch"]
+rules: []
 ---
+# Compatibility binding: it references the intentionally empty legacy role.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -38,6 +36,93 @@ subjects:
     name: terraform-ci
     namespace: kube-system
 roleRef:
+  apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: terraform-ci-readonly
+---
+# Terraform's kubectl_manifest resources for MetalLB are namespaced CRs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: terraform-ci-metallb-readonly
+  namespace: metallb-system
+rules:
+  - apiGroups:
+      - metallb.io
+    resources:
+      - ipaddresspools
+      - l2advertisements
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: terraform-ci-metallb-readonly
+  namespace: metallb-system
+subjects:
+  - kind: ServiceAccount
+    name: terraform-ci
+    namespace: kube-system
+roleRef:
   apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: terraform-ci-metallb-readonly
+---
+# Terraform's kubectl_manifest resource for Argo CD is a namespaced AppProject.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: terraform-ci-argocd-readonly
+  namespace: argocd
+rules:
+  - apiGroups:
+      - argoproj.io
+    resources:
+      - appprojects
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: terraform-ci-argocd-readonly
+  namespace: argocd
+subjects:
+  - kind: ServiceAccount
+    name: terraform-ci
+    namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: terraform-ci-argocd-readonly
+---
+# Helm stores the current Longhorn release revision as a Secret. Terraform's
+# helm_release refresh reads that release metadata in this namespace only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: terraform-ci-longhorn-release-readonly
+  namespace: longhorn-system
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: terraform-ci-longhorn-release-readonly
+  namespace: longhorn-system
+subjects:
+  - kind: ServiceAccount
+    name: terraform-ci
+    namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: terraform-ci-longhorn-release-readonly

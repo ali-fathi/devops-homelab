@@ -58,14 +58,78 @@ Post plan to PR                                   ← ⑥ github-script posts "#
 
 ### 3.2 The RBAC — `kubernetes/ci/terraform-ci/rbac.yaml`
 
+The CI identity is read-only **and scoped to Terraform's current state refreshes**. It intentionally does not use wildcard `apiGroups` or `resources`.
+
 ```text
 ServiceAccount terraform-ci (kube-system)
-   → ClusterRole terraform-ci-readonly:
-       verbs: get, list, watch   ← READ-ONLY. No create/update/delete.
-   → ClusterRoleBinding terraform-ci-readonly
+   -> Role terraform-ci-metallb-readonly (metallb-system)
+      - metallb.io/IPAddressPool
+      - metallb.io/L2Advertisement
+      verbs: get
+   -> Role terraform-ci-argocd-readonly (argocd)
+      - argoproj.io/AppProject
+      verbs: get
+   -> Role terraform-ci-longhorn-release-readonly (longhorn-system)
+      - core/Secret
+      verbs: get, list
 ```
 
-This is the **least-privilege CI identity**. It can read the cluster (which `plan` needs) but can never modify it.
+All usable permissions are namespace-scoped Roles. The retained `terraform-ci-readonly` ClusterRole and ClusterRoleBinding are deliberately empty compatibility objects: retaining their names lets `kubectl apply` replace the old wildcard rules in place without leaving the previously broad access behind.
+
+This is the least privilege required by the current configuration:
+
+| Terraform resource | Provider | Kubernetes API permission |
+|---|---|---|
+| MetalLB `IPAddressPool` | `kubectl_manifest` | `get` on `metallb.io/ipaddresspools` in `metallb-system` |
+| MetalLB `L2Advertisement` | `kubectl_manifest` | `get` on `metallb.io/l2advertisements` in `metallb-system` |
+| Argo CD `AppProject` | `kubectl_manifest` | `get` on `argoproj.io/appprojects` in `argocd` |
+| Longhorn Helm release | `helm_release` | `get` and `list` on `secrets` in `longhorn-system` only |
+
+CI has no `create`, `update`, `patch`, `delete`, `deletecollection`, `exec`, `watch`, or wildcard permission. If a future Terraform resource needs additional read access, add only its exact API group, resource, namespace where applicable, and the minimum required read verb after documenting and testing the requirement.
+
+#### Apply and verify the RBAC hardening
+
+Apply the committed RBAC manifest. It preserves the existing `terraform-ci-readonly` ClusterRole and ClusterRoleBinding names, so it replaces the former wildcard rules in place. The existing CI kubeconfig and GitHub secret do not need to change.
+
+```bash
+kubectl apply -f kubernetes/ci/terraform-ci/rbac.yaml
+```
+
+Verify every required permission is allowed:
+
+```bash
+kubectl auth can-i get ipaddresspools.metallb.io -n metallb-system --as=system:serviceaccount:kube-system:terraform-ci
+```
+
+```bash
+kubectl auth can-i get l2advertisements.metallb.io -n metallb-system --as=system:serviceaccount:kube-system:terraform-ci
+```
+
+```bash
+kubectl auth can-i get appprojects.argoproj.io -n argocd --as=system:serviceaccount:kube-system:terraform-ci
+```
+
+```bash
+kubectl auth can-i list secrets -n longhorn-system --as=system:serviceaccount:kube-system:terraform-ci
+```
+
+Each command must return `yes`. Then prove that unrelated read access and all write access are denied:
+
+```bash
+kubectl auth can-i get pods -n default --as=system:serviceaccount:kube-system:terraform-ci
+```
+
+```bash
+kubectl auth can-i get secrets -n kube-system --as=system:serviceaccount:kube-system:terraform-ci
+```
+
+```bash
+kubectl auth can-i create deployments -n default --as=system:serviceaccount:kube-system:terraform-ci
+```
+
+Each denial command must return `no`.
+
+Finally, open a Terraform pull request or run the manual Terraform workflow and verify that its read-only `terraform plan` still succeeds. If it fails with a Kubernetes `forbidden` error, record the exact API group/resource requested, confirm that Terraform actively manages it, add only that read permission, and retest.
 
 ### 3.3 The GitHub secrets (Settings → Secrets → Actions)
 
@@ -232,12 +296,13 @@ users:
       token: $TOKEN
 EOF
 
-# Verify locally BEFORE uploading:
-kubectl --kubeconfig /tmp/kubeconfig-ci.yaml get nodes     # must return the 3 nodes
+# Verify locally BEFORE uploading (an exact resource Terraform reads):
+kubectl --kubeconfig /tmp/kubeconfig-ci.yaml get ipaddresspools.metallb.io -n metallb-system
 
-# Read-only proof:
-kubectl --kubeconfig /tmp/kubeconfig-ci.yaml auth can-i create deployments   # NO
-kubectl --kubeconfig /tmp/kubeconfig-ci.yaml auth can-i get nodes            # YES
+# Least-privilege proof:
+kubectl --kubeconfig /tmp/kubeconfig-ci.yaml auth can-i get ipaddresspools.metallb.io -n metallb-system   # YES
+kubectl --kubeconfig /tmp/kubeconfig-ci.yaml auth can-i get nodes                                              # NO
+kubectl --kubeconfig /tmp/kubeconfig-ci.yaml auth can-i create deployments                                    # NO
 
 # Upload:
 gh secret set KUBECONFIG_CI --repo ali-fathi/devops-homelab --body "$(base64 < /tmp/kubeconfig-ci.yaml)"
@@ -256,9 +321,10 @@ TEST 2 — PR (the real gate):
 TEST 3 — push to main (negative):
   Plan + comment SKIPPED; only fmt+validate run.
 
-TEST 4 — read-only proof (in DevContainer):
-  kubectl --kubeconfig /tmp/kubeconfig-ci.yaml auth can-i create deployments  # NO
-  kubectl --kubeconfig /tmp/kubeconfig-ci.yaml auth can-i get nodes           # YES
+TEST 4 — least-privilege proof (in DevContainer):
+  kubectl --kubeconfig /tmp/kubeconfig-ci.yaml auth can-i get ipaddresspools.metallb.io -n metallb-system  # YES
+  kubectl --kubeconfig /tmp/kubeconfig-ci.yaml auth can-i get nodes                                             # NO
+  kubectl --kubeconfig /tmp/kubeconfig-ci.yaml auth can-i create deployments                                   # NO
 ```
 
 ## 8. Key files
@@ -276,7 +342,7 @@ TEST 4 — read-only proof (in DevContainer):
 WHAT runs in CI:   fmt, validate (always); plan, comment (PR/dispatch)
 WHAT never runs:   terraform apply  — operators apply locally
 HOW CI reaches cluster:  Tailscale (authkey tag:ci) → subnet router → 192.168.178.80
-HOW CI stays read-only:  SA with get/list/watch only + -lock=false
+HOW CI stays read-only:  SA with exact resource reads only + -lock=false
 The 3 secrets:      ARM_ACCESS_KEY, KUBECONFIG_CI, TS_AUTHKEY
 The 3 network errors in order:  i/o timeout (no route) → x509 (no trust) → credentials (no token)
 ```

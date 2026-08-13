@@ -668,10 +668,18 @@ fmt → init(-backend=false) → validate     ← ALWAYS (no creds needed)
 
 ```yaml
 ServiceAccount terraform-ci (kube-system)
-  → ClusterRole terraform-ci-readonly
-      verbs: ["get", "list", "watch"]   ← READ-ONLY, no create/update/delete
-  → ClusterRoleBinding terraform-ci-readonly
+  → Role terraform-ci-metallb-readonly (metallb-system)
+      metallb.io: ipaddresspools, l2advertisements
+      verbs: ["get"]
+  → Role terraform-ci-argocd-readonly (argocd)
+      argoproj.io: appprojects
+      verbs: ["get"]
+  → Role terraform-ci-longhorn-release-readonly (longhorn-system)
+      core: secrets
+      verbs: ["get", "list"]
 ```
+
+The original wildcard read role was replaced after GitHub code scanning flagged it as overbroad. The CI identity remains read-only, but now only has access to Terraform's currently managed resources. Full mapping and verification commands: [Terraform CI Runbook](terraform-ci-runbook.md).
 
 ### The two GitHub secrets
 
@@ -771,7 +779,8 @@ Push/merge to `main`. The plan + comment steps must show **skipped** (only fmt+v
 
 ```bash
 kubectl --kubeconfig /tmp/kubeconfig-ci.yaml auth can-i create deployments   # → NO
-kubectl --kubeconfig /tmp/kubeconfig-ci.yaml auth can-i get nodes            # → YES
+kubectl --kubeconfig /tmp/kubeconfig-ci.yaml auth can-i get ipaddresspools.metallb.io -n metallb-system  # → YES
+kubectl --kubeconfig /tmp/kubeconfig-ci.yaml auth can-i get nodes                                             # → NO
 ```
 Confirms the CI token can only read.
 
@@ -803,7 +812,7 @@ This document. Records the ownership boundary, the risk assessment, the remote-s
 | Argo CD `selfHeal` fighting Terraform | Drift loop | Ownership boundary; Terraform never touches Application CRs |
 | State file loss | Terraform orphans everything | Blob soft-delete, pre-apply `state pull` backup, KV snapshot |
 | CI holding state lock / CI applying | Blocks operators / mutation | `-lock=false` on CI plan; no apply step in CI |
-| Kubeconfig in GitHub secret leaked | Cluster compromise | Read-only SA token (get/list/watch), revocable, documented rotation |
+| Kubeconfig in GitHub secret leaked | Limited Terraform state visibility | Exact-resource read-only SA token, namespace-scoped Longhorn Secret read, revocable, documented rotation |
 
 ## Universal rules (every task)
 
