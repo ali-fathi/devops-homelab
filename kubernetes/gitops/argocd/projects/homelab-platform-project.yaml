@@ -8,6 +8,9 @@ spec:
 
   sourceRepos:
     - https://github.com/ali-fathi/devops-homelab.git
+    # External Helm chart repos for the observability stack (Argo CD helm source)
+    - https://prometheus-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
 
   destinations:
     - namespace: garmin
