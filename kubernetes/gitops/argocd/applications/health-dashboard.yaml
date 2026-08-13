@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: health-dashboard
   namespace: argocd
+  annotations:
+    gitops.homelab.dev/managed-by: homelab-applications
 spec:
   project: homelab-platform
 
