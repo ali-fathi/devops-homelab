@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+spec:
+  project: homelab-platform
+
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 87.10.1   # pinned from live release (helm list -n monitoring)
+    helm:
+      valueFiles:
+        - https://raw.githubusercontent.com/ali-fathi/devops-homelab/main/kubernetes/observability/monitoring/values.yaml
+        - https://raw.githubusercontent.com/ali-fathi/devops-homelab/main/kubernetes/observability/alerting/values-alertmanager.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: true
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
