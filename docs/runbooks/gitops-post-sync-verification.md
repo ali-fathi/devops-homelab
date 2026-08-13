@@ -239,12 +239,12 @@ ring-health/victoriametrics
 health/health-dashboard
 ```
 
-A Service is considered usable when its legacy `Endpoints` object contains at least one ready address. This verifies selector-to-Pod routing without making an external request.
+A Service is considered usable when its `discovery.k8s.io/v1` EndpointSlice has at least one ready address. This verifies selector-to-Pod routing without making an external request and avoids the deprecated v1 `Endpoints` API.
 
 Manual inspection:
 
 ```bash
-kubectl get endpoints health-dashboard -n health
+kubectl get endpointslices.discovery.k8s.io -n health -l kubernetes.io/service-name=health-dashboard
 ```
 
 A Service with zero endpoints commonly means:

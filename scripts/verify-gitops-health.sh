@@ -108,7 +108,7 @@ check_pods() {
           or ([.status.containerStatuses[]? | select(.ready != true)] | length > 0)
         )
       )
-    | "\(.metadata.name) phase=\(.status.phase // \"Unknown\")"
+    | "\(.metadata.name) phase=\(.status.phase // "Unknown")"
   ')
 
   if [[ -z "$bad_pods" ]]; then
@@ -128,7 +128,7 @@ check_pvcs() {
     return
   fi
 
-  bad_pvcs=$(kubectl -n "$namespace" get pvc -o json | jq -r '.items[] | select(.status.phase != "Bound") | "\(.metadata.name) phase=\(.status.phase // \"Unknown\")"')
+  bad_pvcs=$(kubectl -n "$namespace" get pvc -o json | jq -r '.items[] | select(.status.phase != "Bound") | "\(.metadata.name) phase=\(.status.phase // "Unknown")"')
 
   if [[ -z "$bad_pvcs" ]]; then
     pass "all PVCs in namespace/$namespace are Bound"
@@ -148,16 +148,11 @@ check_service_endpoints() {
     return
   fi
 
-  if ! kubectl -n "$namespace" get endpoints "$service" >/dev/null 2>&1; then
-    fail "Endpoints/$service is missing from namespace/$namespace"
-    return
-  fi
-
-  endpoint_count=$(kubectl -n "$namespace" get endpoints "$service" -o json | jq '[.subsets[]?.addresses[]?] | length')
+  endpoint_count=$(kubectl -n "$namespace" get endpointslices.discovery.k8s.io -l "kubernetes.io/service-name=$service" -o json | jq '[.items[]?.endpoints[]? | select(.conditions.ready != false) | .addresses[]?] | length')
   if (( endpoint_count > 0 )); then
-    pass "Service/$service in namespace/$namespace has $endpoint_count ready endpoint(s)"
+    pass "Service/$service in namespace/$namespace has $endpoint_count ready EndpointSlice address(es)"
   else
-    fail "Service/$service in namespace/$namespace has no ready endpoints"
+    fail "Service/$service in namespace/$namespace has no ready EndpointSlice addresses"
   fi
 }
 
