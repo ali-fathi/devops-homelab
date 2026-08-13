@@ -18,6 +18,7 @@ docs/homelab-study-guide.md
 backup-kubeconfig.sh
 install-tools.sh
 verify-cluster.sh
+verify-gitops-health.sh
 ```
 
 Inspect a script before running it:
@@ -54,6 +55,26 @@ chmod 600 ~/.kube/k3s-config
 This file is currently a placeholder and contains no implementation yet. Its intended purpose is to install or prepare local management tools.
 
 The DevContainer is the preferred tool installation method because it provides a consistent environment. Do not assume this placeholder installs anything.
+
+---
+
+## `verify-gitops-health.sh`
+
+This is the read-only post-sync platform health gate. It checks the root and child Argo CD Applications, Pod readiness, PVC binding, important Service endpoints, ExternalSecret readiness, and core monitoring/logging resources.
+
+Run:
+
+```bash
+./scripts/verify-gitops-health.sh
+```
+
+The script exits non-zero when a required check fails. It never applies, synchronizes, patches, restarts, or deletes Kubernetes resources, and it never prints Secret values.
+
+Read the full operating procedure and troubleshooting guidance:
+
+```text
+docs/runbooks/gitops-post-sync-verification.md
+```
 
 ---
 

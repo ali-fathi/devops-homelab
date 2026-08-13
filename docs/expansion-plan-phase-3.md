@@ -271,18 +271,18 @@ Detailed record:
 docs/ci-manifest-validation.md
 ```
 
-## Task 3.7 — Deployment health gates (next)
+## Task 3.7 — Deployment health gates 🟡
 
-The next implementation task is a repeatable post-sync health gate.
-
-It should create:
+A repeatable post-sync health gate has been implemented. It creates:
 
 ```text
 scripts/verify-gitops-health.sh
 docs/runbooks/gitops-post-sync-verification.md
 ```
 
-The script must be read-only. It must not call `kubectl apply`, `helm upgrade`, `argocd app sync`, or delete resources.
+The full checks, expected output, troubleshooting order, and safety constraints are documented in [GitOps Post-Sync Health Verification](runbooks/gitops-post-sync-verification.md).
+
+The script is read-only. It does not call `kubectl apply`, `helm upgrade`, `argocd app sync`, or delete resources.
 
 ### Required checks
 
