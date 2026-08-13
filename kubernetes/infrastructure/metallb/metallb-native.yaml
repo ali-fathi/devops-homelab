@@ -1385,6 +1385,9 @@ rules:
   - list
   - watch
 ---
+# MetalLB's controller rotates the TLS CA bundle on the exact, vendor-defined
+# ValidatingWebhookConfiguration below. The reviewed Trivy exception is scoped
+# to this source file in .trivyignore.yaml; see README.md for its rationale.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -1434,7 +1437,6 @@ rules:
   - metallb-webhook-configuration
   resources:
   - validatingwebhookconfigurations
-  - mutatingwebhookconfigurations
   verbs:
   - create
   - delete
@@ -1447,7 +1449,6 @@ rules:
   - admissionregistration.k8s.io
   resources:
   - validatingwebhookconfigurations
-  - mutatingwebhookconfigurations
   verbs:
   - list
   - watch

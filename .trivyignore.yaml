@@ -1,0 +1,11 @@
+# Narrow, time-bound Trivy exceptions. Each entry must include an exact path,
+# a documented rationale in docs/security-findings.md, and an expiry date.
+misconfigurations:
+  - id: KSV-0114
+    paths:
+      - kubernetes/infrastructure/metallb/metallb-native.yaml
+    expired_at: 2027-08-13
+    statement: >-
+      The MetalLB v0.14.5 controller must update its sole named
+      ValidatingWebhookConfiguration to rotate the webhook TLS CA. The unused
+      mutating-webhook permission was removed from the vendored manifest.

@@ -124,8 +124,10 @@ kubectl create namespace metallb-system
 ## ✅ Step 2 — Install MetalLB
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.5/config/manifests/metallb-native.yaml
+kubectl apply -f kubernetes/infrastructure/metallb/metallb-native.yaml
 ```
+
+This repository vendors the upstream MetalLB `v0.14.5` native manifest. Apply the reviewed local copy rather than downloading an unreviewed mutable manifest at install time.
 
 ---
 
@@ -144,6 +146,22 @@ speaker-xxxxx         Running
 ```
 
 ---
+
+# 🔐 Controller webhook RBAC
+
+MetalLB's controller automatically creates and rotates its webhook TLS certificate. To publish the resulting CA, it needs to update the single cluster-scoped `ValidatingWebhookConfiguration` named `metallb-webhook-configuration`.
+
+The controller ClusterRole is therefore restricted to that exact named validating webhook. It has **no** permission for `MutatingWebhookConfiguration` resources; MetalLB's native manifest defines no mutating webhook and the controller source configures only the validating webhook plus a CRD conversion webhook.
+
+Trivy rule `KSV-0114` cannot distinguish this required, resource-name-constrained certificate-rotation access from broad webhook administration. The time-bound exception in [`.trivyignore.yaml`](../../../.trivyignore.yaml) applies only to `KSV-0114` in this one vendor manifest; it expires on 2027-08-13. The rationale, validation, and review deadline are recorded in [Security Findings](../../../docs/security-findings.md). Do not remove the remaining validating-webhook access or automatic certificate rotation will fail and MetalLB configuration changes may be rejected after certificate expiry.
+
+Verify the live identity has no mutating-webhook access:
+
+```bash
+kubectl auth can-i patch mutatingwebhookconfigurations.admissionregistration.k8s.io --as=system:serviceaccount:metallb-system:controller
+```
+
+Expected result: `no`.
 
 # ⚙️ Configuration
 

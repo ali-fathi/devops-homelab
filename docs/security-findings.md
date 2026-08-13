@@ -182,6 +182,7 @@ Use this table for findings that are real but intentionally accepted.
 
 | Date | Tool | Severity | Risk | Path | Reason | Review Date |
 |------|------|----------|------|------|--------|-------------|
+| 2026-08-13 | Trivy | CRITICAL | KSV-0114: MetalLB controller can manage webhook configurations | `kubernetes/infrastructure/metallb/metallb-native.yaml` | The vendor controller must update only the named `ValidatingWebhookConfiguration` `metallb-webhook-configuration` to rotate the webhook TLS CA. `mutatingwebhookconfigurations` access was removed because MetalLB does not use it. The path-scoped exception in `.trivyignore.yaml` is limited to this vendor manifest; replacing the remaining validating-webhook permission would break automated certificate rotation. | 2027-08-13 |
 | YYYY-MM-DD | Trivy | MEDIUM | Example accepted risk | path/to/file.yaml | Homelab-only temporary exception | YYYY-MM-DD |
 
 ---
