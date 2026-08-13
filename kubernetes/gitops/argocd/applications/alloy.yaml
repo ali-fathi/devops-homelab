@@ -9,7 +9,7 @@ spec:
   source:
     repoURL: https://grafana.github.io/helm-charts
     chart: alloy
-    targetRevision: 1.10.0   # pinned from live release (helm list -n logging)
+    targetRevision: 1.11.1   # matches the live release shown by Argo diff (chart 1.11.1, Alloy v1.18.1)
     helm:
       valueFiles:
         - https://raw.githubusercontent.com/ali-fathi/devops-homelab/main/kubernetes/observability/logging/alloy-values.yaml
