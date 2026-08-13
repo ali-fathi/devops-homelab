@@ -10,7 +10,6 @@ spec:
     repoURL: https://github.com/ali-fathi/devops-homelab.git
     targetRevision: main
     path: kubernetes/applications/health-dashboard
-    kustomize: {}
 
   destination:
     server: https://kubernetes.default.svc
