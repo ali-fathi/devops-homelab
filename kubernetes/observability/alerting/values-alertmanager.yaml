@@ -35,7 +35,7 @@ alertmanager:
         telegram_configs:
           - api_url: https://api.telegram.org
             bot_token_file: /etc/alertmanager/secrets/telegram-alerts/bot-token
-            chat_id: 123456
+            chat_id_file: /etc/alertmanager/secrets/telegram-alerts/chat-id
             send_resolved: false
             parse_mode: HTML
 
