@@ -48,6 +48,7 @@ Runbooks provide symptom-driven procedures for:
 
 ```text
 Argo CD drift and comparison errors
+GitOps post-sync health verification
 External Secrets failures
 Garmin synchronization failures
 ```
