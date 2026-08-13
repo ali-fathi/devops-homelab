@@ -52,11 +52,12 @@ manual workflow_dispatch
 
 ## Workflow Jobs
 
-The workflow has two main jobs:
+The workflow has three main jobs:
 
 ```text
 1. YAML syntax and style
 2. Kubernetes schema validation
+3. Helm render validation for GitOps-managed observability charts
 ```
 
 ---
@@ -112,6 +113,40 @@ Grafana raw dashboard JSON files
 Generated/vendor install bundles
 Documentation files
 ```
+
+---
+
+## Job 3: Helm Render Validation
+
+The third job installs Helm, adds the Prometheus Community and Grafana chart repositories, and renders the exact chart versions used by the Argo CD Applications:
+
+```text
+kube-prometheus-stack 88.2.0
+loki 7.2.0
+alloy 1.11.1
+```
+
+It uses the same release names, namespaces, and local values files that Argo CD uses:
+
+```text
+monitoring + monitoring/values.yaml + alerting/values-alertmanager.yaml
+loki       + logging/loki-values.yaml
+alloy      + logging/alloy-values.yaml
+```
+
+This is a render gate, not a deployment. It does not need cluster credentials and it does not contact the homelab Kubernetes API.
+
+It catches errors such as:
+
+```text
+Invalid Helm values structure
+Invalid Alertmanager configuration rendered by the chart
+A removed or renamed chart value
+A chart repository/version that cannot be resolved
+Helm template failures before Argo CD attempts a sync
+```
+
+The values are rendered from the checked-out pull request or branch, rather than raw GitHub URLs, so CI validates the exact proposed change.
 
 ---
 
@@ -657,6 +692,7 @@ Week 2 CI manifest validation is complete when:
 [ ] GitHub Actions workflow runs on main.
 [ ] yamllint job passes.
 [ ] kubeconform job passes.
+[ ] Helm render validation passes for monitoring, Loki, and Alloy.
 [ ] Raw dashboard JSON is not scanned.
 [ ] Helm values files are not schema-validated as Kubernetes manifests.
 [ ] Vendor/generated MetalLB manifest is ignored.
@@ -674,7 +710,7 @@ Add kubeconform schema locations for CRDs.
 Add conftest or OPA policy checks.
 Add Kyverno policy validation.
 Add kube-score.
-Add helm lint for Helm values.
+Add rendered Helm output schema validation.
 Add markdown linting.
 Make line-length warnings stricter after cleanup.
 ```

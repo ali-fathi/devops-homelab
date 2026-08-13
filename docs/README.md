@@ -23,6 +23,7 @@ docs/storage.md
 
 ```text
 docs/gitops.md
+docs/expansion-plan-phase-3.md
 docs/gitops-app-of-apps.md
 docs/ci-manifest-validation.md
 docs/observability-gitops-convergence.md
