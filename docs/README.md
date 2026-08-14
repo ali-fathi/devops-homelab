@@ -40,6 +40,7 @@ docs/security/platform-threat-model.md
 docs/security/kubernetes-security-baseline.md
 docs/security/policy-exception-process.md
 docs/security/network-flow-inventory.md
+docs/security/phase-4.1-inventory-review.md
 ```
 
 Security-related decisions should be documented rather than silently ignored.

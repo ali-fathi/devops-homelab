@@ -56,6 +56,22 @@ printf 'run_id=%s\ncollected_at=%s\nkubernetes_context=%s\n' "$run_id" "$(date -
 capture namespaces.json '[.items[] | {name: .metadata.name, podSecurityLabels: ((.metadata.labels // {}) | with_entries(select(.key | startswith("pod-security.kubernetes.io/"))))}]' get namespaces
 capture serviceaccounts.json '[.items[] | {namespace: .metadata.namespace, name: .metadata.name, automountServiceAccountToken: .automountServiceAccountToken}]' get serviceaccounts -A
 capture pods.json '
+  def summarizeContainer($containerType; $podSecurity):
+    . as $container
+    | (.securityContext // {}) as $containerSecurity
+    | {
+        name: .name,
+        containerType: $containerType,
+        image: (if (.image | contains("@") and (contains("@sha256:") | not)) then "<redacted-image-reference>" else .image end),
+        privileged: ($containerSecurity.privileged // false),
+        allowPrivilegeEscalation: ($containerSecurity.allowPrivilegeEscalation // null),
+        readOnlyRootFilesystem: ($containerSecurity.readOnlyRootFilesystem // null),
+        runAsNonRoot: ($containerSecurity.runAsNonRoot // $podSecurity.runAsNonRoot // null),
+        runAsUser: ($containerSecurity.runAsUser // $podSecurity.runAsUser // null),
+        capabilitiesAdd: ($containerSecurity.capabilities.add // []),
+        resourceRequests: (.resources.requests // {}),
+        resourceLimits: (.resources.limits // {})
+      };
   [.items[]
    | (.spec.securityContext // {}) as $podSecurity
    | {
@@ -68,22 +84,11 @@ capture pods.json '
        hostPID: (.spec.hostPID // false),
        hostIPC: (.spec.hostIPC // false),
        hostPathVolumes: [.spec.volumes[]? | select(.hostPath != null) | .name],
-       containers: [
-         .spec.containers[]?
-         | (.securityContext // {}) as $containerSecurity
-         | {
-             name: .name,
-             image: (if (.image | contains("@") and (contains("@sha256:") | not)) then "<redacted-image-reference>" else .image end),
-             privileged: ($containerSecurity.privileged // false),
-             allowPrivilegeEscalation: ($containerSecurity.allowPrivilegeEscalation // null),
-             readOnlyRootFilesystem: ($containerSecurity.readOnlyRootFilesystem // null),
-             runAsNonRoot: ($containerSecurity.runAsNonRoot // $podSecurity.runAsNonRoot // null),
-             runAsUser: ($containerSecurity.runAsUser // $podSecurity.runAsUser // null),
-             capabilitiesAdd: ($containerSecurity.capabilities.add // []),
-             resourceRequests: (.resources.requests // {}),
-             resourceLimits: (.resources.limits // {})
-           }
-       ]
+       containers: (
+         ([.spec.initContainers[]? | summarizeContainer("init"; $podSecurity)] +
+          [.spec.containers[]? | summarizeContainer("container"; $podSecurity)] +
+          [.spec.ephemeralContainers[]? | summarizeContainer("ephemeral"; $podSecurity)])
+       )
      }
   ]' get pods -A
 capture services.json '
