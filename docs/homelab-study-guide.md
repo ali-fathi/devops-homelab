@@ -345,7 +345,7 @@ The DevContainer connects to the API server at:
 https://192.168.178.80:6443
 ```
 
-Recommended K3s baseline:
+Current K3s recovery baseline:
 
 ```yaml
 disable-network-policy: true
@@ -354,7 +354,13 @@ disable:
   - servicelb
 ```
 
-The reasons are documented in:
+This setting is historical, not the Phase 4 security target: disabling the controller means Kubernetes NetworkPolicies do not enforce. It was retained after a cross-node networking incident and must be changed only through the gated Ansible procedure in:
+
+```text
+docs/runbooks/k3s-networkpolicy-controller-remediation.md
+```
+
+The historical incident record remains in:
 
 ```text
 docs/k3s-baseline-networking.md

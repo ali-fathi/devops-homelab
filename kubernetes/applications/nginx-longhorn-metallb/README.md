@@ -670,7 +670,7 @@ Expected:
 Address: 10.43.0.1
 ```
 
-If DNS fails from worker Pods but works from master Pods, check the K3s baseline networking configuration:
+If DNS fails from worker Pods but works from master Pods, inspect the historical K3s recovery configuration. Do not reapply it blindly: `disable-network-policy: true` disables NetworkPolicy enforcement and is being remediated through the gated procedure in [K3s Embedded NetworkPolicy Controller Remediation](../../../docs/runbooks/k3s-networkpolicy-controller-remediation.md).
 
 ```yaml
 disable-network-policy: true

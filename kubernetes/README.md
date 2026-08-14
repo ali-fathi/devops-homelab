@@ -55,7 +55,7 @@ kubectl get nodes -o wide
 
 ## 2. K3s networking baseline
 
-This homelab uses:
+The live cluster currently uses the following **historical recovery** configuration:
 
 ```yaml
 disable-network-policy: true
@@ -64,9 +64,7 @@ disable:
   - servicelb
 ```
 
-### Why disable the built-in network policy controller?
-
-The cluster previously experienced stale kube-router rules and cross-node pod connectivity failures. Disabling the built-in controller avoids conflicts with the homelab networking model.
+`disable-network-policy: true` means Kubernetes NetworkPolicies are not enforced. The Phase 4 disposable probe confirmed this on 2026-08-14. The setting was introduced after a historical stale kube-router/cross-node connectivity incident; it is not the target security baseline. Follow [K3s Embedded NetworkPolicy Controller Remediation](../docs/runbooks/k3s-networkpolicy-controller-remediation.md) for the gated Ansible-owned enablement and rollback procedure.
 
 ### Why use `host-gw`?
 

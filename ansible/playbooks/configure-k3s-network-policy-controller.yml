@@ -1,0 +1,107 @@
+---
+# Intentionally opt-in K3s server configuration change.
+#
+# This playbook owns only /etc/rancher/k3s/config.yaml's
+# disable-network-policy scalar on the single control-plane node. It does not
+# change Flannel, workers, iptables/nftables state, CNI software, Kubernetes
+# workloads, or NetworkPolicies. Read the paired runbook before execution.
+
+- name: Audit or change the embedded K3s NetworkPolicy controller
+  hosts: k3s_master
+  gather_facts: false
+  become: true
+  serial: 1
+
+  vars:
+    k3s_network_policy_confirm: false
+    # Deliberately empty: mutation requires an explicit true or false value.
+    k3s_network_policy_enabled: ""
+    k3s_config_path: /etc/rancher/k3s/config.yaml
+
+  tasks:
+    - name: Verify the K3s configuration exists
+      ansible.builtin.stat:
+        path: "{{ k3s_config_path }}"
+      register: k3s_config
+
+    - name: Stop if the K3s configuration is absent
+      ansible.builtin.assert:
+        that:
+          - k3s_config.stat.exists
+          - k3s_config.stat.isreg
+        fail_msg: "Expected {{ k3s_config_path }} is absent. Do not create a replacement configuration during this remediation."
+
+    - name: Read only the NetworkPolicy setting
+      ansible.builtin.command:
+        argv:
+          - grep
+          - -En
+          - '^[[:space:]]*disable-network-policy[[:space:]]*:'
+          - "{{ k3s_config_path }}"
+      register: k3s_network_policy_current
+      changed_when: false
+      failed_when: false
+
+    - name: Display the non-secret current setting
+      ansible.builtin.debug:
+        msg: "{{ k3s_network_policy_current.stdout | default('disable-network-policy is absent (K3s default applies)', true) }}"
+
+    - name: Explain audit-only result when confirmation is absent
+      ansible.builtin.debug:
+        msg: "Audit complete. No change was made. A change requires -e k3s_network_policy_confirm=true and an explicit -e k3s_network_policy_enabled=true|false."
+      when: not (k3s_network_policy_confirm | bool)
+
+    - name: Require an explicit boolean desired state for a mutation
+      ansible.builtin.assert:
+        that:
+          - k3s_network_policy_enabled | string | lower in ['true', 'false']
+        fail_msg: "Set k3s_network_policy_enabled explicitly to true or false with k3s_network_policy_confirm=true."
+      when: k3s_network_policy_confirm | bool
+
+    - name: Set the K3s embedded NetworkPolicy controller state
+      ansible.builtin.lineinfile:
+        path: "{{ k3s_config_path }}"
+        regexp: '^[[:space:]]*disable-network-policy[[:space:]]*:'
+        line: "disable-network-policy: {{ (not (k3s_network_policy_enabled | bool)) | ternary('true', 'false') }}"
+        backup: true
+      register: k3s_network_policy_change
+      when: k3s_network_policy_confirm | bool
+      notify: Restart K3s server
+
+    - name: Apply a requested K3s server restart before verification
+      ansible.builtin.meta: flush_handlers
+      when: k3s_network_policy_confirm | bool
+
+    - name: Verify K3s service is active after a requested change
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - is-active
+          - k3s
+      register: k3s_service_status
+      changed_when: false
+      failed_when: k3s_network_policy_confirm | bool and k3s_service_status.stdout != 'active'
+      when: k3s_network_policy_confirm | bool
+
+    - name: Verify local Kubernetes API readiness after a requested change
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/k3s
+          - kubectl
+          - get
+          - --raw=/readyz
+      register: k3s_readyz
+      changed_when: false
+      failed_when: k3s_network_policy_confirm | bool and k3s_readyz.rc != 0
+      when: k3s_network_policy_confirm | bool
+
+    - name: Require external allow deny proof after a requested change
+      ansible.builtin.debug:
+        msg: "K3s server change completed. From the operator workstation, run scripts/verify-gitops-health.sh and scripts/verify-networkpolicy-enforcement.sh --confirm. Do not create application policies until both results are reviewed."
+      when: k3s_network_policy_confirm | bool
+
+  handlers:
+    - name: Restart K3s server
+      ansible.builtin.systemd:
+        name: k3s
+        state: restarted

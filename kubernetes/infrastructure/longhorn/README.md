@@ -60,7 +60,7 @@ kubernetes/
 - Open-iSCSI installed on all nodes
 - DNS working between Pods and Services
 
-Recommended K3s configuration:
+Current K3s configuration (historical recovery baseline):
 
 ```yaml
 disable-network-policy: true
@@ -68,6 +68,8 @@ flannel-backend: host-gw
 disable:
   - servicelb
 ```
+
+The disabled policy controller is not a Longhorn requirement; it is a known Phase 4 security gap retained after a historical cross-node networking incident. Re-enabling it can affect Longhorn traffic, so follow [K3s Embedded NetworkPolicy Controller Remediation](../../../docs/runbooks/k3s-networkpolicy-controller-remediation.md) only after the restore and maintenance gates pass.
 
 ---
 

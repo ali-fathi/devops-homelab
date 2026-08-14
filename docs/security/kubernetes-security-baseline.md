@@ -32,7 +32,7 @@ Observe current state -> audit violations -> remediate -> enforce by namespace -
 | Control | Target |
 |---|---|
 | Pod Security labels | Begin `warn`/`audit`; enforce only after compatible workload migration |
-| Network policy | Application namespaces gain default-deny then explicit DNS/required flows in Phase 4.3 |
+| Network policy | **Blocked:** current K3s configuration disables the embedded controller; remediate and pass the disposable `reachable -> denied -> reachable` test before any application default-deny design |
 | RBAC | Dedicated ServiceAccounts, no wildcard access, no cluster-admin for applications |
 | Quotas/limits | Evaluate ResourceQuota and LimitRange after actual resource inventory; do not invent values |
 | Ownership | Namespace and workload owner documented in catalog/runbook |

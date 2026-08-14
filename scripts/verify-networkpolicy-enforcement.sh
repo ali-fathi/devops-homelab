@@ -88,6 +88,7 @@ cleanup() {
     return 1
   fi
   namespace_created=false
+  echo "[PASS] Cleanup completed: ${namespace}"
 }
 
 on_exit() {

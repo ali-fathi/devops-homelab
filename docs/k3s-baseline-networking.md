@@ -21,9 +21,11 @@ The cluster is based on **K3s** and is managed from the DevContainer using:
 
 ---
 
-# ⚙️ Recommended K3s Base Configuration
+# ⚙️ Historical K3s Networking Recovery Configuration
 
-After installing K3s, apply the following configuration on the **master node**.
+> **Phase 4 supersession:** This document records the configuration that stabilized a prior cross-node networking incident. It is not the current security target: `disable-network-policy: true` means Kubernetes NetworkPolicies do not enforce. The 2026-08-14 disposable proof confirmed this behavior. Do not follow the historical restart/iptables steps below to enable policies; use [K3s Embedded NetworkPolicy Controller Remediation](runbooks/k3s-networkpolicy-controller-remediation.md) after its recovery and maintenance gates pass.
+
+The following configuration was applied on the **master node** after the historical incident.
 
 File:
 
@@ -44,7 +46,7 @@ disable:
 
 # 🧠 Why This Configuration Is Used
 
-## 1. Disable K3s Network Policy Controller
+## 1. Historical reason the K3s NetworkPolicy Controller was disabled
 
 ```yaml
 disable-network-policy: true
@@ -125,7 +127,9 @@ MetalLB IP pool used in this homelab:
 
 ---
 
-# 🚀 Apply Configuration
+# 🚀 Historical Recovery Procedure
+
+> Do not run this whole-cluster stop/killall/start procedure as part of the Phase 4 NetworkPolicy enablement. It is retained only as incident history and requires a separately reviewed recovery decision.
 
 ## Step 1 — Edit K3s Config on Master
 
@@ -601,9 +605,9 @@ CoreDNS endpoint 10.42.x.x:53
 
 ---
 
-# ✅ Final Recommended Baseline
+# ✅ Historical Stabilization Baseline
 
-For this homelab, the recommended K3s baseline is:
+This was the post-incident stabilization baseline, not the Phase 4 security target:
 
 ```yaml
 disable-network-policy: true
@@ -621,7 +625,7 @@ No stale kube-router network policy rules
 MetalLB as the only LoadBalancer provider
 ```
 
-This configuration should be applied immediately after installing K3s, before deploying:
+Do not apply this configuration to a new security-focused cluster without deciding its NetworkPolicy implementation first. The historical incident context is retained before deploying:
 
 - MetalLB
 - Longhorn

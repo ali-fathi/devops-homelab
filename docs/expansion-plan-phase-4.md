@@ -195,7 +195,7 @@ Kyverno must be deployed through a dedicated Argo CD Application only after the 
 
 ### Decision rule
 
-First validate the current K3s CNI's NetworkPolicy enforcement with a disposable test namespace. `scripts/verify-networkpolicy-enforcement.sh` implements the required isolated `reachable -> denied -> reachable` ingress test and requires `--confirm`; follow [Disposable NetworkPolicy Enforcement Test](runbooks/networkpolicy-enforcement-test.md). Do not migrate the CNI merely to obtain policies. A Cilium evaluation is a later architectural decision only if eBPF observability, encrypted pod networking, or advanced Layer 7 policy has a documented need and a tested migration plan.
+First validate the current K3s CNI's NetworkPolicy enforcement with a disposable test namespace. `scripts/verify-networkpolicy-enforcement.sh` implements the required isolated `reachable -> denied -> reachable` ingress test and requires `--confirm`; follow [Disposable NetworkPolicy Enforcement Test](runbooks/networkpolicy-enforcement-test.md). The 2026-08-14 live test failed because the K3s server explicitly sets `disable-network-policy: true`; controlled remediation is documented in [K3s Embedded NetworkPolicy Controller Remediation](runbooks/k3s-networkpolicy-controller-remediation.md). Do not migrate the CNI merely to obtain policies. A Cilium evaluation is a later architectural decision only if eBPF observability, encrypted pod networking, or advanced Layer 7 policy has a documented need and a tested migration plan.
 
 ### Design
 

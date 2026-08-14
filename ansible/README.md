@@ -113,7 +113,8 @@ ansible/
 │   └── k3s_cluster.yml
 │
 ├── playbooks/
-│   └── check-cluster.yml
+│   ├── check-cluster.yml
+│   └── configure-k3s-network-policy-controller.yml
 │
 ├── roles/
 │
@@ -575,6 +576,32 @@ Connected successfully to k3s-worker2
 ```
 
 ---
+
+# K3s NetworkPolicy Controller
+
+The live K3s server has `disable-network-policy: true`, a historical recovery setting that prevents Kubernetes NetworkPolicy enforcement. The Phase 4 disposable test confirmed it. The controller can affect cross-node traffic, so the opt-in playbook must not be run as a normal maintenance task.
+
+```text
+playbooks/configure-k3s-network-policy-controller.yml
+```
+
+Default execution is audit-only:
+
+```bash
+ansible-playbook playbooks/configure-k3s-network-policy-controller.yml
+```
+
+An explicit confirmed enablement restarts the single K3s server and is permitted only after the runbook preconditions, restore gate, and maintenance approval:
+
+```bash
+ansible-playbook playbooks/configure-k3s-network-policy-controller.yml -e k3s_network_policy_confirm=true -e k3s_network_policy_enabled=true
+```
+
+Read the complete risk, validation, and rollback procedure first:
+
+```text
+docs/runbooks/k3s-networkpolicy-controller-remediation.md
+```
 
 # Longhorn Synology NFS Backup Preparation
 
