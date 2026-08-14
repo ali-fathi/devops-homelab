@@ -43,7 +43,7 @@ To:
 | **3.3** Azure Key Vault alert routing | Complete | Telegram bot token and chat ID are mounted from an ESO-managed Secret | `values-alertmanager.yaml`, `telegram-external-secret.yaml` |
 | **3.4** Root app-of-apps | Complete | One root Application manages all child Application objects | `bootstrap/root-application.yaml` |
 | **3.5** GitOps chain proof | Complete | Metadata-only child Application change reconciled through the root Application | `health-dashboard.yaml` |
-| **3.6** Helm render CI gate | Implemented; verify in GitHub Actions | CI renders the exact pinned observability Helm charts and values | `.github/workflows/kubernetes-validate.yaml` |
+| **3.6** Helm render CI gate | Verified | CI renders the exact pinned observability Helm charts and values | `.github/workflows/kubernetes-validate.yaml`, GitHub Actions run `31790818607` |
 | **3.7** Deployment health gates | Verified | Reusable post-sync verification for applications, Pods, PVCs, endpoints, metrics, logs, and alerts | `scripts/verify-gitops-health.sh`, `docs/runbooks/gitops-post-sync-verification.md` |
 | **3.8** Backup/restore rehearsal | Implemented; live rehearsal required | Prove external-backup recovery before enabling pruning or larger upgrades | `scripts/rehearse-longhorn-backup-restore.sh`, `docs/runbooks/longhorn-backup-restore-rehearsal.md` |
 
@@ -225,7 +225,7 @@ Git push
 
 This test deliberately did not modify workloads, images, Services, or PVCs.
 
-## Task 3.6 — Helm render CI gate 🟡
+## Task 3.6 — Helm render CI gate ✅
 
 The Kubernetes validation workflow now has three jobs:
 
@@ -253,9 +253,9 @@ alloy      + Alloy 1.11.1 + Alloy values
 
 This is a non-deploying validation gate. It does not receive Kubernetes credentials and does not contact the homelab cluster.
 
-### Verification required
+### Verification record
 
-After the CI workflow change is pushed, verify in GitHub Actions that all three jobs pass:
+GitHub Actions run [`31790818607`](https://github.com/ali-fathi/devops-homelab/actions/runs/31790818607) completed successfully on 2026-08-14 for commit `83fd0cad4357106b33042f4fc08f4a2683db6fbe`. All three jobs passed:
 
 ```text
 YAML syntax and style
@@ -263,7 +263,7 @@ Kubernetes schema validation
 Helm render validation
 ```
 
-Until that run completes successfully, Task 3.6 is implemented but not fully verified.
+Task 3.6 is therefore verified. The job remains non-deploying: it does not receive Kubernetes credentials or contact the homelab cluster.
 
 Detailed record:
 
@@ -370,7 +370,7 @@ A task is only **verified** after its intended end-to-end behavior has been obse
 [ ] Telegram routing test is delivered successfully.
 [ ] Root Application is Synced and Healthy.
 [ ] Git -> root -> child Application reconciliation is proven.
-[ ] Helm render CI job is green in GitHub Actions.
+[x] Helm render CI job is green in GitHub Actions (run 31790818607).
 [ ] Read-only post-sync health gate exists and is tested.
 [ ] Stateful backup and restore rehearsal is documented and tested.
 [ ] Pruning remains disabled until restore is proven.

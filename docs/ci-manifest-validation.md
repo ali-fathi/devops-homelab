@@ -148,6 +148,10 @@ Helm template failures before Argo CD attempts a sync
 
 The values are rendered from the checked-out pull request or branch, rather than raw GitHub URLs, so CI validates the exact proposed change.
 
+### Verified execution
+
+GitHub Actions run [`31790818607`](https://github.com/ali-fathi/devops-homelab/actions/runs/31790818607) completed successfully on 2026-08-14 for commit `83fd0cad4357106b33042f4fc08f4a2683db6fbe`. Its `Helm render validation` job passed alongside the YAML syntax/style and Kubernetes schema-validation jobs. This verifies the pinned monitoring `88.2.0`, Loki `7.2.0`, and Alloy `1.11.1` render path without deploying to the cluster.
+
 ---
 
 ## Why This Is Important
@@ -689,10 +693,10 @@ Week 2 CI manifest validation is complete when:
 ```text
 [ ] .yamllint exists.
 [ ] .github/workflows/kubernetes-validate.yaml exists.
-[ ] GitHub Actions workflow runs on main.
-[ ] yamllint job passes.
-[ ] kubeconform job passes.
-[ ] Helm render validation passes for monitoring, Loki, and Alloy.
+[x] GitHub Actions workflow runs on main (run 31790818607).
+[x] yamllint job passes.
+[x] kubeconform job passes.
+[x] Helm render validation passes for monitoring, Loki, and Alloy.
 [ ] Raw dashboard JSON is not scanned.
 [ ] Helm values files are not schema-validated as Kubernetes manifests.
 [ ] Vendor/generated MetalLB manifest is ignored.

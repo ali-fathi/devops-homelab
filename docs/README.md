@@ -24,6 +24,8 @@ docs/storage.md
 ```text
 docs/gitops.md
 docs/expansion-plan-phase-3.md
+docs/expansion-plan-phase-4.md
+docs/enterprise-devops-roadmap.md
 docs/gitops-app-of-apps.md
 docs/ci-manifest-validation.md
 docs/observability-gitops-convergence.md
@@ -53,6 +55,7 @@ External Secrets failures
 Garmin synchronization failures
 Synology NFS Longhorn backup-target setup and restore rehearsal
 NAS-Backup-setup (exact resume checklist for the deferred NAS setup)
+Future Phase 4 Kyverno, network policy, CI, Harbor, and supply-chain runbooks
 ```
 
 ## Application study guides
