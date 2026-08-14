@@ -83,6 +83,8 @@ Expected success sequence:
 
 ## Evidence
 
+The default probe-state timeout is 60 seconds. The script prints an initial wait message and progress every 10 seconds. A deny test that remains reachable for the full timeout exits with an explicit non-zero `NetworkPolicy enforcement is absent or misconfigured` message; it is not a successful or indefinite test.
+
 The script writes only timestamps, Kubernetes context, selected image reference, and pass/fail state to:
 
 ```text

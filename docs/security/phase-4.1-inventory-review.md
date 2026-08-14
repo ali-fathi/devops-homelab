@@ -149,7 +149,7 @@ jq --slurpfile roles artifacts/platform-security-baseline/20260814144328-31798/c
 [ ] Classify all six external Services and identify owner/exposure purpose.
 [ ] Confirm active use and upstream/K3s purpose of the Traefik Helm and Longhorn support-bundle `cluster-admin` bindings; document retain/narrow/remove decision.
 [ ] Group and prioritize missing resource requests/limits.
-[ ] Confirm the active CNI and prove NetworkPolicy allow/deny behavior in a disposable namespace.
+[ ] Confirm the active CNI and prove NetworkPolicy allow/deny behavior in a disposable namespace. An initial 2026-08-14 probe reached baseline connectivity but was interrupted while waiting for deny-policy propagation; it is not a pass or a CNI conclusion. Rerun the updated 60-second, progress-reporting test.
 [ ] Verify Longhorn, MetalLB, node-exporter, and CoreDNS exception scope/version evidence.
 [ ] Revisit the InfluxDB ownership-init resource settings after the Synology Longhorn restore rehearsal passes and a stateful maintenance window is approved.
 [ ] Add concrete findings, owners, dates, and decisions to docs/security-findings.md.

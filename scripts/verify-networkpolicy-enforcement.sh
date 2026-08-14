@@ -9,7 +9,7 @@
 set -Eeuo pipefail
 
 CONFIRM=false
-TIMEOUT_SECONDS=180
+TIMEOUT_SECONDS=60
 IMAGE="busybox:1.36"
 REPORT_ROOT="${PWD}/artifacts/networkpolicy-enforcement"
 
@@ -25,7 +25,7 @@ or interruption.
 
 Options:
   --confirm              Required acknowledgement that this changes the cluster.
-  --timeout <seconds>    Timeout for Pod readiness and each probe state (default: 180).
+  --timeout <seconds>    Timeout for Pod readiness and each probe state (default: 60).
   --image <reference>    BusyBox-compatible image for both isolated test Pods
                          (default: busybox:1.36).
   --report-dir <path>    Root directory for non-secret local test evidence.
@@ -113,7 +113,7 @@ trap on_exit EXIT
 for permission in "create namespaces" "delete namespaces"; do
   verb="${permission%% *}"
   resource="${permission##* }"
-  [[ "$(kubectl auth can-i "$verb" "$resource")" == "yes" ]] || fail "Current identity cannot ${verb} ${resource}."
+  [[ "$(kubectl auth can-i "$verb" "$resource" 2>/dev/null)" == "yes" ]] || fail "Current identity cannot ${verb} ${resource}."
 done
 
 mkdir -p "$report_dir"
@@ -125,7 +125,7 @@ namespace_created=true
 for permission in "create pods" "create networkpolicies" "create pods/exec"; do
   verb="${permission%% *}"
   resource="${permission##* }"
-  [[ "$(kubectl auth can-i "$verb" "$resource" -n "$namespace")" == "yes" ]] || fail "Current identity cannot ${verb} in ${namespace}."
+  [[ "$(kubectl auth can-i "$verb" "$resource" -n "$namespace" 2>/dev/null)" == "yes" ]] || fail "Current identity cannot ${verb} in ${namespace}."
 done
 
 kubectl run "$server_pod" --namespace "$namespace" --restart=Never --image="$IMAGE" --labels="app=networkpolicy-probe,role=server" --command -- sh -c 'mkdir -p /www && printf ok >/www/index.html && httpd -f -p 8080 -h /www' >/dev/null
@@ -144,8 +144,10 @@ wait_for_probe_state() {
   local expected="$1"
   local description="$2"
   local deadline=$((SECONDS + TIMEOUT_SECONDS))
-  local actual
+  local actual="unknown"
+  local last_progress_seconds=$SECONDS
 
+  echo "[INFO] Waiting up to ${TIMEOUT_SECONDS}s for ${description}: expected ${expected}."
   while (( SECONDS < deadline )); do
     if probe_server; then
       actual="reachable"
@@ -158,10 +160,18 @@ wait_for_probe_state() {
       echo "[PASS] ${description}: ${actual}"
       return 0
     fi
+
+    if (( SECONDS - last_progress_seconds >= 10 )); then
+      echo "[INFO] ${description} is still ${actual}; waiting for policy propagation."
+      last_progress_seconds=$SECONDS
+    fi
     sleep 2
   done
 
-  fail "${description}: expected ${expected}, observed ${actual}."
+  if [[ "$description" == "deny_ingress_policy" && "$actual" == "reachable" ]]; then
+    fail "Deny ingress policy remained reachable for ${TIMEOUT_SECONDS}s. NetworkPolicy enforcement is absent or misconfigured; do not deploy application NetworkPolicies."
+  fi
+  fail "${description}: expected ${expected}, observed ${actual} after ${TIMEOUT_SECONDS}s."
 }
 
 wait_for_probe_state reachable "baseline_without_policy"
