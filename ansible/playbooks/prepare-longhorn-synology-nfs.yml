@@ -1,0 +1,104 @@
+---
+# Prepare every K3s node to use a Synology NFSv4.1 Longhorn backup target.
+#
+# Required invocation (from ansible/):
+# ansible-playbook playbooks/prepare-longhorn-synology-nfs.yml -e longhorn_nfs_confirm=true
+#   -e longhorn_nfs_backup_server=<synology-ip-or-dns>
+#   -e longhorn_nfs_backup_export=/volume1/longhorn-backups -e longhorn_nfs_run_probe=true
+#
+# The optional probe mounts the export briefly on each node, writes and removes
+# a unique empty probe file, then unmounts it. It does not expose credentials.
+
+- name: Prepare K3s nodes for Longhorn Synology NFS backups
+  hosts: k3s_cluster
+  become: true
+  gather_facts: true
+  vars:
+    longhorn_nfs_confirm: false
+    longhorn_nfs_run_probe: false
+    longhorn_nfs_backup_server: ""
+    longhorn_nfs_backup_export: ""
+    longhorn_nfs_mount_root: /mnt/longhorn-nfs-probe
+    longhorn_nfs_client_packages:
+      Debian: nfs-common
+      RedHat: nfs-utils
+
+  pre_tasks:
+    - name: Require explicit confirmation and valid NFS target input
+      ansible.builtin.assert:
+        that:
+          - longhorn_nfs_confirm | bool
+          - longhorn_nfs_backup_server is match('^[A-Za-z0-9.-]+$')
+          - longhorn_nfs_backup_export is match('^/[A-Za-z0-9._/-]+$')
+          - ansible_facts.os_family in longhorn_nfs_client_packages
+        fail_msg: >-
+          Set longhorn_nfs_confirm=true and provide a DNS/IP backup server plus
+          an absolute export path. Supported node OS families are Debian and RedHat.
+
+  tasks:
+    - name: Install the NFSv4 client package
+      ansible.builtin.package:
+        name: "{{ longhorn_nfs_client_packages[ansible_facts.os_family] }}"
+        state: present
+
+    - name: Verify the NFS export on this node
+      when: longhorn_nfs_run_probe | bool
+      block:
+        - name: Create an isolated temporary mount directory
+          ansible.builtin.tempfile:
+            state: directory
+            path: "{{ longhorn_nfs_mount_root }}"
+            prefix: "{{ inventory_hostname }}-"
+          register: longhorn_nfs_probe_directory
+
+        - name: Mount the Synology export with NFSv4.1
+          ansible.builtin.command:
+            argv:
+              - mount
+              - -t
+              - nfs4
+              - -o
+              - vers=4.1
+              - "{{ longhorn_nfs_backup_server }}:{{ longhorn_nfs_backup_export }}"
+              - "{{ longhorn_nfs_probe_directory.path }}"
+
+        - name: Write and remove a unique probe file
+          ansible.builtin.shell:
+            cmd: >-
+              set -e; probe={{ longhorn_nfs_probe_directory.path }}/.longhorn-nfs-probe-{{ inventory_hostname }};
+              : > "${probe}"; sync; rm -f "${probe}"; sync
+          args:
+            executable: /bin/sh
+          changed_when: false
+
+        - name: Report successful NFSv4.1 access
+          ansible.builtin.debug:
+            msg: "{{ inventory_hostname }} mounted and completed the NFS write/remove probe; cleanup will unmount it."
+
+      always:
+        - name: Check whether the temporary directory is still mounted
+          ansible.builtin.command:
+            argv:
+              - mountpoint
+              - -q
+              - "{{ longhorn_nfs_probe_directory.path }}"
+          register: longhorn_nfs_mountpoint
+          changed_when: false
+          failed_when: false
+          when: longhorn_nfs_probe_directory is defined
+
+        - name: Unmount the temporary NFS probe directory
+          ansible.builtin.command:
+            argv:
+              - umount
+              - "{{ longhorn_nfs_probe_directory.path }}"
+          when:
+            - longhorn_nfs_probe_directory is defined
+            - longhorn_nfs_mountpoint.rc == 0
+          changed_when: true
+
+        - name: Remove the temporary probe directory
+          ansible.builtin.file:
+            path: "{{ longhorn_nfs_probe_directory.path }}"
+            state: absent
+          when: longhorn_nfs_probe_directory is defined

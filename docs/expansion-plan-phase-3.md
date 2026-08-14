@@ -312,7 +312,7 @@ The script should return a non-zero status when an expected resource is unhealth
 
 ## Task 3.8 — Backup and restore rehearsal 🟡
 
-An isolated, opt-in Longhorn rehearsal is implemented in `scripts/rehearse-longhorn-backup-restore.sh`. It records non-secret PVC/Longhorn inventory, writes a deterministic fixture to a new test PVC, creates an external backup with a CSI `VolumeSnapshotClass` (`type: bak`), restores a second new PVC, and verifies equal SHA-256 checksums. The complete procedure, backup-target boundary, cleanup, rollback, and RPO/RTO guidance is in [Longhorn Backup and Restore Rehearsal](runbooks/longhorn-backup-restore-rehearsal.md).
+An isolated, opt-in Longhorn rehearsal is implemented in `scripts/rehearse-longhorn-backup-restore.sh`. The planned external target is a dedicated Synology NFSv4.1 share, prepared with `ansible/playbooks/prepare-longhorn-synology-nfs.yml` and configured only through the guarded `scripts/configure-longhorn-synology-nfs-backup-target.sh`. The rehearsal records non-secret PVC/Longhorn inventory, writes a deterministic fixture to a new test PVC, creates an external backup with a CSI `VolumeSnapshotClass` (`type: bak`), restores a second new PVC, and verifies equal SHA-256 checksums. The NAS setup is documented in [Synology NFS Backup Target for Longhorn](runbooks/synology-nfs-longhorn-backup-target-setup.md); recovery, cleanup, rollback, and RPO/RTO guidance is in [Longhorn Backup and Restore Rehearsal](runbooks/longhorn-backup-restore-rehearsal.md).
 
 It is not verified until the default external Longhorn `BackupTarget` is available and a live run returns `[PASS]`. Do not enable pruning on stateful Applications before that live evidence is recorded.
 

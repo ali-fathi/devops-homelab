@@ -42,7 +42,7 @@ Operator workstation
       -> source PVC (StorageClass: longhorn)
       -> writer Pod creates deterministic fixture + SHA-256
       -> CSI VolumeSnapshot (type: bak)
-          -> Longhorn BackupTarget (external Azure Blob, S3-compatible store, NFS, or SMB)
+          -> Longhorn BackupTarget/default (external Synology NFSv4.1 share)
       -> restored PVC sourced from the VolumeSnapshot
       -> reader Pod verifies the restored SHA-256
 ```
@@ -51,18 +51,18 @@ Operator workstation
 |---|---|---|
 | Longhorn Helm release | Terraform | Chart version is pinned in `terraform/longhorn.tf`. |
 | Existing application PVCs and volumes | Their workload/controller | This rehearsal must not modify them. |
-| Backup target credentials | Azure Key Vault and External Secrets Operator | Never commit `AZBLOB_ACCOUNT_KEY`, S3 keys, NFS credentials, or Secret data. |
-| Longhorn `BackupTarget` | Longhorn operator configuration | Must already exist as `default` and report `status.available: true`. |
+| Synology NFS export and ACL | NAS operator | Dedicated share, NFSv4.1, and access only from the three K3s nodes; no Kubernetes credential Secret is used. |
+| Longhorn `BackupTarget` | Explicit operator configuration script | Must be named `default`, point at the reviewed Synology NFS export, and report `status.available: true`. |
 | Rehearsal namespace, PVCs, Pods, VolumeSnapshot, and VolumeSnapshotClass | Explicit operator script | Created with a unique run ID; not Argo CD or Terraform managed. |
 | Evidence files | Operator workstation | Written beneath ignored `artifacts/longhorn-rehearsal/`; no secret values or full backup URL are recorded. |
 
 ## Backup target prerequisite
 
-Longhorn 1.12.0 supports external NFS, SMB/CIFS, Azure Blob Storage, and S3-compatible backupstores. For this Azure-based homelab, Azure Blob is the preferred target when a dedicated storage account/container is available. The target must be independent of Longhorn disks and the K3s nodes; a Longhorn volume, node-local path, or PVC is not a disaster-recovery target.
+This homelab uses a dedicated Synology NFSv4.1 share as the external backupstore. The NAS must be separate from the K3s nodes and Longhorn disks; a Longhorn volume, node-local path, or PVC is not a disaster-recovery target. NFS access is controlled by the Synology export ACL, so this target uses no Kubernetes credential Secret.
 
-Use a dedicated backup container and a least-privilege storage identity. For Azure Blob, Longhorn needs only the target account name and a key/credential with the ability to read, write, list, and delete objects in that dedicated container. Store the credential in Azure Key Vault and sync it to a Kubernetes Secret in `longhorn-system` through External Secrets Operator. Configure Longhorn to reference the Secret by name; never place its values in Git, command history, script arguments, terminal output, or this runbook.
+Complete [Synology NFS Backup Target for Longhorn](synology-nfs-longhorn-backup-target-setup.md) before this rehearsal. It covers DSM shared-folder and NFSv4.1 setup, the restricted `.80`, `.81`, and `.82` node ACL, per-node mount/write validation, guarded BackupTarget configuration, failure handling, and a second-copy strategy.
 
-Longhorn manages backup retention itself. Do **not** add a storage-account lifecycle policy that independently deletes Longhorn backup objects, because it can break incremental backup chains.
+Longhorn manages backup retention itself. Do **not** add a NAS lifecycle/cleanup task that independently deletes individual Longhorn backup objects, because it can break incremental backup chains.
 
 Verify only non-secret target status before starting:
 

@@ -18,5 +18,6 @@ k3s-config
 # Logs
 *.log
 
-# Local, non-secret Longhorn rehearsal evidence
+# Local, non-secret Longhorn backup evidence
 artifacts/longhorn-rehearsal/
+artifacts/longhorn-nfs-target/

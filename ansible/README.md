@@ -576,6 +576,22 @@ Connected successfully to k3s-worker2
 
 ---
 
+# Longhorn Synology NFS Backup Preparation
+
+The deferred Longhorn backup setup uses a dedicated Synology NFSv4.1 export. The playbook installs the NFS client package on every K3s node and, when explicitly requested, mounts the export, writes/removes a probe file, and unmounts it. It does not configure Longhorn itself.
+
+Read the NAS and recovery runbook before running it:
+
+```text
+docs/runbooks/synology-nfs-longhorn-backup-target-setup.md
+```
+
+From `ansible/`, run only after the Synology shared folder, NFSv4.1 service, and per-node export ACL are configured:
+
+```bash
+ansible-playbook playbooks/prepare-longhorn-synology-nfs.yml -e longhorn_nfs_confirm=true -e longhorn_nfs_backup_server=<synology-ip-or-dns> -e longhorn_nfs_backup_export=/volume1/longhorn-backups -e longhorn_nfs_run_probe=true
+```
+
 # Detailed Health Check
 
 The current detailed playbook is:

@@ -19,6 +19,7 @@ backup-kubeconfig.sh
 install-tools.sh
 verify-cluster.sh
 verify-gitops-health.sh
+configure-longhorn-synology-nfs-backup-target.sh
 rehearse-longhorn-backup-restore.sh
 ```
 
@@ -75,6 +76,24 @@ Read the full operating procedure and troubleshooting guidance:
 
 ```text
 docs/runbooks/gitops-post-sync-verification.md
+```
+
+---
+
+## `configure-longhorn-synology-nfs-backup-target.sh`
+
+This is an explicit, guarded **mutating** setup helper for a dedicated Synology NFSv4.1 export. It configures only `longhorn-system/BackupTarget/default`, uses no Kubernetes credential Secret, and refuses to replace a non-empty target unless `--replace-default` is supplied.
+
+Run only after DSM NFS permissions and the all-node NFS mount/write probe pass:
+
+```bash
+./scripts/configure-longhorn-synology-nfs-backup-target.sh --server <synology-ip-or-dns> --export /volume1/longhorn-backups --confirm
+```
+
+Full NAS, node, target, recovery, and maintenance instructions:
+
+```text
+docs/runbooks/synology-nfs-longhorn-backup-target-setup.md
 ```
 
 ---

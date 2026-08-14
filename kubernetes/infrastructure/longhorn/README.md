@@ -268,7 +268,13 @@ Snapshots and backup targets are not sufficient evidence of recoverability. Befo
 ./scripts/rehearse-longhorn-backup-restore.sh --confirm --cleanup
 ```
 
-The BackupTarget must be external and available before running it. Credentials remain Azure Key Vault/External Secrets-backed and must never be committed. Full procedure, recovery limitations, RPO/RTO interpretation, and rollback guidance:
+The BackupTarget must be external and available before running it. This homelab's planned target is a dedicated Synology NFSv4.1 share, restricted to the three K3s node IPs; it uses no Kubernetes credential Secret. Complete the NAS, node mount-probe, and guarded target setup first:
+
+```text
+docs/runbooks/synology-nfs-longhorn-backup-target-setup.md
+```
+
+Then use the rehearsal runbook for recovery limitations, RPO/RTO interpretation, and rollback guidance:
 
 ```text
 docs/runbooks/longhorn-backup-restore-rehearsal.md

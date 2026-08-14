@@ -51,6 +51,8 @@ Argo CD drift and comparison errors
 GitOps post-sync health verification
 External Secrets failures
 Garmin synchronization failures
+Synology NFS Longhorn backup-target setup and restore rehearsal
+NAS-Backup-setup (exact resume checklist for the deferred NAS setup)
 ```
 
 ## Application study guides
