@@ -260,6 +260,20 @@ Supported targets:
 
 ---
 
+## Backup and restore rehearsal
+
+Snapshots and backup targets are not sufficient evidence of recoverability. Before enabling stateful GitOps pruning or relying on a recovery target, run the isolated backup-and-restore rehearsal. It creates and restores only a new test PVC and checks its SHA-256 data integrity; it never overwrites an application volume.
+
+```bash
+./scripts/rehearse-longhorn-backup-restore.sh --confirm --cleanup
+```
+
+The BackupTarget must be external and available before running it. Credentials remain Azure Key Vault/External Secrets-backed and must never be committed. Full procedure, recovery limitations, RPO/RTO interpretation, and rollback guidance:
+
+```text
+docs/runbooks/longhorn-backup-restore-rehearsal.md
+```
+
 # 🔄 Volume Expansion
 
 Increase PVC size and reapply.

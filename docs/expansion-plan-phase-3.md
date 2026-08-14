@@ -44,8 +44,8 @@ To:
 | **3.4** Root app-of-apps | Complete | One root Application manages all child Application objects | `bootstrap/root-application.yaml` |
 | **3.5** GitOps chain proof | Complete | Metadata-only child Application change reconciled through the root Application | `health-dashboard.yaml` |
 | **3.6** Helm render CI gate | Implemented; verify in GitHub Actions | CI renders the exact pinned observability Helm charts and values | `.github/workflows/kubernetes-validate.yaml` |
-| **3.7** Deployment health gates | Next | Reusable post-sync verification for applications, Pods, PVCs, endpoints, metrics, logs, and alerts | `scripts/`, `docs/runbooks/` |
-| **3.8** Backup/restore rehearsal | Planned | Prove recovery before enabling pruning or larger upgrades | Longhorn, stateful workload, and runbook files |
+| **3.7** Deployment health gates | Verified | Reusable post-sync verification for applications, Pods, PVCs, endpoints, metrics, logs, and alerts | `scripts/verify-gitops-health.sh`, `docs/runbooks/gitops-post-sync-verification.md` |
+| **3.8** Backup/restore rehearsal | Implemented; live rehearsal required | Prove external-backup recovery before enabling pruning or larger upgrades | `scripts/rehearse-longhorn-backup-restore.sh`, `docs/runbooks/longhorn-backup-restore-rehearsal.md` |
 
 ## Task 3.1 — Observability convergence ✅
 
@@ -310,9 +310,11 @@ kubectl get prometheus,alertmanager -n monitoring
 
 The script should return a non-zero status when an expected resource is unhealthy, but it should always print enough context for an operator to begin troubleshooting.
 
-## Task 3.8 — Backup and restore rehearsal
+## Task 3.8 — Backup and restore rehearsal 🟡
 
-Do not enable pruning on stateful Applications before this task is complete.
+An isolated, opt-in Longhorn rehearsal is implemented in `scripts/rehearse-longhorn-backup-restore.sh`. It records non-secret PVC/Longhorn inventory, writes a deterministic fixture to a new test PVC, creates an external backup with a CSI `VolumeSnapshotClass` (`type: bak`), restores a second new PVC, and verifies equal SHA-256 checksums. The complete procedure, backup-target boundary, cleanup, rollback, and RPO/RTO guidance is in [Longhorn Backup and Restore Rehearsal](runbooks/longhorn-backup-restore-rehearsal.md).
+
+It is not verified until the default external Longhorn `BackupTarget` is available and a live run returns `[PASS]`. Do not enable pruning on stateful Applications before that live evidence is recorded.
 
 The rehearsal should cover at least one non-production or low-risk recovery path:
 

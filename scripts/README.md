@@ -19,6 +19,7 @@ backup-kubeconfig.sh
 install-tools.sh
 verify-cluster.sh
 verify-gitops-health.sh
+rehearse-longhorn-backup-restore.sh
 ```
 
 Inspect a script before running it:
@@ -74,6 +75,28 @@ Read the full operating procedure and troubleshooting guidance:
 
 ```text
 docs/runbooks/gitops-post-sync-verification.md
+```
+
+---
+
+## `rehearse-longhorn-backup-restore.sh`
+
+This is an explicit, opt-in **mutating** Longhorn disaster-recovery rehearsal. It creates a new isolated PVC, writes a non-secret deterministic fixture, creates an external Longhorn backup with the Kubernetes CSI snapshot API, restores a second new PVC, and compares SHA-256 checksums.
+
+It requires an already configured and available external Longhorn `BackupTarget`; it never creates or changes the backup target, its credential Secret, an existing volume, or an application PVC. `--confirm` is required, and `--cleanup` deletes the successful test namespace and its test-only `VolumeSnapshotClass`.
+
+Run:
+
+```bash
+./scripts/rehearse-longhorn-backup-restore.sh --confirm --cleanup
+```
+
+The script stores non-secret inventory and timing evidence in the ignored `artifacts/longhorn-rehearsal/` directory. It must be run and return `[PASS]` before Task 3.8 is marked verified or stateful GitOps pruning is reconsidered.
+
+Read the full target, safety, cleanup, rollback, and RPO/RTO procedure:
+
+```text
+docs/runbooks/longhorn-backup-restore-rehearsal.md
 ```
 
 ---
