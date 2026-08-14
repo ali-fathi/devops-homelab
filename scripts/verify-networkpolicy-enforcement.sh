@@ -10,6 +10,7 @@ set -Eeuo pipefail
 
 CONFIRM=false
 TIMEOUT_SECONDS=60
+CLEANUP_TIMEOUT_SECONDS=180
 IMAGE="busybox:1.36"
 REPORT_ROOT="${PWD}/artifacts/networkpolicy-enforcement"
 
@@ -83,7 +84,7 @@ cleanup() {
   [[ "$namespace_created" == true ]] || return 0
 
   echo "[INFO] Cleaning up isolated namespace: ${namespace}"
-  if ! kubectl delete namespace "$namespace" --wait=true --timeout="${TIMEOUT_SECONDS}s" >/dev/null; then
+  if ! kubectl delete namespace "$namespace" --wait=true --timeout="${CLEANUP_TIMEOUT_SECONDS}s" >/dev/null; then
     return 1
   fi
   namespace_created=false
@@ -99,7 +100,7 @@ on_exit() {
     cleanup_status=$?
     set -e
     if (( cleanup_status != 0 )); then
-      echo "[FAIL] Cleanup could not delete ${namespace}. Investigate that test namespace before rerunning." >&2
+      echo "[FAIL] Cleanup could not delete ${namespace} within ${CLEANUP_TIMEOUT_SECONDS}s. The delete request may still be progressing; inspect only that test namespace before rerunning." >&2
       if (( original_status == 0 )); then
         original_status=1
       fi

@@ -87,7 +87,7 @@ No controller may take ownership of another layer's resources without a document
 |---|---|---|---|---|
 | **4.1** Platform security baseline | Live inventory captured; review in progress | Read-only inventory, threat model, privileged-access review, and policy rollout design | CIS, PSS, Kyverno | None; audit-only first |
 | **4.2** Admission policy as code | Planned | Audit then enforce workload security standards with narrow exceptions | Kyverno, PolicyReports | 4.1 |
-| **4.3** Network segmentation | Enforcement test implemented; live test required | Default-deny application namespaces and explicit required flows | NetworkPolicy, DNS/metrics rules | 4.1 and CNI capability check |
+| **4.3** Network segmentation | Blocked: live deny-policy test failed; CNI enforcement remediation required | Default-deny application namespaces and explicit required flows | NetworkPolicy, DNS/metrics rules | 4.1 and CNI capability check |
 | **4.4** CI and repository governance | Planned | Protected main, reviewed ownership, immutable action pinning, dependency updates, blocking security gates | GitHub Actions, CODEOWNERS, Dependabot/Renovate, Trivy | None |
 | **4.5** Artifact supply chain | Planned | Build -> scan -> SBOM -> provenance -> sign -> verify path | Syft, Trivy/Grype, Cosign, SLSA provenance | 4.4 |
 | **4.6** Harbor private registry | Blocked by Phase 3.8 | Recoverable authenticated registry with robot accounts, TLS, scan/retention/replication plan | Harbor, Longhorn, MetalLB/Ingress | Verified Synology restore |

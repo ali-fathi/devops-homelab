@@ -21,7 +21,7 @@ One ignored, non-secret local evidence directory
 
 It never reads Secret or ConfigMap data, annotations, Pod environment values, or application manifests. It never changes an existing namespace, Service, workload, NetworkPolicy, Helm release, Argo CD Application, Terraform resource, or Longhorn volume.
 
-It deletes its unique namespace on success, failure, or interruption. If cleanup fails, the script exits non-zero and prints the exact test namespace to remove only after investigation.
+It deletes its unique namespace on success, failure, or interruption. Probe/readiness waits default to 60 seconds; namespace cleanup has a separate 180-second timeout because Kubernetes namespace finalization can take longer. If cleanup does not finish, the script exits non-zero and prints the exact test namespace to inspect before any manual deletion action.
 
 ## Test sequence
 
@@ -105,7 +105,7 @@ docs/security-findings.md
 | Baseline is denied | Pod networking, image startup, or operator access is broken before policy application | Inspect only the disposable namespace and Pod events; do not infer CNI enforcement. |
 | Deny policy remains reachable | The active CNI does not enforce this policy or its enforcement is misconfigured | Do not deploy default-deny/application NetworkPolicies. Identify the CNI implementation and configuration first. |
 | Allow policy remains denied | Policy is enforcing, but the test selector/traffic path needs investigation | Keep the test isolated; inspect the test namespace, CNI logs, and CNI documentation. |
-| Namespace cleanup fails | A test namespace remains | Record its exact generated name, inspect finalizers/events, and delete only that namespace after the cause is understood. |
+| Namespace cleanup does not finish | Namespace deletion may still be progressing or a finalizer may be blocked | Record its exact generated name and inspect phase, deletion timestamp, finalizers, remaining resources, and events. Never force-remove finalizers as a first response. |
 | Image pull fails | Nodes cannot pull the selected test image | Use an approved image already available to every node; do not use an application Pod as a substitute. |
 
 ## What not to do

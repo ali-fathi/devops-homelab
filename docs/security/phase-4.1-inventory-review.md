@@ -149,7 +149,7 @@ jq --slurpfile roles artifacts/platform-security-baseline/20260814144328-31798/c
 [ ] Classify all six external Services and identify owner/exposure purpose.
 [ ] Confirm active use and upstream/K3s purpose of the Traefik Helm and Longhorn support-bundle `cluster-admin` bindings; document retain/narrow/remove decision.
 [ ] Group and prioritize missing resource requests/limits.
-[ ] Confirm the active CNI and prove NetworkPolicy allow/deny behavior in a disposable namespace. An initial 2026-08-14 probe reached baseline connectivity but was interrupted while waiting for deny-policy propagation; it is not a pass or a CNI conclusion. Rerun the updated 60-second, progress-reporting test.
+[ ] Identify and remediate the active CNI/NetworkPolicy enforcement configuration. The 2026-08-14 disposable probe `networkpolicy-probe-20260814151536-16664` proved baseline Pod connectivity but its deny-ingress policy remained reachable for 60 seconds. NetworkPolicy is therefore absent or misconfigured and must not protect workloads until a fresh `reachable -> denied -> reachable` test passes. Its namespace deletion did not complete within the original 60-second cleanup wait; inspect it without force-removing finalizers.
 [ ] Verify Longhorn, MetalLB, node-exporter, and CoreDNS exception scope/version evidence.
 [ ] Revisit the InfluxDB ownership-init resource settings after the Synology Longhorn restore rehearsal passes and a stateful maintenance window is approved.
 [ ] Add concrete findings, owners, dates, and decisions to docs/security-findings.md.
