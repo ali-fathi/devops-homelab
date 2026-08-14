@@ -36,6 +36,10 @@ docs/container-build-pipeline-harbor.md
 
 ```text
 docs/security-findings.md
+docs/security/platform-threat-model.md
+docs/security/kubernetes-security-baseline.md
+docs/security/policy-exception-process.md
+docs/security/network-flow-inventory.md
 ```
 
 Security-related decisions should be documented rather than silently ignored.
@@ -55,7 +59,7 @@ External Secrets failures
 Garmin synchronization failures
 Synology NFS Longhorn backup-target setup and restore rehearsal
 NAS-Backup-setup (exact resume checklist for the deferred NAS setup)
-Future Phase 4 Kyverno, network policy, CI, Harbor, and supply-chain runbooks
+Platform security baseline, future Kyverno/network-policy, CI, Harbor, and supply-chain runbooks
 ```
 
 ## Application study guides

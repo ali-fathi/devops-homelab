@@ -18,6 +18,7 @@ k3s-config
 # Logs
 *.log
 
-# Local, non-secret Longhorn backup evidence
+# Local, non-secret operational evidence
 artifacts/longhorn-rehearsal/
 artifacts/longhorn-nfs-target/
+artifacts/platform-security-baseline/

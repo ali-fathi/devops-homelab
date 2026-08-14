@@ -85,7 +85,7 @@ No controller may take ownership of another layer's resources without a document
 
 | Task | Status | Primary outcome | Key technologies | Dependency |
 |---|---|---|---|---|
-| **4.1** Platform security baseline | Planned | Baseline inventory, threat model, privileged-access review, and policy rollout design | CIS, PSS, Kyverno | None; audit-only first |
+| **4.1** Platform security baseline | Implemented; live inventory required | Read-only inventory, threat model, privileged-access review, and policy rollout design | CIS, PSS, Kyverno | None; audit-only first |
 | **4.2** Admission policy as code | Planned | Audit then enforce workload security standards with narrow exceptions | Kyverno, PolicyReports | 4.1 |
 | **4.3** Network segmentation | Planned | Default-deny application namespaces and explicit required flows | NetworkPolicy, DNS/metrics rules | 4.1 and CNI capability check |
 | **4.4** CI and repository governance | Planned | Protected main, reviewed ownership, immutable action pinning, dependency updates, blocking security gates | GitHub Actions, CODEOWNERS, Dependabot/Renovate, Trivy | None |
@@ -118,10 +118,11 @@ docs/security/platform-threat-model.md
 docs/security/kubernetes-security-baseline.md
 docs/security/policy-exception-process.md
 docs/security/network-flow-inventory.md
+docs/runbooks/platform-security-baseline.md
 scripts/collect-platform-security-inventory.sh
 ```
 
-The inventory script must be read-only, redact Secret values, and produce ignored local evidence only.
+The inventory script is implemented as `scripts/collect-platform-security-inventory.sh`. It is read-only, excludes Secret/ConfigMap data, annotations, Pod environment values, and raw manifests, and produces ignored local evidence only. Follow [Platform Security Baseline Collection](runbooks/platform-security-baseline.md) for the live run and review order.
 
 ### Validation and exit gate
 

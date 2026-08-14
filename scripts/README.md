@@ -19,6 +19,7 @@ backup-kubeconfig.sh
 install-tools.sh
 verify-cluster.sh
 verify-gitops-health.sh
+collect-platform-security-inventory.sh
 configure-longhorn-synology-nfs-backup-target.sh
 rehearse-longhorn-backup-restore.sh
 ```
@@ -76,6 +77,24 @@ Read the full operating procedure and troubleshooting guidance:
 
 ```text
 docs/runbooks/gitops-post-sync-verification.md
+```
+
+---
+
+## `collect-platform-security-inventory.sh`
+
+This is the Phase 4.1 **read-only** security baseline collector. It writes redacted workload security-context, RBAC, network-policy, externally exposed-Service, namespace, and CNI discovery evidence to ignored workstation artifacts. It does not query Secret or ConfigMap data, persist annotations/Pod environment values, or modify cluster resources.
+
+Run:
+
+```bash
+./scripts/collect-platform-security-inventory.sh
+```
+
+Review `summary.json` first, classify findings, and do not enforce Kyverno or NetworkPolicy controls from an unreviewed inventory. Full procedure:
+
+```text
+docs/runbooks/platform-security-baseline.md
 ```
 
 ---
