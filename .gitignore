@@ -22,3 +22,4 @@ k3s-config
 artifacts/longhorn-rehearsal/
 artifacts/longhorn-nfs-target/
 artifacts/platform-security-baseline/
+artifacts/networkpolicy-enforcement/

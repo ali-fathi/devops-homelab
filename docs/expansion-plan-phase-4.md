@@ -87,7 +87,7 @@ No controller may take ownership of another layer's resources without a document
 |---|---|---|---|---|
 | **4.1** Platform security baseline | Live inventory captured; review in progress | Read-only inventory, threat model, privileged-access review, and policy rollout design | CIS, PSS, Kyverno | None; audit-only first |
 | **4.2** Admission policy as code | Planned | Audit then enforce workload security standards with narrow exceptions | Kyverno, PolicyReports | 4.1 |
-| **4.3** Network segmentation | Planned | Default-deny application namespaces and explicit required flows | NetworkPolicy, DNS/metrics rules | 4.1 and CNI capability check |
+| **4.3** Network segmentation | Enforcement test implemented; live test required | Default-deny application namespaces and explicit required flows | NetworkPolicy, DNS/metrics rules | 4.1 and CNI capability check |
 | **4.4** CI and repository governance | Planned | Protected main, reviewed ownership, immutable action pinning, dependency updates, blocking security gates | GitHub Actions, CODEOWNERS, Dependabot/Renovate, Trivy | None |
 | **4.5** Artifact supply chain | Planned | Build -> scan -> SBOM -> provenance -> sign -> verify path | Syft, Trivy/Grype, Cosign, SLSA provenance | 4.4 |
 | **4.6** Harbor private registry | Blocked by Phase 3.8 | Recoverable authenticated registry with robot accounts, TLS, scan/retention/replication plan | Harbor, Longhorn, MetalLB/Ingress | Verified Synology restore |
@@ -120,7 +120,9 @@ docs/security/policy-exception-process.md
 docs/security/network-flow-inventory.md
 docs/security/phase-4.1-inventory-review.md
 docs/runbooks/platform-security-baseline.md
+docs/runbooks/networkpolicy-enforcement-test.md
 scripts/collect-platform-security-inventory.sh
+scripts/verify-networkpolicy-enforcement.sh
 ```
 
 The inventory script is implemented as `scripts/collect-platform-security-inventory.sh`. It is read-only, excludes Secret/ConfigMap data, annotations, Pod environment values, and raw manifests, and produces ignored local evidence only. The first live inventory was captured on 2026-08-14; its reviewed non-secret findings and remaining gates are in [Phase 4.1 Live Inventory Review](security/phase-4.1-inventory-review.md). Follow [Platform Security Baseline Collection](runbooks/platform-security-baseline.md) for repeat runs and review order.
@@ -193,7 +195,7 @@ Kyverno must be deployed through a dedicated Argo CD Application only after the 
 
 ### Decision rule
 
-First validate the current K3s CNI's NetworkPolicy enforcement with a disposable test namespace. Do not migrate the CNI merely to obtain policies. A Cilium evaluation is a later architectural decision only if eBPF observability, encrypted pod networking, or advanced Layer 7 policy has a documented need and a tested migration plan.
+First validate the current K3s CNI's NetworkPolicy enforcement with a disposable test namespace. `scripts/verify-networkpolicy-enforcement.sh` implements the required isolated `reachable -> denied -> reachable` ingress test and requires `--confirm`; follow [Disposable NetworkPolicy Enforcement Test](runbooks/networkpolicy-enforcement-test.md). Do not migrate the CNI merely to obtain policies. A Cilium evaluation is a later architectural decision only if eBPF observability, encrypted pod networking, or advanced Layer 7 policy has a documented need and a tested migration plan.
 
 ### Design
 

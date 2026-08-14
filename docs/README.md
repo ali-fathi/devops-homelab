@@ -60,7 +60,7 @@ External Secrets failures
 Garmin synchronization failures
 Synology NFS Longhorn backup-target setup and restore rehearsal
 NAS-Backup-setup (exact resume checklist for the deferred NAS setup)
-Platform security baseline, future Kyverno/network-policy, CI, Harbor, and supply-chain runbooks
+Platform security baseline and disposable NetworkPolicy enforcement test, future Kyverno/network-policy, CI, Harbor, and supply-chain runbooks
 ```
 
 ## Application study guides

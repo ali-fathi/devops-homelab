@@ -99,6 +99,17 @@ The Garmin watch syncs data to Garmin Connect through the Garmin mobile app. The
 
 The `garmin-fetch-data` container logs into Garmin Connect, fetches data, and writes it into InfluxDB.
 
+### Resource governance
+
+The fetcher has initial CPU/memory requests and limits based on a 2026-08-14 live observation of `0m` CPU and `73Mi` memory at rest:
+
+```text
+Request: 25m CPU, 128Mi memory
+Limit:   250m CPU, 256Mi memory
+```
+
+These values are an initial safety baseline, not a throughput benchmark. After Argo CD applies the manifest, observe at least one Garmin fetch and adjust only through Git if usage approaches a request or limit. The stateful InfluxDB ownership init container remains root because it repairs PVC ownership before InfluxDB starts; review its resource settings only after the Longhorn restore rehearsal passes and during an approved stateful maintenance window.
+
 Important environment variables:
 
 ```text

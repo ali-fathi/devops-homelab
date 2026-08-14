@@ -76,6 +76,16 @@ spec:
             - name: TZ
               value: "Europe/Berlin"
 
+          # Baseline from 2026-08-14: 0m CPU and 73Mi memory at rest. These
+          # conservative values require post-sync observation during a Garmin fetch.
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+
           volumeMounts:
             - name: garminconnect-tokens
               mountPath: /home/appuser/.garminconnect

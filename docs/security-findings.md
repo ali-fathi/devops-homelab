@@ -161,7 +161,13 @@ Use this table for findings that are not yet resolved.
 
 | Date | Tool | Severity | Finding | Path | Decision | Owner | Notes |
 |------|------|----------|---------|------|----------|-------|-------|
-| YYYY-MM-DD | Trivy | HIGH | Example finding | path/to/file.yaml | Needs investigation | Ali | Replace this example with real findings. |
+| 2026-08-14 | Manual Phase 4.1 inventory | HIGH | Longhorn management UI is directly exposed by a LAN LoadBalancer Service | `kubernetes/infrastructure/longhorn/longhorn-ui-lb.yaml` | Needs investigation | Ali | `192.168.178.211` is an administration plane. Confirm approved operators and authenticated/private access before NetworkPolicy or ingress changes. Review by 2026-09-14. |
+| 2026-08-14 | Manual Phase 4.1 inventory | HIGH | VictoriaMetrics query/write API is directly exposed by a LAN LoadBalancer Service | `kubernetes/applications/ring-health-tracker/service.yaml` | Needs investigation | Ali | `192.168.178.214:8428` must have a documented external client and access control. Otherwise migrate it to `ClusterIP` through Git. Review by 2026-09-14. |
+| 2026-08-14 | Manual Phase 4.1 inventory | MEDIUM | Traefik has a LAN LoadBalancer Service while direct MetalLB Services remain in use | Live `kube-system/traefik` Service; Git ingress configuration is incomplete | Needs investigation | Ali | Confirm active routes and intended ownership. Restrict or remove the exposure only after dependency review. Review by 2026-09-14. |
+| 2026-08-14 | Manual Phase 4.1 inventory | HIGH | Traefik Helm reconciliation ServiceAccounts are bound to `cluster-admin` | Live bindings `helm-kube-system-traefik` and `helm-kube-system-traefik-crd` | Needs investigation | Ali | Bound subjects have token automount enabled and were used by completed K3s bundled Traefik/CRD Helm install Jobs. Charts are `39.0.7`; no current running Pod used either identity. Confirm controller recreation/least-privilege behavior before narrowing or deleting. Review by 2026-09-14. |
+| 2026-08-14 | Manual Phase 4.1 inventory | HIGH | Longhorn support-bundle ServiceAccount is bound to `cluster-admin` | Live binding `longhorn-support-bundle` | Needs investigation | Ali | Bound subject is `longhorn-system/longhorn-support-bundle`. No support-bundle Job was found; token automount is unset and therefore inherits the Kubernetes default when used by a Pod. Confirm version-specific vendor purpose before changing it. Review by 2026-09-14. |
+| 2026-08-14 | Manual Phase 4.1 inventory | MEDIUM | Wildcard controller ClusterRoles are bound to named expected control-plane or installed-controller identities | `artifacts/platform-security-baseline/20260814144328-31798/clusterroles.json` (local evidence) | Fix later | Ali | Argo CD, Longhorn, MetalLB, Prometheus Operator, local-path provisioner, K3s, and Kubernetes controllers have no unexpected subject in the initial mapping. Revalidate on controller upgrades; do not grant similar wildcard access to application identities. Review by 2027-08-14. |
+| 2026-08-14 | Manual Phase 4.1 inventory | MEDIUM | Stateful InfluxDB ownership init container lacks resource settings | `kubernetes/applications/garmin/influxdb.yaml` | Fix later | Ali | It runs as UID 0 only to repair PVC ownership. Updating the `Recreate` Deployment would restart a stateful Pod, so defer the template change until the Synology Longhorn restore rehearsal passes and a maintenance window is approved. Review by 2026-09-14. |
 
 ---
 
@@ -172,7 +178,7 @@ Use this table for findings that were fixed or closed.
 | Date | Tool | Severity | Finding | Path | Resolution | Notes |
 |------|------|----------|---------|------|------------|-------|
 | 2026-08-13 | Trivy | CRITICAL | KSV-0046: ClusterRole could manage all resources through wildcard API groups and resources | `kubernetes/ci/terraform-ci/rbac.yaml` | Replaced wildcard ClusterRole permissions with exact MetalLB and AppProject read permissions plus a namespace-scoped Longhorn Helm Secret read Role | Validate required permissions are `yes`, unrelated/write permissions are `no`, then confirm the Terraform CI plan succeeds. |
-| YYYY-MM-DD | Gitleaks | HIGH | Example secret finding | path/to/file | Secret rotated and removed | Replace this example with real resolved findings. |
+| 2026-08-14 | Manual Phase 4.1 inventory | MEDIUM | Garmin fetcher lacked CPU/memory requests and limits | `kubernetes/applications/garmin/garmin-fetch-data.yaml` | Added evidence-based initial requests/limits through Git | Fetcher baseline is 25m/128Mi request and 250m/256Mi limit after an observed 73Mi idle footprint. Observe an actual fetch post-sync. |
 
 ---
 

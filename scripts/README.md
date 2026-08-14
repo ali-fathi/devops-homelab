@@ -20,6 +20,7 @@ install-tools.sh
 verify-cluster.sh
 verify-gitops-health.sh
 collect-platform-security-inventory.sh
+verify-networkpolicy-enforcement.sh
 configure-longhorn-synology-nfs-backup-target.sh
 rehearse-longhorn-backup-restore.sh
 ```
@@ -95,6 +96,24 @@ Review `summary.json` first, classify findings, and do not enforce Kyverno or Ne
 
 ```text
 docs/runbooks/platform-security-baseline.md
+```
+
+---
+
+## `verify-networkpolicy-enforcement.sh`
+
+This is the Phase 4.1 **confirmation-gated mutating** test for Kubernetes NetworkPolicy enforcement. It creates a unique temporary namespace with two BusyBox Pods, proves Pod-to-Pod HTTP works, proves a deny-ingress policy blocks it, proves a client-only allow policy restores it, and then deletes the namespace on every exit path.
+
+Run only after reading the runbook and confirming the intended Kubernetes context:
+
+```bash
+./scripts/verify-networkpolicy-enforcement.sh --confirm
+```
+
+It does not touch application resources or print Secret data. A pass proves only the isolated ingress allow/deny behavior; it does not authorize default-deny rollout. Full procedure, evidence, cleanup, and failure handling:
+
+```text
+docs/runbooks/networkpolicy-enforcement-test.md
 ```
 
 ---
