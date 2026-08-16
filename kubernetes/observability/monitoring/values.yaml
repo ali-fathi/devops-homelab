@@ -16,6 +16,9 @@ grafana:
 
 prometheus:
   prometheusSpec:
+    # Temporary incident recovery: remove the active CSI ticket so Longhorn can
+    # gracefully detach the stale worker2 engine. Remove after Detached is proven.
+    replicas: 0
     retention: 30d
 
     storageSpec:
