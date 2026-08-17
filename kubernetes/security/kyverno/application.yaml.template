@@ -1,0 +1,46 @@
+# TEMPLATE ONLY -- do not move into kubernetes/gitops/argocd/applications/
+# until the Phase 4.2 admission-webhook change gate is approved.
+#
+# Before use:
+# 1. Revalidate Kyverno chart 3.8.2 against the selected K3s version.
+# 2. Add the Kyverno Helm repository, kyverno destination, and required
+#    cluster-scoped kinds to the AppProject in the same reviewed change.
+# 3. Confirm this Argo CD version supports multiple sources and $values.
+# 4. Render with the exact chart version in CI before enabling auto-sync.
+# 5. Establish an observation/rollback window with failurePolicy Ignore.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno
+  namespace: argocd
+spec:
+  project: homelab-platform
+
+  sources:
+    - repoURL: https://kyverno.github.io/kyverno/
+      chart: kyverno
+      targetRevision: 3.8.2
+      helm:
+        valueFiles:
+          - $values/kubernetes/security/kyverno/values-audit.yaml
+
+    - repoURL: https://github.com/ali-fathi/devops-homelab.git
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+
+  syncPolicy:
+    automated:
+      # Turn on only in the approved installation change, not while this file
+      # remains a template outside the root application's watched directory.
+      enabled: false
+      prune: false
+      selfHeal: false
+
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

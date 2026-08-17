@@ -86,7 +86,7 @@ No controller may take ownership of another layer's resources without a document
 | Task | Status | Primary outcome | Key technologies | Dependency |
 |---|---|---|---|---|
 | **4.1** Platform security baseline | Live inventory captured; review in progress | Read-only inventory, threat model, privileged-access review, and policy rollout design | CIS, PSS, Kyverno | None; audit-only first |
-| **4.2** Admission policy as code | Planned | Audit then enforce workload security standards with narrow exceptions | Kyverno, PolicyReports | 4.1 |
+| **4.2** Admission policy as code | Preflight and non-deployed Audit-policy source staged; installation pending approval | Audit then enforce workload security standards with narrow exceptions | Kyverno, PolicyReports | 4.1 |
 | **4.3** Network segmentation | Blocked: live deny-policy test failed; CNI enforcement remediation required | Default-deny application namespaces and explicit required flows | NetworkPolicy, DNS/metrics rules | 4.1 and CNI capability check |
 | **4.4** CI and repository governance | Read-only baseline captured; remediation pending approval | Protected main, reviewed ownership, immutable action pinning, dependency updates, blocking security gates | GitHub Actions, CODEOWNERS, Dependabot/Renovate, Trivy | None |
 | **4.5** Artifact supply chain | Planned | Build -> scan -> SBOM -> provenance -> sign -> verify path | Syft, Trivy/Grype, Cosign, SLSA provenance | 4.4 |
@@ -179,7 +179,7 @@ kubernetes/security/kyverno/tests/
 docs/runbooks/kyverno-policy-violation.md
 ```
 
-Kyverno must be deployed through a dedicated Argo CD Application only after the AppProject permits its required CRDs, webhooks, RBAC, and namespace.
+Kyverno must be deployed through a dedicated Argo CD Application only after the AppProject permits its required CRDs, webhooks, RBAC, and namespace. The 2026-08-17 read-only preflight confirmed no existing Kyverno installation, compatible K3s `v1.35.5+k3s1`, three Ready nodes, and a clean post-Longhorn-incident GitOps health gate; the non-deployed Audit-policy source and remaining change gates are in [Phase 4.2 Kyverno Preflight](security/phase-4.2-kyverno-preflight.md).
 
 ### Exit gate
 

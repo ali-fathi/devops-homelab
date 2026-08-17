@@ -1,0 +1,61 @@
+# Planned Kyverno Helm values for the first audit-only rollout.
+# This file is not referenced by an Argo CD Application yet.
+#
+# Chart: kyverno/kyverno 3.8.2 (revalidate the exact chart and values schema
+# before creating the future Application).
+
+crds:
+  install: true
+
+features:
+  # Audit policies must never make an unavailable Kyverno webhook block the API
+  # server. Revisit this only after policy reports and webhook availability are
+  # proven over an approved observation period.
+  forceFailurePolicyIgnore:
+    enabled: true
+
+  backgroundScan:
+    enabled: true
+    backgroundScanInterval: 1h
+
+  # PolicyException CRs are deliberately unavailable during initial audit.
+  # Exceptions must first follow docs/security/policy-exception-process.md.
+  policyExceptions:
+    enabled: false
+
+admissionController:
+  replicas: 1
+  serviceMonitor:
+    enabled: false
+  container:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 384Mi
+
+backgroundController:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+# No cleanup policies exist in the first audit-only rollout.
+cleanupController:
+  enabled: false
+
+reportsController:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi

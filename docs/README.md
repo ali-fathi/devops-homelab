@@ -41,6 +41,7 @@ docs/security/kubernetes-security-baseline.md
 docs/security/policy-exception-process.md
 docs/security/network-flow-inventory.md
 docs/security/phase-4.1-inventory-review.md
+docs/security/phase-4.2-kyverno-preflight.md
 docs/security/phase-4.4-ci-governance-audit.md
 ```
 
@@ -61,7 +62,7 @@ External Secrets failures
 Garmin synchronization failures
 Synology NFS Longhorn backup-target setup and restore rehearsal
 NAS-Backup-setup (exact resume checklist for the deferred NAS setup)
-Platform security baseline, CI/repository-governance audit, disposable NetworkPolicy enforcement test, K3s NetworkPolicy-controller remediation, future Kyverno/network-policy, CI, Harbor, and supply-chain runbooks
+Platform security baseline, Kyverno audit-policy violations, CI/repository-governance audit, disposable NetworkPolicy enforcement test, K3s NetworkPolicy-controller remediation, future Kyverno/network-policy, CI, Harbor, and supply-chain runbooks
 ```
 
 ## Application study guides

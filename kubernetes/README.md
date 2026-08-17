@@ -11,6 +11,7 @@ kubernetes/
 ├── infrastructure/  Networking, storage, ingress, and platform services
 ├── observability/   Metrics, logs, dashboards, and alerts
 ├── registry/        Harbor registry preparation
+├── security/        Staged admission-policy and security controls
 ├── gitops/          Argo CD and Flux configuration
 └── ci/              Future in-cluster CI systems
 ```
@@ -628,5 +629,7 @@ docs/storage.md
 docs/gitops.md
 docs/ci-manifest-validation.md
 docs/security-findings.md
+docs/security/phase-4.2-kyverno-preflight.md
+kubernetes/security/kyverno/README.md
 kubernetes/README-kubectl-cheatsheet.md
 ```

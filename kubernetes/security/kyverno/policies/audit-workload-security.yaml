@@ -1,0 +1,114 @@
+# First-phase Kyverno policies for application namespaces only.
+#
+# These policies are intentionally Audit-only. They do not cover platform or
+# storage namespaces, do not create exceptions, and do not mutate workloads.
+# Review resulting PolicyReports before expanding scope or enforcing a rule.
+
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: audit-application-container-security
+  annotations:
+    policies.kyverno.io/title: Audit application container security context
+    policies.kyverno.io/category: Pod Security Standards (Baseline)
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: require-explicit-container-security-context
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - garmin
+                - health
+                - ring-health
+      validate:
+        message: >-
+          Application containers must explicitly run as non-root, prohibit
+          privilege escalation, and explicitly set privileged to false.
+        foreach:
+          - list: request.object.spec.containers[]
+            pattern:
+              securityContext:
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
+                privileged: false
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: audit-application-resource-governance
+  annotations:
+    policies.kyverno.io/title: Audit application resource governance
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: require-cpu-and-memory-requests-and-limits
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - garmin
+                - health
+                - ring-health
+      validate:
+        message: >-
+          Application containers must declare CPU and memory requests and
+          limits. Use a documented, time-bound exception only after review.
+        foreach:
+          - list: request.object.spec.containers[]
+            pattern:
+              resources:
+                requests:
+                  cpu: '?*'
+                  memory: '?*'
+                limits:
+                  cpu: '?*'
+                  memory: '?*'
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: audit-application-image-tags
+  annotations:
+    policies.kyverno.io/title: Audit mutable application image tags
+    policies.kyverno.io/category: Software Supply Chain Security
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: disallow-latest-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - garmin
+                - health
+                - ring-health
+      validate:
+        message: >-
+          Mutable latest image tags are not permitted for application
+          workloads. Use a versioned tag now and a digest after Phase 4.5.
+        foreach:
+          - list: request.object.spec.containers[]
+            deny:
+              conditions:
+                any:
+                  - key: '{{ element.image }}'
+                    operator: Contains
+                    value: ':latest'
