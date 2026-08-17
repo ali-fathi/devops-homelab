@@ -1,0 +1,19 @@
+# Default ownership for this single-maintainer homelab repository.
+# GitHub branch rules must require Code Owner review before this file becomes
+# an enforced control.
+* @ali-fathi
+
+# Delivery and repository governance
+/.github/ @ali-fathi
+/.github/workflows/ @ali-fathi
+
+# Platform ownership boundaries
+/ansible/ @ali-fathi
+/terraform/ @ali-fathi
+/kubernetes/gitops/ @ali-fathi
+/kubernetes/infrastructure/ @ali-fathi
+/kubernetes/security/ @ali-fathi
+
+# Security-sensitive operational procedures
+/docs/runbooks/ @ali-fathi
+/docs/security/ @ali-fathi
