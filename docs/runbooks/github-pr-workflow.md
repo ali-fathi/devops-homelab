@@ -13,6 +13,39 @@ Edit locally
   -> GitHub Actions / Argo CD reconcile the approved main change
 ```
 
+## Quick command cheat sheet
+
+Use this for a normal new change **after the previous PR is merged**. Replace the placeholders before running it.
+
+```bash
+# 1. Start from an up-to-date main branch and create a feature branch
+git switch main && git pull --ff-only && git switch -c feat/<short-change-name>
+
+# 2. Review exactly what changed before committing
+git status --short && git diff --check && git diff
+
+# 3. Commit only the intended files
+git add <file-paths> && git commit -m "type(scope): short description"
+
+# 4. Push the branch and open the PR in your browser
+git push -u origin HEAD && gh pr create --fill --web
+
+# 5. Wait for GitHub Actions checks
+gh pr checks --watch
+
+# 6. After your GitHub review and all checks are green, merge normally
+gh pr merge --squash --delete-branch
+
+# 7. Return to main after the merge
+git switch main && git pull --ff-only
+```
+
+Never use this for an existing open PR branch. For an existing PR, stay on its branch, commit the additional intended changes, and run:
+
+```bash
+git push && gh pr checks --watch
+```
+
 ## Current protection model
 
 ```text
