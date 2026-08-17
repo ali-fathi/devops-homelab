@@ -20,6 +20,7 @@ install-tools.sh
 verify-cluster.sh
 verify-gitops-health.sh
 collect-platform-security-inventory.sh
+audit-ci-repository-governance.sh
 verify-networkpolicy-enforcement.sh
 configure-longhorn-synology-nfs-backup-target.sh
 rehearse-longhorn-backup-restore.sh
@@ -96,6 +97,24 @@ Review `summary.json` first, classify findings, and do not enforce Kyverno or Ne
 
 ```text
 docs/runbooks/platform-security-baseline.md
+```
+
+---
+
+## `audit-ci-repository-governance.sh`
+
+This is the Phase 4.4 **read-only** GitHub Actions and repository-governance baseline collector. It records curated repository/ruleset/Actions-policy metadata and local workflow action references/declared permissions under ignored `artifacts/ci-repository-governance/`. It never reads or prints GitHub Secrets, tokens, or workflow variables, and never changes repository settings, branches, workflows, or cluster resources.
+
+Run:
+
+```bash
+./scripts/audit-ci-repository-governance.sh
+```
+
+Read the full evidence, review order, and remediation guardrails:
+
+```text
+docs/runbooks/ci-repository-governance-audit.md
 ```
 
 ---

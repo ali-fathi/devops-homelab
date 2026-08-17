@@ -88,7 +88,7 @@ No controller may take ownership of another layer's resources without a document
 | **4.1** Platform security baseline | Live inventory captured; review in progress | Read-only inventory, threat model, privileged-access review, and policy rollout design | CIS, PSS, Kyverno | None; audit-only first |
 | **4.2** Admission policy as code | Planned | Audit then enforce workload security standards with narrow exceptions | Kyverno, PolicyReports | 4.1 |
 | **4.3** Network segmentation | Blocked: live deny-policy test failed; CNI enforcement remediation required | Default-deny application namespaces and explicit required flows | NetworkPolicy, DNS/metrics rules | 4.1 and CNI capability check |
-| **4.4** CI and repository governance | Planned | Protected main, reviewed ownership, immutable action pinning, dependency updates, blocking security gates | GitHub Actions, CODEOWNERS, Dependabot/Renovate, Trivy | None |
+| **4.4** CI and repository governance | Read-only baseline captured; remediation pending approval | Protected main, reviewed ownership, immutable action pinning, dependency updates, blocking security gates | GitHub Actions, CODEOWNERS, Dependabot/Renovate, Trivy | None |
 | **4.5** Artifact supply chain | Planned | Build -> scan -> SBOM -> provenance -> sign -> verify path | Syft, Trivy/Grype, Cosign, SLSA provenance | 4.4 |
 | **4.6** Harbor private registry | Blocked by Phase 3.8 | Recoverable authenticated registry with robot accounts, TLS, scan/retention/replication plan | Harbor, Longhorn, MetalLB/Ingress | Verified Synology restore |
 | **4.7** GitOps promotion and deployment control | Planned | Environment overlays, controlled sync, image-digest deployment, and release evidence | Argo CD, Kustomize, GitHub Environments | 4.2, 4.4, 4.5 |
@@ -245,6 +245,8 @@ Reusable workflows: centralize validation/build/signing behavior instead of dupl
 ```
 
 `trivy config` currently uploads findings for review. Phase 4 changes this progressively: first remove high-signal remediable findings, then make the security job blocking. Vendor exceptions must stay path-scoped and expire; never exclude a whole source tree to make CI green.
+
+The 2026-08-17 read-only baseline is recorded in [Phase 4.4 CI and Repository-Governance Audit](security/phase-4.4-ci-governance-audit.md). It found that the active all-branch rule only prevents deletion/force pushes, all 20 action references use mutable tags, CODEOWNERS and dependency automation are absent, and the Health Dashboard workflow has workflow-wide write access/direct main promotion. Apply the documented remediation sequence only through an approved repository-settings change; do not change branch protection or make scans broadly blocking during a storage recovery incident.
 
 ### Exit gate
 
