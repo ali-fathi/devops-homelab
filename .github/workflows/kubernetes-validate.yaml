@@ -28,6 +28,41 @@ jobs:
         run: |
           yamllint kubernetes docs ansible .github
 
+  workflow-permissions:
+    name: Workflow least-privilege validation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Require explicit workflow token permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          missing=()
+          while IFS= read -r workflow; do
+            if ! grep -q '^permissions:' "$workflow"; then
+              missing+=("$workflow")
+            fi
+          done < <(find .github/workflows -maxdepth 1 -type f \( -name '*.yaml' -o -name '*.yml' \) -print | sort)
+
+          if ((${#missing[@]} > 0)); then
+            printf '::error::Workflow(s) missing an explicit top-level permissions block:\n' >&2
+            printf '%s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+
+          if rg -n '^permissions:\s*(read-all|write-all)\s*$' .github/workflows; then
+            echo '::error::Do not use read-all or write-all; declare only the required scopes.' >&2
+            exit 1
+          fi
+
+          echo "[PASS] Every workflow declares explicit token permissions."
+
   kubeconform:
     name: Kubernetes schema validation
     runs-on: ubuntu-latest

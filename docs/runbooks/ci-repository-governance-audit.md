@@ -74,8 +74,9 @@ Expected completion:
    - Review allowed-action policy, SHA pinning, and default token scope.
 4. governance-files.json
    - Confirm CODEOWNERS and Dependabot/Renovate presence.
-5. workflow-action-references.json and workflow-permissions.txt
-   - Find mutable action tags and workflow-level elevated permissions.
+5. workflow-permission-declarations.json, workflow-action-references.json, and workflow-permissions.txt
+   - Confirm every workflow has an explicit top-level `permissions:` block.
+   - Find mutable action tags and elevated job permissions.
 ```
 
 Record decisions in `docs/security-findings.md` and update the current Phase 4.4 audit review. A finding is evidence for a reviewed change; do not change repository settings solely because a script reported an observation.
@@ -92,6 +93,7 @@ Keep Gitleaks blocking and preserve Trivy SARIF uploads when changing scan gates
 Do not make Trivy blocking until existing findings are classified and narrow,
 time-bound exceptions are documented.
 Do not permit a PR-triggered test job to retain a workflow-wide write token.
+Every workflow must declare a top-level `permissions:` block. Use `permissions: {}` plus job-level scopes when one isolated job needs elevated access, such as a main-only GHCR publisher.
 ```
 
 ## Failure handling
