@@ -76,6 +76,10 @@ Container port:
 8080
 ```
 
+The image runs as the fixed non-root numeric user/group `10001:10001`. Port
+`8080` does not require root privileges. This is required for the image's
+Kubernetes `runAsNonRoot` compatibility and Trivy Dockerfile hardening.
+
 ---
 
 ## Endpoints
