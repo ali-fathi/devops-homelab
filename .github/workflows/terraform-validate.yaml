@@ -71,12 +71,14 @@ jobs:
       # Tailscale (the cloud runner joins the tailnet to reach 192.168.178.80).
 
       # Join the tailnet so the runner can reach the homelab cluster API.
+      # Dependabot PRs do not receive ordinary Actions secrets, so they run
+      # fmt/validate but intentionally skip this secret-backed read-only plan.
       # Uses an auth key (Free-plan friendly) instead of an OAuth client.
       # Pin an explicit version (v1.102.2 = latest stable, 2026-08). Using
       # "stable" as the version broke the action's download+checksum step.
       - name: Connect to Tailscale
         id: tailscale
-        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+        if: (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') || github.event_name == 'workflow_dispatch'
         uses: tailscale/github-action@4e4c49acaa9818630ce0bd7a564372c17e33fb4d # v2
         with:
           authkey: ${{ secrets.TS_AUTHKEY }}
@@ -84,7 +86,7 @@ jobs:
           version: "1.102.2"
 
       - name: Terraform init (backend)
-        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+        if: (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') || github.event_name == 'workflow_dispatch'
         env:
           ARM_ACCESS_KEY: ${{ secrets.ARM_ACCESS_KEY }}
         run: |
@@ -93,7 +95,7 @@ jobs:
 
       - name: Terraform plan (read-only)
         id: plan
-        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+        if: (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') || github.event_name == 'workflow_dispatch'
         env:
           ARM_ACCESS_KEY: ${{ secrets.ARM_ACCESS_KEY }}
           TF_VAR_kubeconfig_path: /tmp/kubeconfig-ci
@@ -117,8 +119,14 @@ jobs:
       # ─── Post the plan as a PR comment (tfcmt-style gate, simpler) ────
       # Only when running on a PR (context.issue.number exists). On
       # workflow_dispatch there is no PR to comment on — skip.
+      - name: Dependabot plan notice
+        if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+        run: >-
+          echo "Dependabot PR: Terraform fmt and validate ran; the secret-backed
+          cluster plan is intentionally skipped."
+
       - name: Post plan to PR
-        if: github.event_name == 'pull_request' && steps.plan.outcome == 'success'
+        if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' && steps.plan.outcome == 'success'
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |

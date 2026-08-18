@@ -9,8 +9,13 @@ GitHub Actions runs **three gates** on every change touching `terraform/`:
 
 ```text
 GATE 1 (always):  fmt + validate      → style + syntax, no credentials
-GATE 2 (PR only): terraform plan      → shows what WOULD change (read-only)
-GATE 3 (PR only): PR comment          → posts the plan for review
+GATE 2 (PR/manual, non-Dependabot): terraform plan → shows what WOULD change (read-only)
+GATE 3 (PR/manual, non-Dependabot): PR comment     → posts the plan for review
+
+Dependabot PRs run Gate 1 only. GitHub intentionally withholds ordinary
+Actions secrets from Dependabot, so they must not join Tailscale or access the
+Azure backend/cluster. This is expected and does not weaken Terraform syntax
+or formatting validation.
 
 NEVER: terraform apply. CI is a watchdog, not a deployer.
 ```
@@ -51,10 +56,11 @@ Post plan to PR                                   ← ⑥ github-script posts "#
 | fmt check | always | — | fails if formatting differs |
 | init (no backend) | always | — | fetches providers, skips state |
 | validate | always | — | syntax + internal consistency |
-| **Connect Tailscale** | PR + dispatch | `TS_AUTHKEY` | joins tailnet (WireGuard) |
-| init (backend) | PR + dispatch | `ARM_ACCESS_KEY` | connects to Azure state |
-| **plan (read-only)** | PR + dispatch | `ARM_ACCESS_KEY`, `KUBECONFIG_CI` | builds plan, output to `$GITHUB_OUTPUT` |
-| **Post plan to PR** | **PR only** | `pull-requests: write` | comments the plan on the PR |
+| **Connect Tailscale** | Non-Dependabot PR + dispatch | `TS_AUTHKEY` | joins tailnet (WireGuard) |
+| init (backend) | Non-Dependabot PR + dispatch | `ARM_ACCESS_KEY` | connects to Azure state |
+| **plan (read-only)** | Non-Dependabot PR + dispatch | `ARM_ACCESS_KEY`, `KUBECONFIG_CI` | builds plan, output to `$GITHUB_OUTPUT` |
+| **Post plan to PR** | **Non-Dependabot PR only** | `pull-requests: write` | comments the plan on the PR |
+| Dependabot plan notice | Dependabot PR only | — | records that only fmt/validate ran; never accesses secrets |
 
 ### 3.2 The RBAC — `kubernetes/ci/terraform-ci/rbac.yaml`
 
@@ -163,13 +169,14 @@ Subnet router (Proxmox LXC, like the Cloudflare agent):
 
 ```text
 1. PR touches terraform/** → workflow triggers
-2. fmt + validate pass (no creds)
-3. runner joins tailnet (TS_AUTHKEY) → can now reach 192.168.178.80
-4. init reads ARM_ACCESS_KEY → Azure Storage state
-5. plan decodes KUBECONFIG_CI → authenticates as terraform-ci (read-only)
-6. plan refreshes live state vs config, produces the diff
-7. github-script posts "## Terraform Plan" on the PR
-8. On push→main: steps 3–7 SKIP (only fmt+validate) — main is the GitOps source of truth
+2. fmt + validate pass (no credentials)
+3. Dependabot PR? Stop here and record the intentional plan skip.
+4. Non-Dependabot PR/manual run? Runner joins tailnet (TS_AUTHKEY) → can reach 192.168.178.80
+5. init reads ARM_ACCESS_KEY → Azure Storage state
+6. plan decodes KUBECONFIG_CI → authenticates as terraform-ci (read-only)
+7. plan refreshes live state vs config, produces the diff
+8. github-script posts "## Terraform Plan" on the PR
+9. On push→main: steps 3–8 SKIP (only fmt+validate) — main is the GitOps source of truth
 ```
 
 ## 5. Troubleshooting — symptom → cause → fix
