@@ -15,9 +15,9 @@ on:
 
   workflow_dispatch:
 
-permissions:
-  contents: read
-  packages: write
+# Jobs must declare their own minimum token scope. The empty workflow default
+# prevents a future job from inheriting the repository's write-capable default.
+permissions: {}
 
 concurrency:
   group: health-dashboard-build-${{ github.ref }}
@@ -27,6 +27,8 @@ jobs:
   test:
     name: Run application tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
@@ -45,8 +47,10 @@ jobs:
 
   build:
     needs: test
-    name: Build, scan, and publish image
+    name: Build, scan, and stage image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     env:
       IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/health-dashboard
@@ -62,7 +66,6 @@ jobs:
             --label org.opencontainers.image.revision="${{ github.sha }}" \
             --label org.opencontainers.image.title="health-dashboard" \
             -t "${IMAGE_NAME}:${{ github.sha }}" \
-            -t "${IMAGE_NAME}:latest" \
             apps/health-dashboard
 
       - name: Scan image with Trivy
@@ -75,19 +78,51 @@ jobs:
           vuln-type: os,library
           severity: CRITICAL,HIGH
 
+      - name: Save scanned image
+        run: docker save --output /tmp/health-dashboard-image.tar "${IMAGE_NAME}:${{ github.sha }}"
+
+      - name: Upload scanned image
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: health-dashboard-image-${{ github.sha }}
+          path: /tmp/health-dashboard-image.tar
+          retention-days: 1
+          if-no-files-found: error
+
+  publish:
+    name: Publish image to GHCR
+    needs: build
+    # Publishing occurs only for a reviewed commit that has reached main.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+
+    env:
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/health-dashboard
+
+    steps:
+      - name: Download scanned image
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: health-dashboard-image-${{ github.sha }}
+          path: /tmp/image
+
+      - name: Load scanned image
+        run: docker load --input /tmp/image/health-dashboard-image.tar
+
       - name: Login to GitHub Container Registry
-        if: github.event_name != 'pull_request'
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
             -u "${{ github.actor }}" \
             --password-stdin
 
-      - name: Push container image and publish digest summary
-        if: github.event_name != 'pull_request'
+      - name: Push immutable and latest image tags and publish digest summary
         shell: bash
         run: |
           set -euo pipefail
 
+          docker tag "${IMAGE_NAME}:${{ github.sha }}" "${IMAGE_NAME}:latest"
           docker push "${IMAGE_NAME}:${{ github.sha }}" | tee /tmp/image-push.log
           docker push "${IMAGE_NAME}:latest"
 

@@ -139,8 +139,10 @@ jq -n \
 
 refs_file="${report_dir}/workflow-action-references.tsv"
 permissions_file="${report_dir}/workflow-permissions.txt"
+permission_declarations_file="${report_dir}/workflow-permission-declarations.tsv"
 : > "$refs_file"
 : > "$permissions_file"
+: > "$permission_declarations_file"
 
 while IFS= read -r workflow; do
   while IFS= read -r reference; do
@@ -150,7 +152,16 @@ while IFS= read -r workflow; do
   printf '===== %s =====\n' "$workflow" >> "$permissions_file"
   rg -n '^(permissions:|[[:space:]]{2,}(actions|attestations|checks|contents|deployments|id-token|issues|packages|pull-requests|security-events|statuses):)' "$workflow" \
     >> "$permissions_file" || true
+
+  if grep -q '^permissions:' "$workflow"; then
+    printf '%s\ttrue\n' "$workflow" >> "$permission_declarations_file"
+  else
+    printf '%s\tfalse\n' "$workflow" >> "$permission_declarations_file"
+  fi
 done < <(find .github/workflows -maxdepth 1 -type f \( -name '*.yaml' -o -name '*.yml' \) -print | sort)
+
+jq -Rn '[inputs | select(length > 0) | split("\t") | {path: .[0], explicitTopLevelPermissions: (.[1] == "true")}]' \
+  < "$permission_declarations_file" > "${report_dir}/workflow-permission-declarations.json"
 
 jq -Rn '[inputs | select(length > 0) | split("\t") | {path: .[0], reference: .[1], immutableCommitSha: (.[1] | test("@[0-9a-fA-F]{40}$"))}]' \
   < "$refs_file" > "${report_dir}/workflow-action-references.json"
@@ -161,6 +172,7 @@ jq -n \
   --slurpfile actions "${report_dir}/actions-permissions.json" \
   --slurpfile token_defaults "${report_dir}/workflow-token-defaults.json" \
   --slurpfile governance "${report_dir}/governance-files.json" \
+  --slurpfile workflow_permissions "${report_dir}/workflow-permission-declarations.json" \
   --slurpfile refs "${report_dir}/workflow-action-references.json" \
   '{
     branchProtected: $branch_data[0].protected,
@@ -168,6 +180,7 @@ jq -n \
     actions: $actions[0],
     workflowTokenDefaults: $token_defaults[0],
     governanceFiles: $governance[0],
+    workflowFilesWithoutExplicitTopLevelPermissions: ([$workflow_permissions[0][] | select(.explicitTopLevelPermissions | not)] | length),
     workflowActionReferences: ($refs[0] | length),
     actionReferencesNotPinnedToCommitSha: ([$refs[0][] | select(.immutableCommitSha | not)] | length)
   }' > "${report_dir}/summary.json"
@@ -186,7 +199,7 @@ Review order:
 2. ruleset-details.json and legacy-branch-protection.json
 3. actions-permissions.json and workflow-token-defaults.json
 4. governance-files.json
-5. workflow-action-references.json and workflow-permissions.txt
+5. workflow-permission-declarations.json, workflow-action-references.json, and workflow-permissions.txt
 
 A finding is evidence for a reviewed change; this audit never changes a
 GitHub repository setting or workflow.
