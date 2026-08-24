@@ -9,3 +9,29 @@ ansible_become_method: sudo
 
 # Python Interpreter
 ansible_python_interpreter: /usr/bin/python3
+
+# K3s HA control-plane join baseline. The join playbook reads the existing
+# server token directly from k3s-master with no_log enabled; never add it here
+# or commit it to inventory, variables, or extra-vars files.
+k3s_version: v1.35.5+k3s1
+k3s_api_endpoint: https://192.168.178.85:6443
+k3s_api_vip: 192.168.178.85
+k3s_api_dns_name: k3s-api.home.arpa
+k3s_lan_interface: ens18
+k3s_flannel_backend: host-gw
+k3s_disable_network_policy: true
+k3s_disable_components:
+  - servicelb
+k3s_server_prerequisite_packages:
+  Debian:
+    - ca-certificates
+    - curl
+    - nfs-common
+    - open-iscsi
+  RedHat:
+    - ca-certificates
+    - curl
+    - nfs-utils
+    - iscsi-initiator-utils
+k3s_server_minimum_root_free_mb: 20480
+k3s_server_minimum_memory_mb: 4096
