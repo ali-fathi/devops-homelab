@@ -199,6 +199,8 @@ Use this table for findings that are real but intentionally accepted.
 | Date | Tool | Severity | Risk | Path | Reason | Review Date |
 |------|------|----------|------|------|--------|-------------|
 | 2026-08-13 | Trivy | CRITICAL | KSV-0114: MetalLB controller can manage webhook configurations | `kubernetes/infrastructure/metallb/metallb-native.yaml` | The vendor controller must update only the named `ValidatingWebhookConfiguration` `metallb-webhook-configuration` to rotate the webhook TLS CA. `mutatingwebhookconfigurations` access was removed because MetalLB does not use it. The path-scoped exception in `.trivyignore.yaml` is limited to this vendor manifest; replacing the remaining validating-webhook permission would break automated certificate rotation. | 2027-08-13 |
+| 2026-08-24 | Trivy | HIGH | KSV-0009: Kube-VIP uses the host network namespace | `kubernetes/infrastructure/kube-vip/daemonset.yaml` | Kube-VIP must add and advertise the API virtual IP on the control-plane LAN interface. The DaemonSet is control-plane-only, runs as non-root with a read-only root filesystem and RuntimeDefault seccomp profile, and is exempted only at this path. | 2027-08-24 |
+| 2026-08-24 | Trivy | HIGH | KSV-0119: Kube-VIP adds NET_RAW | `kubernetes/infrastructure/kube-vip/daemonset.yaml` | Kube-VIP needs NET_RAW for ARP advertisement of the API virtual IP. It drops all capabilities before adding only NET_ADMIN and NET_RAW; the exception is path-scoped. | 2027-08-24 |
 | YYYY-MM-DD | Trivy | MEDIUM | Example accepted risk | path/to/file.yaml | Homelab-only temporary exception | YYYY-MM-DD |
 
 ---

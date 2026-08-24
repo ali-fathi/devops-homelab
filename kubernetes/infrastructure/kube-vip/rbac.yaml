@@ -1,6 +1,6 @@
-# Kube-VIP control-plane leader-election RBAC. This is the reviewed upstream
-# v1.2.3 role required by the in-cluster DaemonSet; it is intentionally not
-# cluster-admin. Kube-VIP Service LoadBalancer mode is disabled in daemonset.yaml.
+# Kube-VIP control-plane leader-election RBAC. Service LoadBalancer mode is
+# disabled in daemonset.yaml, so the DaemonSet needs access only to its
+# kube-system leader-election Lease.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -8,37 +8,24 @@ metadata:
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
-  name: system:kube-vip-role
+  name: kube-vip
+  namespace: kube-system
 rules:
-  - apiGroups: [""]
-    resources: ["services/status"]
-    verbs: ["update"]
-  - apiGroups: [""]
-    resources: ["services", "endpoints"]
-    verbs: ["list", "get", "watch", "update"]
-  - apiGroups: [""]
-    resources: ["nodes"]
-    verbs: ["list", "get", "watch", "update", "patch"]
   - apiGroups: ["coordination.k8s.io"]
     resources: ["leases"]
-    verbs: ["list", "get", "watch", "update", "create"]
-  - apiGroups: ["discovery.k8s.io"]
-    resources: ["endpointslices"]
-    verbs: ["list", "get", "watch", "update"]
-  - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["list"]
+    verbs: ["get", "create", "update"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
-  name: system:kube-vip-binding
+  name: kube-vip
+  namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: system:kube-vip-role
+  kind: Role
+  name: kube-vip
 subjects:
   - kind: ServiceAccount
     name: kube-vip

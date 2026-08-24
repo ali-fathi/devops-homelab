@@ -32,7 +32,7 @@ jobs:
           scan-type: config
           scan-ref: .
           trivy-config: trivy.yaml
-          ignorefile: .trivyignore.yaml
+          trivyignores: .trivyignore.yaml
           format: sarif
           output: trivy-config-results.sarif
           exit-code: "0"

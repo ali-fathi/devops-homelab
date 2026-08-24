@@ -9,3 +9,19 @@ misconfigurations:
       The MetalLB v0.14.5 controller must update its sole named
       ValidatingWebhookConfiguration to rotate the webhook TLS CA. The unused
       mutating-webhook permission was removed from the vendored manifest.
+  - id: KSV-0009
+    paths:
+      - kubernetes/infrastructure/kube-vip/daemonset.yaml
+    expired_at: 2027-08-24
+    statement: >-
+      Kube-VIP must share the control-plane host network namespace to add and
+      advertise the API virtual IP on ens18. The DaemonSet is restricted to
+      control-plane nodes and has a read-only root filesystem.
+  - id: KSV-0119
+    paths:
+      - kubernetes/infrastructure/kube-vip/daemonset.yaml
+    expired_at: 2027-08-24
+    statement: >-
+      Kube-VIP requires NET_RAW to send ARP advertisements for the API virtual
+      IP. It drops every other capability before adding only NET_ADMIN and
+      NET_RAW.
