@@ -20,5 +20,6 @@ spec:
 
   # No automated sync: this cluster-scoped, host-networked control-plane
   # component requires an operator-reviewed first Argo CD sync.
-  syncOptions:
-    - ServerSideApply=true
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
