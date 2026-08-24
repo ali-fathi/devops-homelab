@@ -21,9 +21,11 @@ Kube-VIP `services` feature or add a Kube-VIP cloud controller.
 
 The DaemonSet requires `hostNetwork`, `NET_ADMIN`, and `NET_RAW` to add/remove
 and advertise the VIP on the LAN. Its image is pinned to the reviewed
-Kube-VIP `v1.2.3` manifest-list digest. It runs as non-root with a read-only
-root filesystem and RuntimeDefault seccomp profile. Its namespaced RBAC is
-limited to the leader-election Lease in `kube-system`.
+Kube-VIP `v1.2.3` manifest-list digest. Kube-VIP runs as root because its
+upstream DaemonSet requires effective host-network capabilities to add the VIP
+and open an ARP raw socket; it drops every capability except `NET_ADMIN` and
+`NET_RAW`. Its namespaced RBAC is limited to the leader-election Lease in
+`kube-system`.
 
 ## Prerequisites
 
