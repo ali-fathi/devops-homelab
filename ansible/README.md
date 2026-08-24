@@ -469,7 +469,7 @@ ansible/group_vars/k3s_cluster.yml
 ---
 ansible_user: ansible
 
-ansible_ssh_private_key_file: /home/vscode/.ssh/my_ansible_homelab
+ansible_ssh_private_key_file: "{{ lookup('env', 'HOME') }}/.ssh/my_ansible_homelab"
 
 ansible_become: true
 

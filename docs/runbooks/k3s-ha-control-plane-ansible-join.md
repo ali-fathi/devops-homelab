@@ -64,7 +64,7 @@ Before any mutation:
 [ ] A fresh embedded-etcd snapshot and its off-host copy exist.
 [ ] k3s-master2 and k3s-master3 are clean hosts with static .83/.84 addresses.
 [ ] An existing administrator account can SSH to the new hosts and use sudo.
-[ ] The DevContainer has /home/vscode/.ssh/my_ansible_homelab.pub mounted.
+[ ] The Ansible controller has $HOME/.ssh/my_ansible_homelab.pub available.
 [ ] The pull request containing this automation has been reviewed and merged.
 ```
 
