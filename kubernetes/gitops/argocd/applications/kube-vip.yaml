@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-vip
+  namespace: argocd
+  annotations:
+    gitops.homelab.dev/managed-by: homelab-applications
+    gitops.homelab.dev/first-sync: manual-approved
+spec:
+  project: homelab-platform
+
+  source:
+    repoURL: https://github.com/ali-fathi/devops-homelab.git
+    targetRevision: main
+    path: kubernetes/infrastructure/kube-vip
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+
+  # No automated sync: this cluster-scoped, host-networked control-plane
+  # component requires an operator-reviewed first Argo CD sync.
+  syncOptions:
+    - ServerSideApply=true
