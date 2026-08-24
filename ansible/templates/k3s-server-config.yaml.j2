@@ -1,0 +1,14 @@
+# Managed by Ansible. The token is sourced at runtime from the existing
+# k3s-master and is never stored in Git, inventory, or Ansible output.
+server: {{ k3s_api_endpoint }}
+token: {{ k3s_join_token }}
+node-ip: {{ ansible_host }}
+tls-san:
+  - {{ k3s_api_dns_name }}
+  - {{ k3s_api_vip }}
+disable-network-policy: {{ k3s_disable_network_policy | bool | ternary('true', 'false') }}
+flannel-backend: {{ k3s_flannel_backend }}
+disable:
+{% for component in k3s_disable_components %}
+  - {{ component }}
+{% endfor %}

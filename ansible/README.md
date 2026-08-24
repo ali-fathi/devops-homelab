@@ -53,7 +53,9 @@ Current Kubernetes cluster:
 
 | Hostname | Role | IP Address |
 |-----------|---------|------------|
-| k3s-master | Control Plane | 192.168.178.80 |
+| k3s-master | Existing control-plane server | 192.168.178.80 |
+| k3s-master2 | Planned control-plane server | 192.168.178.83 |
+| k3s-master3 | Planned control-plane server | 192.168.178.84 |
 | k3s-worker1 | Worker Node | 192.168.178.81 |
 | k3s-worker2 | Worker Node | 192.168.178.82 |
 
@@ -113,8 +115,10 @@ ansible/
 │   └── k3s_cluster.yml
 │
 ├── playbooks/
+│   ├── bootstrap-ansible-user.yml
 │   ├── check-cluster.yml
-│   └── configure-k3s-network-policy-controller.yml
+│   ├── configure-k3s-network-policy-controller.yml
+│   └── join-k3s-ha-control-plane.yml
 │
 ├── roles/
 │
@@ -423,10 +427,18 @@ all:
   children:
     k3s_cluster:
       children:
-        k3s_master:
-          hosts:
-            k3s-master:
-              ansible_host: 192.168.178.80
+        k3s_control_plane:
+          children:
+            k3s_master:
+              hosts:
+                k3s-master:
+                  ansible_host: 192.168.178.80
+            k3s_new_control_plane:
+              hosts:
+                k3s-master2:
+                  ansible_host: 192.168.178.83
+                k3s-master3:
+                  ansible_host: 192.168.178.84
         k3s_workers:
           hosts:
             k3s-worker1:
@@ -601,6 +613,21 @@ Read the complete risk, validation, and rollback procedure first:
 
 ```text
 docs/runbooks/k3s-networkpolicy-controller-remediation.md
+```
+
+# K3s HA Control-Plane Expansion
+
+K3s server installation and host configuration belong to Ansible, not
+Terraform. The controlled HA expansion creates the dedicated `ansible` user on
+new hosts, configures the K3s server baseline, obtains the existing join token
+at runtime without storing it in Git, and joins exactly one server at a time
+through Kube-VIP. It preserves `host-gw`, `disable-network-policy: true`, and
+K3s ServiceLB disablement; it does not enable NetworkPolicy enforcement.
+
+Read the complete preflight, execution, validation, and rollback procedure:
+
+```text
+docs/runbooks/k3s-ha-control-plane-ansible-join.md
 ```
 
 # Longhorn Synology NFS Backup Preparation

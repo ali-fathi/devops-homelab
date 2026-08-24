@@ -1,0 +1,286 @@
+---
+# Joins exactly one new K3s server per invocation through the Kube-VIP API.
+# The join token is read at runtime from k3s-master with no_log enabled. It is
+# never committed, printed, placed in inventory, or passed as an extra variable.
+#
+# Required invocation (from ansible/):
+# ansible-playbook playbooks/join-k3s-ha-control-plane.yml --limit k3s-master2 -e k3s_join_confirm=true
+#
+# Run the post-join health gates before using --limit k3s-master3.
+
+- name: Audit and join one K3s HA control-plane server
+  hosts: k3s_new_control_plane
+  gather_facts: true
+  become: true
+  serial: 1
+
+  vars:
+    k3s_join_confirm: false
+    k3s_config_path: /etc/rancher/k3s/config.yaml
+    k3s_binary_path: /usr/local/bin/k3s
+    k3s_install_script_path: /usr/local/sbin/install-k3s.sh
+
+  pre_tasks:
+    - name: Require a one-server limit
+      ansible.builtin.assert:
+        that:
+          - ansible_play_hosts_all | length == 1
+        fail_msg: >-
+          Join exactly one server with --limit k3s-master2 or --limit k3s-master3.
+          Validate the first server before attempting the second.
+      run_once: true
+
+    - name: Read the existing server K3s version
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/k3s
+          - --version
+      delegate_to: "{{ groups['k3s_master'] | first }}"
+      register: k3s_primary_version
+      changed_when: false
+      run_once: true
+
+    - name: Require the target K3s version to match the existing server
+      ansible.builtin.assert:
+        that:
+          - k3s_version in k3s_primary_version.stdout
+        fail_msg: >-
+          Existing server version does not match k3s_version={{ k3s_version }}.
+          Update the reviewed group variable instead of joining mixed versions.
+      run_once: true
+
+    - name: Inspect local K3s installation state
+      ansible.builtin.stat:
+        path: "{{ k3s_binary_path }}"
+      register: k3s_binary
+
+    - name: Inspect existing K3s configuration when present
+      ansible.builtin.slurp:
+        path: "{{ k3s_config_path }}"
+      register: k3s_existing_config
+      when: k3s_binary.stat.exists
+      no_log: true
+
+    - name: Reject an existing K3s installation pointed at a different cluster
+      ansible.builtin.assert:
+        that:
+          - "k3s_existing_config.content | b64decode is search('server: ' ~ k3s_api_endpoint)"
+          - "k3s_existing_config.content | b64decode is search('node-ip: ' ~ ansible_host)"
+        fail_msg: >-
+          K3s already exists but is not configured for this reviewed HA endpoint.
+          Do not overwrite an existing installation; investigate it first.
+      when: k3s_binary.stat.exists
+      no_log: true
+
+    - name: Check that no K3s agent installation conflicts with server join
+      ansible.builtin.stat:
+        path: /etc/systemd/system/k3s-agent.service
+      register: k3s_agent_service
+
+    - name: Refuse to replace a K3s agent installation
+      ansible.builtin.assert:
+        that:
+          - not k3s_agent_service.stat.exists
+        fail_msg: >-
+          A K3s agent service exists on this host. Do not convert it in place;
+          investigate or rebuild the host before joining it as a server.
+
+    - name: Read NTP synchronization state
+      ansible.builtin.command:
+        argv:
+          - timedatectl
+          - show
+          - --property=NTPSynchronized
+          - --value
+      register: k3s_ntp_synchronized
+      changed_when: false
+
+    - name: Read available root filesystem capacity in MiB
+      ansible.builtin.command:
+        argv:
+          - df
+          - -Pm
+          - /
+      register: k3s_root_disk
+      changed_when: false
+
+    - name: Verify hostname, LAN address, interface, time, and host capacity
+      ansible.builtin.assert:
+        that:
+          - ansible_hostname == inventory_hostname
+          - ansible_host in ansible_all_ipv4_addresses
+          - k3s_lan_interface in ansible_interfaces
+          - k3s_ntp_synchronized.stdout | trim | lower == 'yes'
+          - ansible_memtotal_mb | int >= k3s_server_minimum_memory_mb | int
+          - k3s_root_disk.stdout_lines[-1].split()[3] | int >= k3s_server_minimum_root_free_mb | int
+        fail_msg: >-
+          Host preflight failed: verify hostname, static LAN IP, ens18, NTP,
+          memory, and root free space before enabling the K3s server service.
+
+    - name: Read the route to the Kube-VIP API endpoint
+      ansible.builtin.command:
+        argv:
+          - ip
+          - route
+          - get
+          - "{{ k3s_api_vip }}"
+      register: k3s_vip_route
+      changed_when: false
+
+    - name: Require the Kube-VIP route to use the reviewed LAN interface
+      ansible.builtin.assert:
+        that:
+          - "'dev ' ~ k3s_lan_interface ~ ' ' in k3s_vip_route.stdout"
+        fail_msg: "Kube-VIP route must use {{ k3s_lan_interface }}: {{ k3s_vip_route.stdout }}"
+
+    - name: Report audit-only result until confirmation is supplied
+      ansible.builtin.debug:
+        msg: >-
+          Preflight passed for {{ inventory_hostname }}. No host changes were made.
+          To join exactly this server, rerun with -e k3s_join_confirm=true.
+      when: not (k3s_join_confirm | bool)
+
+    - name: Require explicit approval before changing the host
+      ansible.builtin.assert:
+        that:
+          - k3s_join_confirm | bool
+        fail_msg: "Set k3s_join_confirm=true only after reviewing this preflight and an off-host snapshot copy."
+
+  tasks:
+    - name: Require a supported OS package family
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.os_family in k3s_server_prerequisite_packages
+        fail_msg: "Unsupported OS family {{ ansible_facts.os_family }} for the reviewed K3s prerequisites."
+
+    - name: Install K3s and Longhorn host prerequisites without upgrading the host
+      ansible.builtin.package:
+        name: "{{ k3s_server_prerequisite_packages[ansible_facts.os_family] }}"
+        state: present
+
+    - name: Enable the iSCSI service required for Longhorn attachment
+      ansible.builtin.systemd:
+        name: iscsid
+        enabled: true
+        state: started
+      when: ansible_facts.os_family == 'Debian'
+
+    - name: Read the current cluster join token from the existing server
+      ansible.builtin.slurp:
+        path: /var/lib/rancher/k3s/server/token
+      delegate_to: "{{ groups['k3s_master'] | first }}"
+      register: k3s_join_token_raw
+      run_once: true
+      no_log: true
+
+    - name: Create the K3s configuration directory
+      ansible.builtin.file:
+        path: /etc/rancher/k3s
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Render the private K3s HA server configuration
+      ansible.builtin.template:
+        src: ../templates/k3s-server-config.yaml.j2
+        dest: "{{ k3s_config_path }}"
+        owner: root
+        group: root
+        mode: "0600"
+      vars:
+        k3s_join_token: "{{ k3s_join_token_raw.content | b64decode | trim }}"
+      register: k3s_config_change
+      no_log: true
+
+    - name: Download the official K3s installer
+      ansible.builtin.get_url:
+        url: https://get.k3s.io
+        dest: "{{ k3s_install_script_path }}"
+        owner: root
+        group: root
+        mode: "0755"
+      when: not k3s_binary.stat.exists
+
+    - name: Install the pinned K3s server version
+      ansible.builtin.command:
+        argv:
+          - /bin/sh
+          - "{{ k3s_install_script_path }}"
+      environment:
+        INSTALL_K3S_VERSION: "{{ k3s_version }}"
+        INSTALL_K3S_EXEC: server
+      when: not k3s_binary.stat.exists
+      no_log: true
+
+    - name: Restart an existing K3s server only when its managed configuration changed
+      ansible.builtin.systemd:
+        name: k3s
+        state: restarted
+      when:
+        - k3s_binary.stat.exists
+        - k3s_config_change.changed
+
+    - name: Ensure the K3s server service is enabled and started
+      ansible.builtin.systemd:
+        name: k3s
+        enabled: true
+        state: started
+
+    - name: Wait for the joined server local API readiness
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/k3s
+          - kubectl
+          - get
+          - --raw=/readyz
+      register: k3s_local_readyz
+      changed_when: false
+      retries: 30
+      delay: 10
+      until: k3s_local_readyz.rc == 0
+
+    - name: Wait for the joined node to be Ready from the existing server
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/k3s
+          - kubectl
+          - wait
+          - "--for=condition=Ready"
+          - "node/{{ inventory_hostname }}"
+          - --timeout=300s
+      delegate_to: "{{ groups['k3s_master'] | first }}"
+      changed_when: false
+
+    - name: Wait for Kube-VIP to roll out to every current control-plane node
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/k3s
+          - kubectl
+          - -n
+          - kube-system
+          - rollout
+          - status
+          - daemonset/kube-vip-ds
+          - --timeout=300s
+      delegate_to: "{{ groups['k3s_master'] | first }}"
+      changed_when: false
+
+    - name: Verify authenticated API readiness through the Kube-VIP endpoint
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/k3s
+          - kubectl
+          - "--server={{ k3s_api_endpoint }}"
+          - get
+          - --raw=/readyz
+      register: k3s_vip_readyz
+      changed_when: false
+      failed_when: k3s_vip_readyz.stdout | trim != 'ok'
+
+    - name: Report successful join and required external health gate
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }} joined through {{ k3s_api_endpoint }} and is Ready.
+          Before joining the other server, run kubectl get nodes -o wide, verify
+          Kube-VIP Pods, Longhorn volume health, and scripts/verify-gitops-health.sh.

@@ -1,0 +1,60 @@
+---
+# One-time bootstrap for hosts that do not yet have the dedicated automation
+# account. Invoke with -e ansible_user=<existing-admin-user>; do not place that
+# bootstrap user or any password in inventory.
+
+- name: Bootstrap the dedicated Ansible user on new control-plane hosts
+  hosts: k3s_new_control_plane
+  gather_facts: false
+  become: true
+  serial: 1
+
+  vars:
+    ansible_bootstrap_public_key_path: "{{ lookup('env', 'HOME') }}/.ssh/my_ansible_homelab.pub"
+    ansible_bootstrap_user: ansible
+
+  pre_tasks:
+    - name: Require the controller public key
+      ansible.builtin.assert:
+        that:
+          - lookup('ansible.builtin.file', ansible_bootstrap_public_key_path) | trim | length > 0
+        fail_msg: >-
+          The controller public key is unavailable at {{ ansible_bootstrap_public_key_path }}.
+          Mount or create the public key before bootstrap; do not paste private keys.
+      no_log: true
+
+  tasks:
+    - name: Create the dedicated automation account
+      ansible.builtin.user:
+        name: "{{ ansible_bootstrap_user }}"
+        shell: /bin/bash
+        groups: sudo
+        append: true
+        create_home: true
+        state: present
+
+    - name: Create the automation SSH directory
+      ansible.builtin.file:
+        path: "/home/{{ ansible_bootstrap_user }}/.ssh"
+        state: directory
+        owner: "{{ ansible_bootstrap_user }}"
+        group: "{{ ansible_bootstrap_user }}"
+        mode: "0700"
+
+    - name: Install the controller public key for automation
+      ansible.builtin.copy:
+        content: "{{ lookup('ansible.builtin.file', ansible_bootstrap_public_key_path) | trim }}\n"
+        dest: "/home/{{ ansible_bootstrap_user }}/.ssh/authorized_keys"
+        owner: "{{ ansible_bootstrap_user }}"
+        group: "{{ ansible_bootstrap_user }}"
+        mode: "0600"
+      no_log: true
+
+    - name: Grant narrowly named passwordless sudo to automation
+      ansible.builtin.copy:
+        content: "{{ ansible_bootstrap_user }} ALL=(ALL) NOPASSWD: ALL\n"
+        dest: "/etc/sudoers.d/{{ ansible_bootstrap_user }}"
+        owner: root
+        group: root
+        mode: "0440"
+        validate: /usr/sbin/visudo -cf %s
