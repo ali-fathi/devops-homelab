@@ -32,12 +32,6 @@ spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       serviceAccountName: kube-vip
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 10001
-        runAsGroup: 10001
-        seccompProfile:
-          type: RuntimeDefault
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -98,9 +92,10 @@ spec:
             limits:
               cpu: 100m
               memory: 128Mi
+          # Kube-VIP's upstream DaemonSet runs as root with only these two
+          # effective network capabilities. It must modify the host interface
+          # and send ARP frames to advertise the control-plane VIP.
           securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
