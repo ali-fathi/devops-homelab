@@ -20,7 +20,10 @@ Workload plane:
 ## Nodes
 
 ```text
-k3s-master   192.168.178.80   control plane
+Kube-VIP     192.168.178.85   control-plane API endpoint
+k3s-master   192.168.178.80   control-plane,etcd
+k3s-master2  192.168.178.83   control-plane,etcd
+k3s-master3  192.168.178.84   control-plane,etcd
 k3s-worker1  192.168.178.81   worker
 k3s-worker2  192.168.178.82   worker
 ```
@@ -71,10 +74,11 @@ GitHub
 
 ## Network addresses
 
-MetalLB pool:
+Control-plane VIP and MetalLB pool:
 
 ```text
-192.168.178.210-192.168.178.220
+Kube-VIP API endpoint: 192.168.178.85
+MetalLB pool:           192.168.178.210-192.168.178.220
 ```
 
 Important services:

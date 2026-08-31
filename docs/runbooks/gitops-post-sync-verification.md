@@ -103,6 +103,7 @@ Expected Applications:
 
 ```text
 homelab-applications
+kube-vip
 monitoring
 loki
 alloy
@@ -133,6 +134,22 @@ If an Application is OutOfSync or Degraded, start with:
 
 ```bash
 argocd app diff <application-name> --hard-refresh --diff-exit-code 0
+```
+
+### 2. Control-plane networking
+
+The gate also requires the Kube-VIP DaemonSet in `kube-system` to be available
+on every control-plane server scheduled by its affinity rule. This proves the
+GitOps-managed API endpoint is present after a server join.
+
+Manual inspection:
+
+```bash
+kubectl -n kube-system get daemonset kube-vip-ds
+```
+
+```bash
+kubectl -n kube-system get pods -l app.kubernetes.io/name=kube-vip-ds -o wide
 ```
 
 Then use:

@@ -2,12 +2,12 @@
 # Intentionally opt-in K3s server configuration change.
 #
 # This playbook owns only /etc/rancher/k3s/config.yaml's
-# disable-network-policy scalar on the single control-plane node. It does not
-# change Flannel, workers, iptables/nftables state, CNI software, Kubernetes
-# workloads, or NetworkPolicies. Read the paired runbook before execution.
+# disable-network-policy scalar on every control-plane server, one at a time.
+# It does not change Flannel, workers, iptables/nftables state, CNI software,
+# Kubernetes workloads, or NetworkPolicies. Read the paired runbook before execution.
 
 - name: Audit or change the embedded K3s NetworkPolicy controller
-  hosts: k3s_master
+  hosts: k3s_control_plane
   gather_facts: false
   become: true
   serial: 1

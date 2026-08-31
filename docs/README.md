@@ -62,7 +62,7 @@ External Secrets failures
 Garmin synchronization failures
 Synology NFS Longhorn backup-target setup and restore rehearsal
 NAS-Backup-setup (exact resume checklist for the deferred NAS setup)
-Solo-maintainer GitHub pull-request workflow, platform security baseline, Kyverno audit-policy violations, CI/repository-governance audit, disposable NetworkPolicy enforcement test, K3s NetworkPolicy-controller remediation, future Kyverno/network-policy, CI, Harbor, and supply-chain runbooks
+Solo-maintainer GitHub pull-request workflow, platform security baseline, Kyverno audit-policy violations, CI/repository-governance audit, disposable NetworkPolicy enforcement test, K3s HA control-plane expansion with Ansible, K3s NetworkPolicy-controller remediation, future Kyverno/network-policy, CI, Harbor, and supply-chain runbooks
 ```
 
 ## Application study guides

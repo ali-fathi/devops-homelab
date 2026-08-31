@@ -33,7 +33,7 @@ Developer workstation
   → VS Code DevContainer
   → kubectl / Helm / Kustomize / Argo CD
   → kubeconfig
-  → K3s API server: 192.168.178.80:6443
+  → Kube-VIP API endpoint: 192.168.178.85:6443
   → K3s cluster
 ```
 
@@ -41,7 +41,9 @@ Current nodes:
 
 | Node | Role | Address |
 |---|---|---|
-| `k3s-master` | Control plane | `192.168.178.80` |
+| `k3s-master` | Control plane and etcd | `192.168.178.80` |
+| `k3s-master2` | Control plane and etcd | `192.168.178.83` |
+| `k3s-master3` | Control plane and etcd | `192.168.178.84` |
 | `k3s-worker1` | Worker | `192.168.178.81` |
 | `k3s-worker2` | Worker | `192.168.178.82` |
 

@@ -21,7 +21,7 @@ Registry governance          -> private, authenticated Harbor image distribution
 Operational auditability     -> actionable security and delivery evidence
 ```
 
-The objective is not to claim that a three-node homelab is a regulated enterprise production environment. The objective is to use the same control patterns, make deviations explicit, and prove the controls work before relying on them.
+The objective is not to claim that a five-node homelab with a three-server HA control plane is a regulated enterprise production environment. The objective is to use the same control patterns, make deviations explicit, and prove the controls work before relying on them.
 
 ## Engineering principles
 

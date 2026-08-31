@@ -8,7 +8,7 @@ It is intentionally broader than a command cheat sheet. The objective is to unde
 
 ## 1. The platform in one sentence
 
-This repository manages a remote three-node K3s cluster from a reproducible DevContainer using Ansible, Terraform, Helm, Kubernetes manifests, GitHub Actions, Argo CD, Longhorn, MetalLB, External Secrets, Prometheus, Grafana, Loki, and application workloads.
+This repository manages a remote five-node K3s cluster with a three-server embedded-etcd HA control plane from a reproducible DevContainer using Ansible, Terraform, Helm, Kubernetes manifests, GitHub Actions, Argo CD, Longhorn, MetalLB, External Secrets, Prometheus, Grafana, Loki, and application workloads.
 
 ---
 
@@ -161,7 +161,7 @@ scripts/README.md
 
 ## 5. Ansible: host automation
 
-Ansible connects over SSH to the three nodes:
+Ansible connects over SSH to all five nodes:
 
 ```text
 DevContainer
@@ -189,10 +189,12 @@ Configuration:
 ansible/ansible.cfg
 ```
 
-Current playbook:
+Current playbooks include:
 
 ```text
 ansible/playbooks/check-cluster.yml
+ansible/playbooks/bootstrap-ansible-user.yml
+ansible/playbooks/join-k3s-ha-control-plane.yml
 ```
 
 Run:
@@ -335,14 +337,15 @@ terraform/README.md
 The cluster has:
 
 ```text
-1 control-plane node
+3 control-plane and embedded-etcd servers
 2 worker nodes
+1 Kube-VIP API endpoint
 ```
 
-The DevContainer connects to the API server at:
+The DevContainer connects to the API endpoint at:
 
 ```text
-https://192.168.178.80:6443
+https://192.168.178.85:6443
 ```
 
 Current K3s recovery baseline:

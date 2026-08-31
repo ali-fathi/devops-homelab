@@ -15,11 +15,22 @@ The cluster is based on **K3s** and is managed from the DevContainer using:
 
 | Node | Role | IP |
 |---|---|---|
-| k3s-master | Control Plane | 192.168.178.80 |
+| k3s-master | Control plane and etcd | 192.168.178.80 |
+| k3s-master2 | Control plane and etcd | 192.168.178.83 |
+| k3s-master3 | Control plane and etcd | 192.168.178.84 |
 | k3s-worker1 | Worker | 192.168.178.81 |
 | k3s-worker2 | Worker | 192.168.178.82 |
+| Kube-VIP API endpoint | Control-plane virtual IP | 192.168.178.85 |
 
 ---
+
+> **Topology note:** The cluster is now a five-node, three-server HA cluster.
+> The recovery commands and three-node route examples below are retained as
+> historical incident evidence from before the HA expansion; they are not a
+> current operation procedure. Use
+> `docs/runbooks/k3s-ha-control-plane-ansible-join.md` for server membership and
+> `docs/runbooks/k3s-networkpolicy-controller-remediation.md` for the separate
+> NetworkPolicy-controller decision.
 
 # ⚙️ Historical K3s Networking Recovery Configuration
 

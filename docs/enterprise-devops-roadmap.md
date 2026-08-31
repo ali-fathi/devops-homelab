@@ -44,7 +44,7 @@ Before adding a platform component, answer these questions in an ADR or task des
 ```text
 What concrete risk or manual operation does it remove?
 Who owns upgrades, credentials, RBAC, and incident response?
-What is the resource footprint on a three-node cluster?
+What is the resource footprint on the five-node cluster?
 What happens when it is unavailable?
 How is its state backed up and restored?
 Can an existing component safely provide the same control?
@@ -137,7 +137,7 @@ Start with Git-based templates and reusable workflows. Do not install Backstage,
 
 ## Phase 7 — Scale, Zero Trust, and Advanced Assurance
 
-> **Entry gate:** There is a real business/operational need beyond the three-node homelab, plus capacity and support ownership for each new control plane.
+> **Entry gate:** There is a real business/operational need beyond the current five-node homelab, plus capacity and support ownership for each new control plane.
 
 ### Goal
 

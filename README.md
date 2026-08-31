@@ -58,9 +58,11 @@ The repository is designed to be:
 ┌─────────────────────────────────────┐
 │          K3s Kubernetes Cluster     │
 │                                     │
-│  Master: 192.168.178.80             │
-│  Worker: 192.168.178.81             │
-│  Worker: 192.168.178.82             │
+│  API VIP: 192.168.178.85            │
+│  Server:  192.168.178.80             │
+│  Server:  192.168.178.83             │
+│  Server:  192.168.178.84             │
+│  Workers: 192.168.178.81, .82        │
 │                                     │
 │  Platform Services:                 │
 │  - Argo CD                          │
@@ -102,7 +104,7 @@ kubectl
     ↓
 kubeconfig
     ↓
-https://192.168.178.80:6443
+https://192.168.178.85:6443 (Kube-VIP)
     ↓
 K3s API Server
     ↓
@@ -227,10 +229,10 @@ Inside the copied file find:
 server: https://127.0.0.1:6443
 ```
 
-Replace it with:
+Replace it with the Kube-VIP endpoint:
 
 ```yaml
-server: https://192.168.178.80:6443
+server: https://192.168.178.85:6443
 ```
 
 Why?
@@ -281,6 +283,8 @@ Expected result:
 
 ```text
 k3s-master
+k3s-master2
+k3s-master3
 k3s-worker1
 k3s-worker2
 ```
@@ -295,11 +299,11 @@ If this fails:
 Network tests:
 
 ```bash
-ping 192.168.178.80
+ping 192.168.178.85
 ```
 
 ```bash
-curl -k https://192.168.178.80:6443
+kubectl --kubeconfig ~/.kube/k3s-config --server=https://192.168.178.85:6443 get --raw=/readyz
 ```
 
 Do not continue until this step succeeds.

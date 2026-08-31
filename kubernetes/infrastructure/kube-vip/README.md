@@ -40,8 +40,9 @@ Before the first sync:
   Longhorn health, and GitOps health gates pass.
 ```
 
-The first sync occurs while only `k3s-master` exists; this is expected. The
-DaemonSet expands to `k3s-master2` and `k3s-master3` as they join.
+The first sync occurred while only `k3s-master` existed. The DaemonSet has
+subsequently expanded to all three control-plane servers: `k3s-master`,
+`k3s-master2`, and `k3s-master3`.
 
 ## First installation
 
@@ -56,16 +57,17 @@ ip addr | grep 192.168.178.85
 curl -k https://192.168.178.85:6443/readyz
 ```
 
-Do not join new control-plane nodes through the VIP until every command
-succeeds.
+The three-server HA expansion is complete. For the reusable staged join,
+validation, and rollback procedure, read
+`docs/runbooks/k3s-ha-control-plane-ansible-join.md`.
 
 ## Rollback
 
-If the first sync does not announce the VIP or affects API health, revert the
-reviewed Git change and manually sync the child Application to remove the
-DaemonSet/RBAC. The existing direct API endpoint `192.168.178.80:6443` remains
-available until the new server nodes are joined. Do not delete Longhorn
-resources or modify the K3s datastore as part of this rollback.
+If Kube-VIP does not announce the VIP or affects API health, stop further
+control-plane changes and use the direct server endpoint only for emergency
+administration while the issue is investigated. Revert the reviewed Git change
+and manually sync the child Application only after reviewing the Argo diff. Do
+not delete Longhorn resources or modify the K3s datastore as part of rollback.
 
 ## Failover test
 

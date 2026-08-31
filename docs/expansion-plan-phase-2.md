@@ -538,7 +538,7 @@ This is the most important learning experience in the project. Read it carefully
 
 ```text
 All 7 Longhorn volumes: attached + healthy ✅
-All 3 nodes: ready ✅
+All 3 nodes: ready ✅ (historical recovery record before the later five-node HA expansion)
 All apps Running (garmin, ring, observability, health-dashboard) ✅
 All PVCs Bound (garmin 10+1Gi, loki 20Gi, prometheus 20Gi, grafana+alertmanager+vm 5Gi each) ✅
 All MetalLB IPs back (.210-.216) ✅
@@ -690,11 +690,11 @@ The original wildcard read role was replaced after GitHub code scanning flagged 
 
 ## ⚠️ The network problem discovered (and the Tailscale solution)
 
-**The problem:** the first CI run failed with:
+**Historical pre-HA problem:** the first CI run failed with:
 ```text
 dial tcp 192.168.178.80:6443: i/o timeout
 ```
-The GitHub cloud runner cannot reach the cluster API — `192.168.178.80:6443` is a **private homelab LAN IP** with no route from Microsoft's cloud. The RBAC, secrets, and kubeconfig were all valid; only **network reachability** was broken.
+At that time the GitHub cloud runner could not reach the direct primary-server API address. The RBAC, secrets, and kubeconfig were valid; only **network reachability** was broken. The current CI endpoint is the Kube-VIP address `192.168.178.85:6443` through the same private Tailscale subnet route.
 
 **Options considered:**
 | Option | Verdict |
@@ -707,7 +707,7 @@ The GitHub cloud runner cannot reach the cluster API — `192.168.178.80:6443` i
 ```text
 GitHub cloud runner (ubuntu-latest — SAFE sandbox)
    ├── tailscale/github-action@v2  →  joins the tailnet over WireGuard
-   └── reaches 192.168.178.80:6443 THROUGH the tailnet (no public exposure)
+   └── reaches 192.168.178.85:6443 through Kube-VIP and the tailnet (no public exposure)
 
 Homelab (Proxmox LXC, like the Cloudflare agent pattern)
    └── tailscaled →  subnet router advertising 192.168.178.0/24
@@ -723,7 +723,7 @@ Homelab (Proxmox LXC, like the Cloudflare agent pattern)
     authkey: ${{ secrets.TS_AUTHKEY }}   # auth key (Free-plan friendly, simpler than OAuth)
     tags: tag:ci
 ```
-The `KUBECONFIG_CI` secret still points at `192.168.178.80:6443` — the runner reaches it *through* the subnet-router-advertised route.
+The CI kubeconfig should use the Kube-VIP endpoint `192.168.178.85:6443`; the runner reaches it *through* the subnet-router-advertised route. The earlier `.80` reference is a pre-HA historical endpoint.
 
 ### The Tailscale setup (one-time)
 
