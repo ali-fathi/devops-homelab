@@ -180,7 +180,7 @@ ansible/inventory/hosts.yml
 Group variables:
 
 ```text
-ansible/group_vars/k3s_cluster.yml
+ansible/inventory/group_vars/k3s_cluster.yml
 ```
 
 Configuration:

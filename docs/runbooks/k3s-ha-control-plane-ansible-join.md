@@ -37,7 +37,7 @@ enforcement. Its separate, gated remediation remains documented in
 
 ```text
 ansible/inventory/hosts.yml
-ansible/group_vars/k3s_cluster.yml
+ansible/inventory/group_vars/k3s_cluster.yml
 ansible/playbooks/bootstrap-ansible-user.yml
 ansible/playbooks/join-k3s-ha-control-plane.yml
 ansible/templates/k3s-server-config.yaml.j2
