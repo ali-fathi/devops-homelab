@@ -23,6 +23,8 @@ Recommended for:
 
 ```text
 k3s-master
+k3s-master2
+k3s-master3
 k3s-worker1
 k3s-worker2
 ```

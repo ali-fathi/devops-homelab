@@ -22,7 +22,7 @@ if command -v kubectl >/dev/null 2>&1; then
     echo ""
     echo "[WARN] Kubernetes cluster NOT reachable from this environment."
     echo "       Check: kubeconfig path, server address, VPN/LAN, K3s API."
-    echo "       Manual: curl -k https://192.168.178.80:6443"
+    echo "       Manual: kubectl --server=https://192.168.178.85:6443 get --raw=/readyz"
   fi
 else
   echo "[WARN] kubectl not installed."

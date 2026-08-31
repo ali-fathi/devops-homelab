@@ -16,7 +16,7 @@ This configuration protects against loss of a Longhorn disk, K3s node, or the wh
 ## Architecture and boundaries
 
 ```text
-K3s nodes: 192.168.178.80, .81, .82
+K3s nodes: 192.168.178.80, .81, .82, .83, .84
   -> NFSv4.1 mount to dedicated Synology share
   -> Longhorn BackupTarget/default
   -> Longhorn backupstore
@@ -27,7 +27,7 @@ Synology NAS is not a Kubernetes workload and is not GitOps-managed.
 
 | Layer | Owner | Responsibility |
 |---|---|---|
-| Synology shared folder, NFS service, firewall, and export ACL | NAS operator | Dedicated storage and access limited to the three K3s nodes. |
+| Synology shared folder, NFS service, firewall, and export ACL | NAS operator | Dedicated storage and access limited to the five K3s nodes. |
 | NFS client package and write/mount probe on K3s nodes | Ansible playbook | Confirms every node can use the export with NFSv4.1. |
 | `BackupTarget/default` endpoint | Explicit operator script | Configures the Longhorn API only after the mount probe passes. |
 | Existing application data | Application owners | Never altered by initial target setup or isolated rehearsal. |
@@ -44,7 +44,7 @@ Record these non-secret values in your operator notes. Do not add them to a cred
 | Synology name/IP | A DHCP-reserved LAN IP or internal DNS name | The backup target must remain reachable after router/DHCP changes. |
 | Dedicated shared folder | `longhorn-backups` | Prevents Longhorn retention from mixing with personal, media, or Terraform-state files. |
 | Export path | Usually `/volume1/longhorn-backups` | This is the path DSM displays for the NFS export; confirm it in DSM. |
-| NFS clients | `192.168.178.80`, `192.168.178.81`, `192.168.178.82` | Least privilege: only K3s nodes may mount the backup share. |
+| NFS clients | `192.168.178.80`, `192.168.178.81`, `192.168.178.82`, `192.168.178.83`, `192.168.178.84` | Least privilege: only K3s nodes may mount the backup share. |
 | NFS version | NFSv4.1 | Required/supported by Longhorn backup operations. |
 | Longhorn target name | `default` | The rehearsal script intentionally uses only the default target. |
 | Poll interval | `300` seconds initially | Reasonable discovery interval for a small homelab; adjust after observation. |
@@ -79,20 +79,20 @@ If the NAS uses Btrfs, Synology snapshots of the **whole dedicated share** can p
 4. Apply the settings.
 5. If DSM asks for an NFSv4 domain, record the chosen domain and use the DSM default unless your NAS identity design requires a specific one.
 
-NFS with `AUTH_SYS` does not encrypt data on the wire. Keep the NAS and nodes on a trusted LAN/VLAN, do not expose NFS to the internet, and use Synology firewall rules to permit NFS only from the three node IPs.
+NFS with `AUTH_SYS` does not encrypt data on the wire. Keep the NAS and nodes on a trusted LAN/VLAN, do not expose NFS to the internet, and use Synology firewall rules to permit NFS only from the five node IPs.
 
 ### 3. Restrict the NFS export
 
 1. Open **Control Panel → Shared Folder**.
 2. Select `longhorn-backups`, select **Edit**, then open **NFS Permissions**.
-3. Create one read/write rule for each K3s node: `192.168.178.80`, `192.168.178.81`, and `192.168.178.82`.
+3. Create one read/write rule for each K3s node: `192.168.178.80`, `192.168.178.81`, `192.168.178.82`, `192.168.178.83`, and `192.168.178.84`.
 4. Select **Read/Write** privilege and **sys** security.
-5. For this dedicated machine-to-machine backup share, use **Map all users to admin** to avoid `AUTH_SYS` UID/GID mismatch between Longhorn components and DSM. This is acceptable only because the share is dedicated and the client ACL is restricted to those three nodes.
+5. For this dedicated machine-to-machine backup share, use **Map all users to admin** to avoid `AUTH_SYS` UID/GID mismatch between Longhorn components and DSM. This is acceptable only because the share is dedicated and the client ACL is restricted to those five nodes.
 6. Do not use `*`, `192.168.178.0/24`, or an internet-routable network unless there is a documented operational reason.
 7. Leave guest/anonymous access disabled and do not enable access for untrusted networks.
 8. Apply the rule and record the exact export path DSM shows.
 
-If your DSM version uses slightly different labels, preserve the same outcome: NFSv4.1, read/write access from only `.80`, `.81`, `.82`, and a dedicated share that permits Longhorn's mounted workload identity to write.
+If your DSM version uses slightly different labels, preserve the same outcome: NFSv4.1, read/write access from only `.80`, `.81`, `.82`, `.83`, `.84`, and a dedicated share that permits Longhorn's mounted workload identity to write.
 
 ## Stage 2 — Prepare and probe every K3s node
 
@@ -110,7 +110,7 @@ From the repository root, check Ansible connectivity:
 cd ansible && ansible k3s_cluster -m ping
 ```
 
-Run the prepare-and-probe playbook after substituting the NAS address and confirmed DSM export path. The command is intentionally explicit and mutating only on the three K3s nodes and the dedicated NAS share:
+Run the prepare-and-probe playbook after substituting the NAS address and confirmed DSM export path. The command is intentionally explicit and mutating only on the five K3s nodes and the dedicated NAS share:
 
 ```bash
 cd ansible && ansible-playbook playbooks/prepare-longhorn-synology-nfs.yml -e longhorn_nfs_confirm=true -e longhorn_nfs_backup_server=<synology-ip-or-dns> -e longhorn_nfs_backup_export=/volume1/longhorn-backups -e longhorn_nfs_run_probe=true
@@ -248,7 +248,7 @@ scripts/rehearse-longhorn-backup-restore.sh
 ```text
 [ ] Synology has a dedicated longhorn-backups share.
 [ ] NFSv4.1 is enabled on the NAS.
-[ ] Only 192.168.178.80, .81, and .82 have read/write NFS access.
+[ ] Only 192.168.178.80, .81, .82, .83, and .84 have read/write NFS access.
 [ ] NFS client/probe passes on every K3s node.
 [ ] Longhorn BackupTarget/default reports available: true.
 [ ] The isolated backup/restore script returns [PASS].

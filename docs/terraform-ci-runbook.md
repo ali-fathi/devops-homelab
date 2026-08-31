@@ -20,7 +20,7 @@ or formatting validation.
 NEVER: terraform apply. CI is a watchdog, not a deployer.
 ```
 
-The cloud runner reaches your homelab cluster through **Tailscale** (the runner can't route to `192.168.178.80:6443` directly — it's a private LAN IP).
+The cloud runner reaches your homelab cluster through **Tailscale** (the runner can't route to `192.168.178.85:6443` directly — it's a private LAN IP).
 
 ## 2. The architecture (end to end)
 
@@ -161,7 +161,7 @@ Policy (admin console):
 
 Subnet router (Proxmox LXC, like the Cloudflare agent):
   tailscaled up --advertise-routes=192.168.178.0/24 --accept-routes=true
-  → cloud runner routes to 192.168.178.80 through this node
+  → cloud runner routes to the 192.168.178.85 Kube-VIP endpoint through this node
   → must APPROVE the route in admin console
 ```
 
@@ -171,7 +171,7 @@ Subnet router (Proxmox LXC, like the Cloudflare agent):
 1. PR touches terraform/** → workflow triggers
 2. fmt + validate pass (no credentials)
 3. Dependabot PR? Stop here and record the intentional plan skip.
-4. Non-Dependabot PR/manual run? Runner joins tailnet (TS_AUTHKEY) → can reach 192.168.178.80
+4. Non-Dependabot PR/manual run? Runner joins tailnet (TS_AUTHKEY) → can reach 192.168.178.85
 5. init reads ARM_ACCESS_KEY → Azure Storage state
 6. plan decodes KUBECONFIG_CI → authenticates as terraform-ci (read-only)
 7. plan refreshes live state vs config, produces the diff
@@ -181,7 +181,7 @@ Subnet router (Proxmox LXC, like the Cloudflare agent):
 
 ## 5. Troubleshooting — symptom → cause → fix
 
-### 5.1 `dial tcp 192.168.178.80:6443: i/o timeout`
+### 5.1 `dial tcp 192.168.178.85:6443: i/o timeout`
 ```text
 Cause:   runner can't REACH the cluster — Tailscale not connected,
          subnet router down, or route not approved.
@@ -288,7 +288,7 @@ kind: Config
 clusters:
   - name: k3s
     cluster:
-      server: https://192.168.178.80:6443
+      server: https://192.168.178.85:6443
       certificate-authority-data: $CA
 contexts:
   - name: ci
@@ -348,7 +348,7 @@ TEST 4 — least-privilege proof (in DevContainer):
 ```text
 WHAT runs in CI:   fmt, validate (always); plan, comment (PR/dispatch)
 WHAT never runs:   terraform apply  — operators apply locally
-HOW CI reaches cluster:  Tailscale (authkey tag:ci) → subnet router → 192.168.178.80
+HOW CI reaches cluster:  Tailscale (authkey tag:ci) → subnet router → 192.168.178.85 Kube-VIP endpoint
 HOW CI stays read-only:  SA with exact resource reads only + -lock=false
 The 3 secrets:      ARM_ACCESS_KEY, KUBECONFIG_CI, TS_AUTHKEY
 The 3 network errors in order:  i/o timeout (no route) → x509 (no trust) → credentials (no token)

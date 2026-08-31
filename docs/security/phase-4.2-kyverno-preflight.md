@@ -12,7 +12,7 @@
 | Kyverno CRDs | None detected | No existing policy API ownership to preserve. |
 | Kyverno webhooks | None detected | No existing webhook behavior to preserve. |
 | K3s server version | `v1.35.5+k3s1` | Compatible with the selected stable Kyverno Helm chart `3.8.2` requirement of Kubernetes `>=1.25`. Revalidate before installation. |
-| Nodes | Three Ready nodes | `k3s-master`, `k3s-worker1`, and `k3s-worker2` were Ready. |
+| Nodes | Historical pre-HA snapshot: three Ready nodes | This observation predates the HA expansion; the current topology has five Ready nodes: three control-plane/etcd servers and two workers. |
 | Observed node memory | Master 66%; worker1 23%; worker2 32% | Start with one replica per required Kyverno controller and explicit resource requests. Avoid control-plane affinity. |
 | Post-incident GitOps health | 35 checks, 0 failures, 0 warnings | Prometheus, PVCs, application endpoints, ExternalSecrets, and all Argo CD Applications were healthy after the Longhorn incident recovery. |
 

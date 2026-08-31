@@ -28,7 +28,7 @@ Required intended state:
 ```text
 Dedicated shared folder: longhorn-backups
 NFS version: NFSv4.1
-Allowed K3s clients only: 192.168.178.80, 192.168.178.81, 192.168.178.82
+Allowed K3s clients only: 192.168.178.80, .81, .82, .83, .84
 Longhorn target form: nfs://<synology-ip-or-dns>:/volume1/longhorn-backups
 Kubernetes credential Secret: none (NFS export ACL controls access)
 ```
@@ -39,7 +39,7 @@ Kubernetes credential Secret: none (NFS export ACL controls access)
 cd ansible && ansible-playbook playbooks/prepare-longhorn-synology-nfs.yml -e longhorn_nfs_confirm=true -e longhorn_nfs_backup_server=<synology-ip-or-dns> -e longhorn_nfs_backup_export=/volume1/longhorn-backups -e longhorn_nfs_run_probe=true
 ```
 
-Do not continue unless `.80`, `.81`, and `.82` each pass the temporary NFSv4.1 mount/write/remove/unmount probe.
+Do not continue unless `.80`, `.81`, `.82`, `.83`, and `.84` each pass the temporary NFSv4.1 mount/write/remove/unmount probe.
 
 ## Step 3 — Configure Longhorn
 

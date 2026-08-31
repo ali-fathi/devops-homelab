@@ -3,7 +3,7 @@
 > **The learning guide for the first expansion phase of the DevOps Homelab platform.**
 > Duration: Weeks 1–3 · Goal: solidify the operator workstation side of the homelab before expanding into new platform services.
 
-This is one installment of the DevOps Homelab expansion plan — a multi-phase roadmap (kept privately, outside this repository) for evolving the homelab to a production-grade platform. This document covers all five tasks of Phase 1, from secure kubeconfig backups to a hardened DevContainer.
+This is one installment of the DevOps Homelab expansion plan — a multi-phase roadmap (kept privately, outside this repository) for evolving the homelab to a production-grade platform. This document covers all five tasks of Phase 1, from secure kubeconfig backups to a hardened DevContainer. The original examples predate the later five-node HA expansion; current cluster access uses the Kube-VIP endpoint `https://192.168.178.85:6443` and the current inventory in `ansible/inventory/hosts.yml`.
 
 ---
 
@@ -43,7 +43,7 @@ Phase 1 goal:
 `~/.kube/k3s-config` is the **master key** to your cluster:
 
 ```text
-cluster server address     →  https://192.168.178.80:6443
+cluster server address     →  https://192.168.178.85:6443 (Kube-VIP)
 cluster CA data            →  base64 certificate authority
 client certificate data    →  proves identity
 client key data            →  proves identity
@@ -239,7 +239,7 @@ A new machine (or a broken DevContainer) needs ~10 CLIs installed and version-pi
 | `kubectl` | Everything against the cluster |
 | `helm` | Installing platform charts (MetalLB, Argo CD, Longhorn…) |
 | `terraform` | Phase 2: IaC for cluster bootstrap |
-| `ansible` | SSH automation of the three K3s nodes |
+| `ansible` | SSH automation of the five K3s nodes |
 | `argocd` | `argocd app get/sync/diff` GitOps operations |
 | `kustomize` | Rendering manifests (`kubectl kustomize`) |
 | `kubeseal` | Phase 5: Sealed Secrets encryption |
@@ -430,6 +430,11 @@ terraform validate                 →  Success! The configuration is valid.
 ---
 
 # Task 1.4 — Ansible Inventory Modernization
+
+> **Historical inventory note:** The original three-node examples in this Phase
+> 1 learning record are retained to explain the initial YAML conversion. The
+> current five-node inventory, including three control-plane/etcd servers, is
+> `ansible/inventory/hosts.yml`; use it and the HA join runbook for operations.
 
 ## The problem
 
@@ -672,7 +677,7 @@ Sample output (host without cluster access):
 Checking Kubernetes cluster...
 [WARN] Kubernetes cluster NOT reachable from this environment.
        Check: kubeconfig path, server address, VPN/LAN, K3s API.
-       Manual: curl -k https://192.168.178.80:6443
+       Manual: kubectl --server=https://192.168.178.85:6443 get --raw=/readyz
 
 Checking installed tools...
 [OK] kubectl: Client Version: v1.34.1

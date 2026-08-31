@@ -10,6 +10,7 @@ set -uo pipefail
 
 readonly APPS=(
   homelab-applications
+  kube-vip
   monitoring
   loki
   alloy
@@ -277,6 +278,9 @@ main() {
 
   printf '\n%s\n' '--- External Secrets ---'
   check_external_secrets
+
+  printf '\n%s\n' '--- Control-plane networking ---'
+  check_daemonset kube-system kube-vip-ds
 
   printf '\n%s\n' '--- Observability resources ---'
   check_prometheus_resource prometheus monitoring-kube-prometheus-prometheus

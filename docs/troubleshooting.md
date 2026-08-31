@@ -15,5 +15,5 @@ ping 192.168.178.80
 ## Verify API
 
 ```bash
-curl -k https://192.168.178.80:6443
+kubectl --server=https://192.168.178.85:6443 get --raw=/readyz
 ```

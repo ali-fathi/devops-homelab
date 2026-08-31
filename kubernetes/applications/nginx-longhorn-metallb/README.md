@@ -171,6 +171,8 @@ Expected:
 
 ```text
 k3s-master    Ready
+k3s-master2   Ready
+k3s-master3   Ready
 k3s-worker1   Ready
 k3s-worker2   Ready
 ```

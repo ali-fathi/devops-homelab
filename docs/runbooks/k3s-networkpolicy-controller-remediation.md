@@ -50,7 +50,7 @@ All conditions must be true before a change:
 ```text
 [ ] Synology Longhorn restore rehearsal has passed, or the operator explicitly accepts the recovery risk.
 [ ] A maintenance window is approved; a single control-plane restart briefly interrupts Kubernetes API reconciliation.
-[ ] All three Nodes are Ready and no Longhorn volume is degraded/faulted.
+[ ] All five Nodes are Ready, all three control-plane servers are Ready, and no Longhorn volume is degraded/faulted.
 [ ] The current configuration and historical cross-node failure are reviewed.
 [ ] A rollback operator and the current disabled setting are available.
 [ ] No stateful migration, restore, Longhorn upgrade, or Terraform apply is in progress.
@@ -70,7 +70,7 @@ kubectl get nodes && kubectl get volumes.longhorn.io -n longhorn-system -o json 
 Inspect existing kube-router-related rules without printing configuration secrets. Run on all nodes; output is expected to be empty while the controller is disabled, but any output must be reviewed as historical state:
 
 ```bash
-for host in 192.168.178.80 192.168.178.81 192.168.178.82; do echo "== ${host} =="; ssh -o BatchMode=yes ansible@"${host}" 'sudo iptables-save | grep -E "KUBE-ROUTER|KUBE-NWPLCY|KUBE-POD-FW" || true; sudo ip6tables-save | grep -E "KUBE-ROUTER|KUBE-NWPLCY|KUBE-POD-FW" || true'; done
+for host in 192.168.178.80 192.168.178.81 192.168.178.82 192.168.178.83 192.168.178.84; do echo "== ${host} =="; ssh -o BatchMode=yes ansible@"${host}" 'sudo iptables-save | grep -E "KUBE-ROUTER|KUBE-NWPLCY|KUBE-POD-FW" || true; sudo ip6tables-save | grep -E "KUBE-ROUTER|KUBE-NWPLCY|KUBE-POD-FW" || true'; done
 ```
 
 Do not run `k3s-killall.sh`, manually flush iptables/nftables, remove chains, or alter Flannel as part of this initial enablement. Those are outage-level recovery actions, not a policy-controller rollout.
@@ -105,8 +105,8 @@ The playbook:
 ```text
 1. Backs up the remote K3s config using Ansible's root-owned backup mechanism.
 2. Changes only disable-network-policy to false.
-3. Restarts only the k3s server service on k3s-master.
-4. Checks the local service and API /readyz endpoint.
+3. Restarts the k3s service sequentially on k3s-master, k3s-master2, and k3s-master3.
+4. Checks the local service and API /readyz endpoint on each server.
 5. Does not restart workers, alter host-gw, or clean firewall state.
 ```
 

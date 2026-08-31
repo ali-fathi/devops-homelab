@@ -53,9 +53,9 @@ Current Kubernetes cluster:
 
 | Hostname | Role | IP Address |
 |-----------|---------|------------|
-| k3s-master | Existing control-plane server | 192.168.178.80 |
-| k3s-master2 | Planned control-plane server | 192.168.178.83 |
-| k3s-master3 | Planned control-plane server | 192.168.178.84 |
+| k3s-master | Control-plane and etcd server | 192.168.178.80 |
+| k3s-master2 | Control-plane and etcd server | 192.168.178.83 |
+| k3s-master3 | Control-plane and etcd server | 192.168.178.84 |
 | k3s-worker1 | Worker Node | 192.168.178.81 |
 | k3s-worker2 | Worker Node | 192.168.178.82 |
 
@@ -79,9 +79,9 @@ SSH Key Authentication
 +--------------------------+
 |      K3s Cluster         |
 +--------------------------+
-| 192.168.178.80 Master    |
-| 192.168.178.81 Worker 1  |
-| 192.168.178.82 Worker 2  |
+| API VIP .85              |
+| .80, .83, .84 Servers    |
+| .81, .82 Workers          |
 +--------------------------+
 ```
 
@@ -177,6 +177,8 @@ Perform the following steps once on all cluster nodes.
 Run on:
 
 - k3s-master
+- k3s-master2
+- k3s-master3
 - k3s-worker1
 - k3s-worker2
 
@@ -282,6 +284,22 @@ ssh-copy-id \
 ansible@192.168.178.80
 ```
 
+Control-plane server 2:
+
+```bash
+ssh-copy-id \
+-i ~/.ssh/my_ansible_homelab.pub \
+ansible@192.168.178.83
+```
+
+Control-plane server 3:
+
+```bash
+ssh-copy-id \
+-i ~/.ssh/my_ansible_homelab.pub \
+ansible@192.168.178.84
+```
+
 Worker 1:
 
 ```bash
@@ -303,7 +321,7 @@ ansible@192.168.178.82
 ## Optional: Copy Key to All Nodes Automatically
 
 ```bash
-for host in 192.168.178.80 192.168.178.81 192.168.178.82; do
+for host in 192.168.178.80 192.168.178.81 192.168.178.82 192.168.178.83 192.168.178.84; do
   ssh-copy-id \
     -i ~/.ssh/my_ansible_homelab.pub \
     ansible@$host
@@ -320,6 +338,18 @@ Master:
 
 ```bash
 ssh -i ~/.ssh/my_ansible_homelab ansible@192.168.178.80
+```
+
+Control-plane server 2:
+
+```bash
+ssh -i ~/.ssh/my_ansible_homelab ansible@192.168.178.83
+```
+
+Control-plane server 3:
+
+```bash
+ssh -i ~/.ssh/my_ansible_homelab ansible@192.168.178.84
 ```
 
 Worker 1:
@@ -358,6 +388,16 @@ Host k3s-master
     User ansible
     IdentityFile ~/.ssh/my_ansible_homelab
 
+Host k3s-master2
+    HostName 192.168.178.83
+    User ansible
+    IdentityFile ~/.ssh/my_ansible_homelab
+
+Host k3s-master3
+    HostName 192.168.178.84
+    User ansible
+    IdentityFile ~/.ssh/my_ansible_homelab
+
 Host k3s-worker1
     HostName 192.168.178.81
     User ansible
@@ -379,6 +419,14 @@ Verify:
 
 ```bash
 ssh k3s-master
+```
+
+```bash
+ssh k3s-master2
+```
+
+```bash
+ssh k3s-master3
 ```
 
 ```bash
@@ -548,6 +596,14 @@ k3s-master | SUCCESS => {
     "ping": "pong"
 }
 
+k3s-master2 | SUCCESS => {
+    "ping": "pong"
+}
+
+k3s-master3 | SUCCESS => {
+    "ping": "pong"
+}
+
 k3s-worker1 | SUCCESS => {
     "ping": "pong"
 }
@@ -583,6 +639,8 @@ Example:
 
 ```text
 Connected successfully to k3s-master
+Connected successfully to k3s-master2
+Connected successfully to k3s-master3
 Connected successfully to k3s-worker1
 Connected successfully to k3s-worker2
 ```
@@ -603,7 +661,7 @@ Default execution is audit-only:
 ansible-playbook playbooks/configure-k3s-network-policy-controller.yml
 ```
 
-An explicit confirmed enablement restarts the single K3s server and is permitted only after the runbook preconditions, restore gate, and maintenance approval:
+An explicit confirmed enablement restarts every control-plane K3s server sequentially and is permitted only after the runbook preconditions, restore gate, and maintenance approval:
 
 ```bash
 ansible-playbook playbooks/configure-k3s-network-policy-controller.yml -e k3s_network_policy_confirm=true -e k3s_network_policy_enabled=true
@@ -683,7 +741,9 @@ Expected:
 
 ```text
 NAME          STATUS   ROLES
-k3s-master    Ready    control-plane
+k3s-master    Ready    control-plane,etcd
+k3s-master2   Ready    control-plane,etcd
+k3s-master3   Ready    control-plane,etcd
 k3s-worker1   Ready
 k3s-worker2   Ready
 ```

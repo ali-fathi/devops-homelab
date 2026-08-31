@@ -51,7 +51,7 @@ Operator workstation
 |---|---|---|
 | Longhorn Helm release | Terraform | Chart version is pinned in `terraform/longhorn.tf`. |
 | Existing application PVCs and volumes | Their workload/controller | This rehearsal must not modify them. |
-| Synology NFS export and ACL | NAS operator | Dedicated share, NFSv4.1, and access only from the three K3s nodes; no Kubernetes credential Secret is used. |
+| Synology NFS export and ACL | NAS operator | Dedicated share, NFSv4.1, and access only from the five K3s nodes; no Kubernetes credential Secret is used. |
 | Longhorn `BackupTarget` | Explicit operator configuration script | Must be named `default`, point at the reviewed Synology NFS export, and report `status.available: true`. |
 | Rehearsal namespace, PVCs, Pods, VolumeSnapshot, and VolumeSnapshotClass | Explicit operator script | Created with a unique run ID; not Argo CD or Terraform managed. |
 | Evidence files | Operator workstation | Written beneath ignored `artifacts/longhorn-rehearsal/`; no secret values or full backup URL are recorded. |
