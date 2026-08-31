@@ -150,7 +150,7 @@ The DevContainer mounts (**read-only** — the container can read your SSH keys 
 Ansible uses the mounted private key configured in:
 
 ```text
-ansible/group_vars/k3s_cluster.yml
+ansible/inventory/group_vars/k3s_cluster.yml
 ```
 
 The expected key path inside the container is currently:

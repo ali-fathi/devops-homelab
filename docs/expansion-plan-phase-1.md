@@ -479,16 +479,16 @@ all
                            k3s-worker2   (192.168.178.82)
 ```
 
-Node-level variables (`ansible_user`, SSH key, `become`, Python interpreter) remain in `group_vars/k3s_cluster.yml` — inherited by every host in the group.
+Node-level variables (`ansible_user`, SSH key, `become`, Python interpreter) remain in `inventory/group_vars/k3s_cluster.yml` — inherited by every host in the group.
 
 ## Where the connection variables live
 
 Not in the inventory — in **group variables**:
 
 ```yaml
-# ansible/group_vars/k3s_cluster.yml
+# ansible/inventory/group_vars/k3s_cluster.yml
 ansible_user: ansible                                # SSH user
-ansible_ssh_private_key_file: /home/vscode/.ssh/my_ansible_homelab  # key
+ansible_ssh_private_key_file: "{{ lookup('env', 'HOME') }}/.ssh/my_ansible_homelab"  # key
 ansible_become: true                                 # sudo
 ansible_become_method: sudo
 ansible_python_interpreter: /usr/bin/python3
