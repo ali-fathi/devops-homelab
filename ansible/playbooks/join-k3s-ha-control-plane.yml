@@ -38,16 +38,14 @@
       delegate_to: "{{ groups['k3s_master'] | first }}"
       register: k3s_primary_version
       changed_when: false
-      run_once: true
 
     - name: Require the target K3s version to match the existing server
       ansible.builtin.assert:
         that:
-          - k3s_version in k3s_primary_version.stdout
+          - "k3s_version in k3s_primary_version.stdout"
         fail_msg: >-
           Existing server version does not match k3s_version={{ k3s_version }}.
           Update the reviewed group variable instead of joining mixed versions.
-      run_once: true
 
     - name: Inspect local K3s installation state
       ansible.builtin.stat:
