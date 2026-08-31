@@ -35,5 +35,8 @@ k3s_server_prerequisite_packages:
     - curl
     - nfs-utils
     - iscsi-initiator-utils
+k3s_server_iscsi_service:
+  Debian: iscsid
+  RedHat: iscsid
 k3s_server_minimum_root_free_mb: 20480
 k3s_server_minimum_memory_mb: 4096

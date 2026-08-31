@@ -249,6 +249,13 @@ kubectl -n kube-system get pods -l app.kubernetes.io/name=kube-vip-ds -o wide
 ssh master@192.168.178.80 'ip addr show dev ens18 | grep -F 192.168.178.85'
 ```
 
+The mutation run installs only required packages, including the Longhorn iSCSI
+initiator (`open-iscsi` on Debian or `iscsi-initiator-utils` on Red Hat), enables
+its `iscsid` service, verifies `iscsiadm -V`, writes a root-only K3s
+configuration, installs the pinned K3s version, waits for Node Ready, waits for
+the Kube-VIP DaemonSet rollout, and verifies authenticated API readiness through
+the VIP.
+
 A plain unauthenticated curl can return `401 Unauthorized`; that still proves
 TCP/TLS reached the Kubernetes API. Use the authenticated `kubectl --raw`
 checks above as the readiness decision.
