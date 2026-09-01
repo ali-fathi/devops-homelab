@@ -15,12 +15,14 @@ readonly APPS=(
   loki
   alloy
   observability-config
+  csi-snapshotter
+  longhorn-config
   garmin
   ring-health-tracker
   health-dashboard
 )
 
-readonly POD_NAMESPACES=(argocd monitoring logging garmin ring-health health)
+readonly POD_NAMESPACES=(argocd kube-system longhorn-system monitoring logging garmin ring-health health)
 
 readonly PVC_NAMESPACES=(monitoring logging garmin ring-health)
 

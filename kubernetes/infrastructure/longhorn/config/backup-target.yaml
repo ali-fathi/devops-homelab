@@ -1,0 +1,12 @@
+apiVersion: longhorn.io/v1beta2
+kind: BackupTarget
+metadata:
+  name: default
+  namespace: longhorn-system
+  labels:
+    app.kubernetes.io/name: longhorn-backup-target
+    app.kubernetes.io/component: nfs-backup
+spec:
+  backupTargetURL: "nfs://192.168.178.120:/srv/longhorn_backups"
+  credentialSecret: ""
+  pollInterval: "300s"

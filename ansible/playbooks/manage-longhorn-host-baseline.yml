@@ -1,0 +1,96 @@
+---
+# Manage host prerequisites required by Longhorn on every K3s node.
+#
+# This playbook does not reboot, drain, or stop K3s. It installs only the
+# reviewed prerequisite packages, keeps iscsid enabled, and disables multipathd
+# after confirming that no multipath maps are active.
+#
+# Required invocation (from ansible/):
+# ansible-playbook playbooks/manage-longhorn-host-baseline.yml -e longhorn_host_baseline_confirm=true
+
+- name: Manage Longhorn host storage baseline
+  hosts: k3s_cluster
+  become: true
+  gather_facts: true
+  serial: 1
+
+  vars:
+    longhorn_host_baseline_confirm: false
+
+  pre_tasks:
+    - name: Require explicit confirmation for host baseline changes
+      ansible.builtin.assert:
+        that:
+          - longhorn_host_baseline_confirm | bool
+        fail_msg: >-
+          Set longhorn_host_baseline_confirm=true only after reviewing the
+          host package and multipathd changes. No reboot or node drain is used.
+
+    - name: Require a supported OS package family
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.os_family in k3s_server_prerequisite_packages
+          - ansible_facts.os_family in k3s_server_iscsi_service
+        fail_msg: "Unsupported OS family {{ ansible_facts.os_family }} for Longhorn host prerequisites."
+
+    - name: Inspect active multipath maps before changing multipathd
+      ansible.builtin.command:
+        argv:
+          - multipath
+          - -ll
+      register: longhorn_multipath_maps
+      changed_when: false
+      failed_when: false
+
+    - name: Refuse to disable multipathd when maps are active
+      ansible.builtin.assert:
+        that:
+          - longhorn_multipath_maps.stdout | trim == ''
+        fail_msg: >-
+          Active multipath maps were detected on {{ inventory_hostname }}.
+          Do not disable multipathd; evacuate storage workloads and investigate first.
+
+  tasks:
+    - name: Install reviewed Longhorn host prerequisites without upgrading the host
+      ansible.builtin.package:
+        name: "{{ k3s_server_prerequisite_packages[ansible_facts.os_family] }}"
+        state: present
+
+    - name: Enable and start the iSCSI service required by Longhorn
+      ansible.builtin.systemd:
+        name: "{{ k3s_server_iscsi_service[ansible_facts.os_family] }}"
+        enabled: true
+        state: started
+
+    - name: Verify the iSCSI initiator is available
+      ansible.builtin.command:
+        argv:
+          - iscsiadm
+          - -V
+      changed_when: false
+
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Disable multipathd when the service is installed
+      ansible.builtin.systemd:
+        name: multipathd
+        enabled: false
+        state: stopped
+      when: "'multipathd.service' in ansible_facts.services or 'multipathd' in ansible_facts.services"
+
+    - name: Verify multipathd is inactive when installed
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - is-active
+          - multipathd
+      register: longhorn_multipathd_state
+      changed_when: false
+      failed_when: false
+
+    - name: Require multipathd to be inactive
+      ansible.builtin.assert:
+        that:
+          - longhorn_multipathd_state.rc != 0 or longhorn_multipathd_state.stdout | trim == 'inactive'
+        fail_msg: "multipathd remains active on {{ inventory_hostname }}."

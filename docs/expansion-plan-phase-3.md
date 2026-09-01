@@ -45,7 +45,7 @@ To:
 | **3.5** GitOps chain proof | Complete | Metadata-only child Application change reconciled through the root Application | `health-dashboard.yaml` |
 | **3.6** Helm render CI gate | Verified | CI renders the exact pinned observability Helm charts and values | `.github/workflows/kubernetes-validate.yaml`, GitHub Actions run `31790818607` |
 | **3.7** Deployment health gates | Verified | Reusable post-sync verification for applications, Pods, PVCs, endpoints, metrics, logs, and alerts | `scripts/verify-gitops-health.sh`, `docs/runbooks/gitops-post-sync-verification.md` |
-| **3.8** Backup/restore rehearsal | Implemented; live rehearsal required | Prove external-backup recovery before enabling pruning or larger upgrades | `scripts/rehearse-longhorn-backup-restore.sh`, `docs/runbooks/longhorn-backup-restore-rehearsal.md` |
+| **3.8** Backup/restore rehearsal | Verified 2026-09-01 | Prove external-backup recovery before enabling pruning or larger upgrades | `scripts/rehearse-longhorn-backup-restore.sh`, `docs/runbooks/longhorn-backup-restore-rehearsal.md` |
 
 ## Task 3.1 — Observability convergence ✅
 
@@ -312,9 +312,9 @@ The script should return a non-zero status when an expected resource is unhealth
 
 ## Task 3.8 — Backup and restore rehearsal 🟡
 
-An isolated, opt-in Longhorn rehearsal is implemented in `scripts/rehearse-longhorn-backup-restore.sh`. The planned external target is a dedicated Synology NFSv4.1 share, prepared with `ansible/playbooks/prepare-longhorn-synology-nfs.yml` and configured only through the guarded `scripts/configure-longhorn-synology-nfs-backup-target.sh`. The rehearsal records non-secret PVC/Longhorn inventory, writes a deterministic fixture to a new test PVC, creates an external backup with a CSI `VolumeSnapshotClass` (`type: bak`), restores a second new PVC, and verifies equal SHA-256 checksums. The NAS setup is documented in [Synology NFS Backup Target for Longhorn](runbooks/synology-nfs-longhorn-backup-target-setup.md); recovery, cleanup, rollback, and RPO/RTO guidance is in [Longhorn Backup and Restore Rehearsal](runbooks/longhorn-backup-restore-rehearsal.md).
+An isolated, opt-in Longhorn rehearsal is implemented in `scripts/rehearse-longhorn-backup-restore.sh`. The configured external target is `nfs://192.168.178.120:/srv/longhorn_backups` using a dedicated NFSv4.1 share, prepared with `ansible/playbooks/prepare-longhorn-synology-nfs.yml` and configured only through the guarded `scripts/configure-longhorn-synology-nfs-backup-target.sh`. The rehearsal records non-secret PVC/Longhorn inventory, writes a deterministic fixture to a new test PVC, creates an external backup with a CSI `VolumeSnapshotClass` (`type: bak`), restores a second new PVC, and verifies equal SHA-256 checksums. The NAS setup is documented in [Synology NFS Backup Target for Longhorn](runbooks/synology-nfs-longhorn-backup-target-setup.md); recovery, cleanup, rollback, and RPO/RTO guidance is in [Longhorn Backup and Restore Rehearsal](runbooks/longhorn-backup-restore-rehearsal.md).
 
-It is not verified until the default external Longhorn `BackupTarget` is available and a live run returns `[PASS]`. Do not enable pruning on stateful Applications before that live evidence is recorded.
+The default external Longhorn `BackupTarget` is configured as `nfs://192.168.178.120:/srv/longhorn_backups` and reports available. The matching CSI snapshot CRDs/controller are installed and a live run returned `[PASS]` on 2026-09-01. Evidence is recorded at `artifacts/longhorn-rehearsal/20260901151703-11241/result.txt`: source/restored SHA-256 matched, backup duration was 11 seconds, and observed RTO was 77 seconds. Do not enable stateful pruning until workload-specific restore procedures are also reviewed.
 
 The rehearsal should cover at least one non-production or low-risk recovery path:
 
@@ -372,8 +372,8 @@ A task is only **verified** after its intended end-to-end behavior has been obse
 [ ] Git -> root -> child Application reconciliation is proven.
 [x] Helm render CI job is green in GitHub Actions (run 31790818607).
 [ ] Read-only post-sync health gate exists and is tested.
-[ ] Stateful backup and restore rehearsal is documented and tested.
-[ ] Pruning remains disabled until restore is proven.
+[x] Stateful backup and restore rehearsal is documented and tested.
+[x] Pruning remains disabled until restore is proven.
 ```
 
 ## Related documentation

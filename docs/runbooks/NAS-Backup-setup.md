@@ -2,7 +2,7 @@
 
 > **Resume point for Synology NAS + Longhorn backup setup.**
 >
-> Do not run these steps until the Synology NAS is ready. This repository is prepared; no NAS, K3s-node, Longhorn BackupTarget, or existing application data has been changed by the preparation work.
+> The live Longhorn target is configured as `nfs://192.168.178.120:/srv/longhorn_backups`. Complete the node probe and restore rehearsal before relying on it for disaster recovery.
 
 ## Exact setup order
 
@@ -28,15 +28,15 @@ Required intended state:
 ```text
 Dedicated shared folder: longhorn-backups
 NFS version: NFSv4.1
-Allowed K3s clients only: 192.168.178.80, .81, .82, .83, .84
-Longhorn target form: nfs://<synology-ip-or-dns>:/volume1/longhorn-backups
+Allowed K3s clients only: 192.168.178.80, 192.168.178.81, 192.168.178.82, 192.168.178.83, 192.168.178.84
+Longhorn target: nfs://192.168.178.120:/srv/longhorn_backups
 Kubernetes credential Secret: none (NFS export ACL controls access)
 ```
 
 ## Step 2 — Test every K3s node's NFS access
 
 ```bash
-cd ansible && ansible-playbook playbooks/prepare-longhorn-synology-nfs.yml -e longhorn_nfs_confirm=true -e longhorn_nfs_backup_server=<synology-ip-or-dns> -e longhorn_nfs_backup_export=/volume1/longhorn-backups -e longhorn_nfs_run_probe=true
+cd ansible && ansible-playbook playbooks/prepare-longhorn-synology-nfs.yml -e longhorn_nfs_confirm=true -e longhorn_nfs_backup_server=192.168.178.120 -e longhorn_nfs_backup_export=/srv/longhorn_backups -e longhorn_nfs_run_probe=true
 ```
 
 Do not continue unless `.80`, `.81`, `.82`, `.83`, and `.84` each pass the temporary NFSv4.1 mount/write/remove/unmount probe.
@@ -44,7 +44,7 @@ Do not continue unless `.80`, `.81`, `.82`, `.83`, and `.84` each pass the tempo
 ## Step 3 — Configure Longhorn
 
 ```bash
-./scripts/configure-longhorn-synology-nfs-backup-target.sh --server <synology-ip-or-dns> --export /volume1/longhorn-backups --confirm
+./scripts/configure-longhorn-synology-nfs-backup-target.sh --server 192.168.178.120 --export /srv/longhorn_backups --confirm
 ```
 
 If another non-empty Longhorn target already exists, inspect it first and use `--replace-default` only after confirming replacement is intended.
@@ -85,7 +85,7 @@ artifacts/longhorn-rehearsal/<run-id>/result.txt
 Never use an application PVC as the first rehearsal source.
 Never print or commit NAS credentials or Kubernetes Secret values.
 Never use a Kubernetes PVC or Longhorn disk as the backup target.
-Never permit the whole LAN when only the three K3s node IPs are needed.
+Never permit the whole LAN when only the five K3s node IPs are needed.
 Never let NAS cleanup delete individual Longhorn backup objects.
 Never enable stateful Argo CD pruning until the rehearsal has passed and evidence is recorded.
 ```

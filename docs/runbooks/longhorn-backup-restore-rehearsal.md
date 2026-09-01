@@ -5,8 +5,8 @@ This runbook performs Phase 3 Task 3.8 without touching an application PVC. It p
 ## Status
 
 ```text
-Task status: implemented; live rehearsal required for verification
-Longhorn chart assumed by this runbook: 1.12.0
+Task status: verified with a live rehearsal on 2026-09-01
+Longhorn chart assumed by this runbook: 1.12.1
 Test scope: isolated 1 GiB Longhorn PVC and deterministic non-secret fixture
 ```
 
@@ -51,7 +51,7 @@ Operator workstation
 |---|---|---|
 | Longhorn Helm release | Terraform | Chart version is pinned in `terraform/longhorn.tf`. |
 | Existing application PVCs and volumes | Their workload/controller | This rehearsal must not modify them. |
-| Synology NFS export and ACL | NAS operator | Dedicated share, NFSv4.1, and access only from the five K3s nodes; no Kubernetes credential Secret is used. |
+| Synology NFS export and ACL | NAS operator | Dedicated share `/srv/longhorn_backups`, NFSv4.1, and access only from the five K3s nodes; no Kubernetes credential Secret is used. |
 | Longhorn `BackupTarget` | Explicit operator configuration script | Must be named `default`, point at the reviewed Synology NFS export, and report `status.available: true`. |
 | Rehearsal namespace, PVCs, Pods, VolumeSnapshot, and VolumeSnapshotClass | Explicit operator script | Created with a unique run ID; not Argo CD or Terraform managed. |
 | Evidence files | Operator workstation | Written beneath ignored `artifacts/longhorn-rehearsal/`; no secret values or full backup URL are recorded. |
@@ -60,7 +60,7 @@ Operator workstation
 
 This homelab uses a dedicated Synology NFSv4.1 share as the external backupstore. The NAS must be separate from the K3s nodes and Longhorn disks; a Longhorn volume, node-local path, or PVC is not a disaster-recovery target. NFS access is controlled by the Synology export ACL, so this target uses no Kubernetes credential Secret.
 
-Complete [Synology NFS Backup Target for Longhorn](synology-nfs-longhorn-backup-target-setup.md) before this rehearsal. It covers DSM shared-folder and NFSv4.1 setup, the restricted `.80`, `.81`, and `.82` node ACL, per-node mount/write validation, guarded BackupTarget configuration, failure handling, and a second-copy strategy.
+Complete [Synology NFS Backup Target for Longhorn](synology-nfs-longhorn-backup-target-setup.md) before this rehearsal. It covers DSM shared-folder and NFSv4.1 setup, the restricted `.80`, `.81`, `.82`, `.83`, and `.84` node ACL, per-node mount/write validation, guarded BackupTarget configuration, failure handling, and a second-copy strategy.
 
 Longhorn manages backup retention itself. Do **not** add a NAS lifecycle/cleanup task that independently deletes individual Longhorn backup objects, because it can break incremental backup chains.
 
@@ -265,7 +265,7 @@ docs/expansion-plan-phase-3.md
 
 ## References
 
-- Longhorn 1.12.0: [Create a Backup](https://longhorn.io/docs/1.12.0/snapshots-and-backups/backup-and-restore/create-a-backup/)
-- Longhorn 1.12.0: [Restore from a Backup](https://longhorn.io/docs/1.12.0/snapshots-and-backups/backup-and-restore/restore-from-a-backup/)
-- Longhorn 1.12.0: [CSI VolumeSnapshot Associated with Longhorn Backup](https://longhorn.io/docs/1.12.0/snapshots-and-backups/csi-snapshot-support/csi-volume-snapshot-associated-with-longhorn-backup/)
-- Longhorn 1.12.0: [Set a Backup Target](https://longhorn.io/docs/1.12.0/snapshots-and-backups/backup-and-restore/set-backup-target/)
+- Longhorn 1.12.1: [Create a Backup](https://longhorn.io/docs/1.12.1/snapshots-and-backups/backup-and-restore/create-a-backup/)
+- Longhorn 1.12.1: [Restore from a Backup](https://longhorn.io/docs/1.12.1/snapshots-and-backups/backup-and-restore/restore-from-a-backup/)
+- Longhorn 1.12.1: [CSI VolumeSnapshot Associated with Longhorn Backup](https://longhorn.io/docs/1.12.1/snapshots-and-backups/csi-snapshot-support/csi-volume-snapshot-associated-with-longhorn-backup/)
+- Longhorn 1.12.1: [Set a Backup Target](https://longhorn.io/docs/1.12.1/snapshots-and-backups/backup-and-restore/set-backup-target/)

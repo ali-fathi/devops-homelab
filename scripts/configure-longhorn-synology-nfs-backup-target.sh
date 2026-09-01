@@ -124,7 +124,7 @@ metadata:
 spec:
   backupTargetURL: "${target_url}"
   credentialSecret: ""
-  pollInterval: "${POLL_INTERVAL}"
+  pollInterval: "${POLL_INTERVAL}s"
 EOF
 
 deadline=$((SECONDS + TIMEOUT_SECONDS))
