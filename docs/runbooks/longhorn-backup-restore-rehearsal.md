@@ -64,6 +64,23 @@ Complete [Synology NFS Backup Target for Longhorn](synology-nfs-longhorn-backup-
 
 Longhorn manages backup retention itself. Do **not** add a NAS lifecycle/cleanup task that independently deletes individual Longhorn backup objects, because it can break incremental backup chains.
 
+### Scheduled protection
+
+The GitOps-managed Longhorn recurring jobs provide the baseline protection:
+
+| Job | Schedule | Retention | Scope |
+|---|---|---:|---|
+| `weekly-volume-backup-2week` | Sundays at 01:00 | 2 backups | Every volume in the `default` group |
+| `weekly-system-backup-2week` | Sundays at 01:30 | 2 system backups | Longhorn Settings, CRDs, PV/PVC metadata, volumes, recurring jobs, and related Longhorn resources |
+
+The system backup uses `volume-backup-policy: if-not-present` and the default external BackupTarget. The volume job is the authoritative weekly data backup; the system job protects Longhorn configuration and records the volume-backup references needed for system recovery. Longhorn does not back up Kubernetes Nodes, application Secrets, or arbitrary application resources. Keep Git/Argo CD as the source of truth for manifests and the external secret manager as the source of truth for credentials.
+
+Verify the declared jobs and non-secret target status before relying on them:
+
+```bash
+kubectl -n longhorn-system get recurringjobs.longhorn.io weekly-volume-backup-2week weekly-system-backup-2week -o custom-columns='NAME:.metadata.name,TASK:.spec.task,CRON:.spec.cron,RETAIN:.spec.retain,GROUPS:.spec.groups'
+```
+
 Verify only non-secret target status before starting:
 
 ```bash

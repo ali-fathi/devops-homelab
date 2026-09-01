@@ -32,6 +32,8 @@ Longhorn provides:
 - Replicated Storage
 - Snapshots
 - Backups
+- Weekly recurring volume backups with two-backup retention
+- Weekly Longhorn system/configuration backups with two-backup retention
 - Volume Expansion
 - High Availability
 - Web Management UI

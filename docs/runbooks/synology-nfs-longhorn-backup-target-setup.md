@@ -225,7 +225,9 @@ Wait for BackupTarget/default to return available: true before retrying a backup
 
 ### Retention and second copy
 
-Longhorn controls deletion of individual backup objects and incremental chains. Keep Longhorn's own backup retention as the authoritative lifecycle. If you add Synology Snapshot Replication, Hyper Backup, immutable snapshots, or a second NAS/cloud copy, apply it to the dedicated share as a secondary copy and test recovery separately. Never assume a NAS replication job proves that Longhorn can restore a volume.
+Longhorn controls deletion of individual backup objects and incremental chains. The GitOps-managed schedule takes a volume backup every Sunday at 01:00 and retains two backups per volume. A Longhorn system backup runs at 01:30, also retaining two copies; it protects Longhorn Settings, recurring jobs, CRDs, and storage metadata. Keep Longhorn's own backup retention as the authoritative lifecycle.
+
+If you add Synology Snapshot Replication, Hyper Backup, immutable snapshots, or a second NAS/cloud copy, apply it to the dedicated share as a secondary copy and test recovery separately. Never assume a NAS replication job proves that Longhorn can restore a volume.
 
 ## Files added for deferred Synology setup
 
@@ -238,6 +240,12 @@ scripts/configure-longhorn-synology-nfs-backup-target.sh
 
 kubernetes/infrastructure/longhorn/backup-target-synology-nfs.yaml.template
   Human-review template; intentionally not directly applicable.
+
+kubernetes/infrastructure/longhorn/config/recurringjob-weekly-volume-backup.yaml
+  Weekly backup for all volumes in the default group; retains two backups.
+
+kubernetes/infrastructure/longhorn/config/recurringjob-weekly-system-backup.yaml
+  Weekly Longhorn system/configuration backup; retains two backups.
 
 scripts/rehearse-longhorn-backup-restore.sh
   Existing isolated end-to-end backup/restore proof after target setup.
