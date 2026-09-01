@@ -1097,9 +1097,28 @@ spec:
         app.kubernetes.io/name: snapshot-controller
     spec:
       serviceAccountName: snapshot-controller
+      securityContext:
+        runAsUser: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: snapshot-controller
           image: registry.k8s.io/sig-storage/snapshot-controller:v8.5.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
           args:
             - "--v=5"
             - "--leader-election=true"
