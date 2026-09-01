@@ -1,0 +1,18 @@
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: weekly-volume-backup-2week
+  namespace: longhorn-system
+  labels:
+    app.kubernetes.io/name: longhorn-recurring-backup
+    app.kubernetes.io/component: volume-backup
+spec:
+  name: weekly-volume-backup-2week
+  task: backup
+  cron: "0 1 * * SUN"
+  retain: 2
+  concurrency: 1
+  groups:
+    - default
+  labels: {}
+  parameters: {}
