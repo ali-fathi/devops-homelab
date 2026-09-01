@@ -3,8 +3,8 @@
 #
 # Required invocation (from ansible/):
 # ansible-playbook playbooks/prepare-longhorn-synology-nfs.yml -e longhorn_nfs_confirm=true
-#   -e longhorn_nfs_backup_server=<synology-ip-or-dns>
-#   -e longhorn_nfs_backup_export=/volume1/longhorn-backups -e longhorn_nfs_run_probe=true
+#   -e longhorn_nfs_backup_server=192.168.178.120
+#   -e longhorn_nfs_backup_export=/srv/longhorn_backups -e longhorn_nfs_run_probe=true
 #
 # The optional probe mounts the export briefly on each node, writes and removes
 # a unique empty probe file, then unmounts it. It does not expose credentials.
@@ -44,6 +44,12 @@
     - name: Verify the NFS export on this node
       when: longhorn_nfs_run_probe | bool
       block:
+        - name: Create the NFS probe parent directory
+          ansible.builtin.file:
+            path: "{{ longhorn_nfs_mount_root }}"
+            state: directory
+            mode: "0755"
+
         - name: Create an isolated temporary mount directory
           ansible.builtin.tempfile:
             state: directory
@@ -85,7 +91,9 @@
           register: longhorn_nfs_mountpoint
           changed_when: false
           failed_when: false
-          when: longhorn_nfs_probe_directory is defined
+          when:
+            - longhorn_nfs_probe_directory is defined
+            - longhorn_nfs_probe_directory.path is defined
 
         - name: Unmount the temporary NFS probe directory
           ansible.builtin.command:
@@ -94,6 +102,7 @@
               - "{{ longhorn_nfs_probe_directory.path }}"
           when:
             - longhorn_nfs_probe_directory is defined
+            - longhorn_nfs_probe_directory.path is defined
             - longhorn_nfs_mountpoint.rc == 0
           changed_when: true
 
@@ -101,4 +110,6 @@
           ansible.builtin.file:
             path: "{{ longhorn_nfs_probe_directory.path }}"
             state: absent
-          when: longhorn_nfs_probe_directory is defined
+          when:
+            - longhorn_nfs_probe_directory is defined
+            - longhorn_nfs_probe_directory.path is defined

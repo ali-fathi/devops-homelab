@@ -144,7 +144,7 @@ This is an explicit, guarded **mutating** setup helper for a dedicated Synology 
 Run only after DSM NFS permissions and the all-node NFS mount/write probe pass:
 
 ```bash
-./scripts/configure-longhorn-synology-nfs-backup-target.sh --server <synology-ip-or-dns> --export /volume1/longhorn-backups --confirm
+./scripts/configure-longhorn-synology-nfs-backup-target.sh --server 192.168.178.120 --export /srv/longhorn_backups --confirm
 ```
 
 Full NAS, node, target, recovery, and maintenance instructions:

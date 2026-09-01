@@ -17,6 +17,6 @@ module "longhorn" {
   release_name  = "longhorn"
   repository    = "https://charts.longhorn.io"
   chart         = "longhorn"
-  chart_version = "1.12.0" # pinned from live: helm list -n longhorn-system (longhorn-1.12.0)
+  chart_version = "1.12.1" # pinned from live: helm list -n longhorn-system (longhorn-1.12.1)
   namespace     = "longhorn-system"
 }

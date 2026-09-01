@@ -701,7 +701,21 @@ docs/runbooks/synology-nfs-longhorn-backup-target-setup.md
 From `ansible/`, run only after the Synology shared folder, NFSv4.1 service, and per-node export ACL are configured:
 
 ```bash
-ansible-playbook playbooks/prepare-longhorn-synology-nfs.yml -e longhorn_nfs_confirm=true -e longhorn_nfs_backup_server=<synology-ip-or-dns> -e longhorn_nfs_backup_export=/volume1/longhorn-backups -e longhorn_nfs_run_probe=true
+ansible-playbook playbooks/prepare-longhorn-synology-nfs.yml -e longhorn_nfs_confirm=true -e longhorn_nfs_backup_server=192.168.178.120 -e longhorn_nfs_backup_export=/srv/longhorn_backups -e longhorn_nfs_run_probe=true
+```
+
+# Longhorn Host Storage Baseline
+
+The Longhorn host baseline is managed explicitly by Ansible. It installs the reviewed iSCSI/NFS prerequisites, keeps `iscsid` enabled, verifies that no multipath maps are active, and disables `multipathd` without rebooting or draining nodes:
+
+```text
+ansible/playbooks/manage-longhorn-host-baseline.yml
+```
+
+Run it only after reviewing the maintenance impact:
+
+```bash
+ansible-playbook playbooks/manage-longhorn-host-baseline.yml -e longhorn_host_baseline_confirm=true
 ```
 
 # Detailed Health Check

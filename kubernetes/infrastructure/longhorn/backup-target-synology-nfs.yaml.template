@@ -1,7 +1,7 @@
 # TEMPLATE ONLY — do not apply until the Synology export and node mount probe pass.
 #
 # Generate the live BackupTarget with:
-# ./scripts/configure-longhorn-synology-nfs-backup-target.sh --server <synology-ip-or-dns> --export /volume1/longhorn-backups --confirm
+# ./scripts/configure-longhorn-synology-nfs-backup-target.sh --server 192.168.178.120 --export /srv/longhorn_backups --confirm
 #
 # This file intentionally has a .template extension and is not GitOps- or
 # Terraform-managed. It contains no credentials because NFS uses export access
@@ -12,6 +12,6 @@ metadata:
   name: default
   namespace: longhorn-system
 spec:
-  backupTargetURL: "nfs://<synology-ip-or-dns>:/volume1/longhorn-backups"
+  backupTargetURL: "nfs://192.168.178.120:/srv/longhorn_backups"
   credentialSecret: ""
-  pollInterval: "300"
+  pollInterval: "300s"

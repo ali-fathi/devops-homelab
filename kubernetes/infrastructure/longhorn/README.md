@@ -270,7 +270,7 @@ Snapshots and backup targets are not sufficient evidence of recoverability. Befo
 ./scripts/rehearse-longhorn-backup-restore.sh --confirm --cleanup
 ```
 
-The BackupTarget must be external and available before running it. This homelab's planned target is a dedicated Synology NFSv4.1 share, restricted to the three K3s node IPs; it uses no Kubernetes credential Secret. Complete the NAS, node mount-probe, and guarded target setup first:
+The BackupTarget must be external and available before running it. This homelab uses the dedicated NFSv4.1 target `nfs://192.168.178.120:/srv/longhorn_backups`, restricted to the five K3s node IPs; it uses no Kubernetes credential Secret. Complete the NAS, node mount-probe, and guarded target setup first:
 
 ```text
 docs/runbooks/synology-nfs-longhorn-backup-target-setup.md

@@ -5,8 +5,8 @@ Use this runbook when you are ready to configure the Synology NAS as Longhorn's 
 ## Status and scope
 
 ```text
-Status: implementation ready; NAS and live-cluster configuration pending
-Longhorn release: chart 1.12.0
+Status: NFS target configured and available; live backup/restore rehearsal pending
+Longhorn release: chart 1.12.1
 Protocol: NFSv4.1
 Longhorn target: longhorn-system/BackupTarget named default
 ```
@@ -43,8 +43,8 @@ Record these non-secret values in your operator notes. Do not add them to a cred
 |---|---|---|
 | Synology name/IP | A DHCP-reserved LAN IP or internal DNS name | The backup target must remain reachable after router/DHCP changes. |
 | Dedicated shared folder | `longhorn-backups` | Prevents Longhorn retention from mixing with personal, media, or Terraform-state files. |
-| Export path | Usually `/volume1/longhorn-backups` | This is the path DSM displays for the NFS export; confirm it in DSM. |
-| NFS clients | `192.168.178.80`, `192.168.178.81`, `192.168.178.82`, `192.168.178.83`, `192.168.178.84` | Least privilege: only K3s nodes may mount the backup share. |
+| Export path | `/srv/longhorn_backups` | Confirm this is the exported path on `192.168.178.120`. |
+| NFS clients | `192.168.178.80` through `192.168.178.84` | Least privilege: only the five K3s nodes may mount the backup share. |
 | NFS version | NFSv4.1 | Required/supported by Longhorn backup operations. |
 | Longhorn target name | `default` | The rehearsal script intentionally uses only the default target. |
 | Poll interval | `300` seconds initially | Reasonable discovery interval for a small homelab; adjust after observation. |
@@ -52,7 +52,7 @@ Record these non-secret values in your operator notes. Do not add them to a cred
 The final target has this form:
 
 ```text
-nfs://<synology-ip-or-dns>:/volume1/longhorn-backups
+nfs://192.168.178.120:/srv/longhorn_backups
 ```
 
 The `nfs://` scheme, server, colon, and absolute export path are all required. Do not point it at `/volume1/homes`, a USB share, a mounted cloud folder, an in-cluster MinIO service, a Kubernetes PVC, or the Terraform-state location.
@@ -67,7 +67,7 @@ The `nfs://` scheme, server, colon, and absolute export path are all required. D
 4. Name the share `longhorn-backups`.
 5. Keep the share dedicated to Longhorn backups; do not put personal, application, or Terraform files in it.
 6. Enable encryption at rest if it is operationally appropriate for this NAS and you have documented how the encryption key is recovered after NAS restart.
-7. Record the displayed path, commonly `/volume1/longhorn-backups`.
+7. Confirm the exported path is `/srv/longhorn_backups`.
 
 If the NAS uses Btrfs, Synology snapshots of the **whole dedicated share** can provide a secondary recovery layer. Do not configure a NAS lifecycle/cleanup task that deletes individual Longhorn files: incremental backup chains are managed by Longhorn and can be damaged by independent deletion.
 
@@ -110,10 +110,10 @@ From the repository root, check Ansible connectivity:
 cd ansible && ansible k3s_cluster -m ping
 ```
 
-Run the prepare-and-probe playbook after substituting the NAS address and confirmed DSM export path. The command is intentionally explicit and mutating only on the five K3s nodes and the dedicated NAS share:
+Run the prepare-and-probe playbook after confirming the NFS export. The command is intentionally explicit and mutating only on the five K3s nodes and the dedicated NAS share:
 
 ```bash
-cd ansible && ansible-playbook playbooks/prepare-longhorn-synology-nfs.yml -e longhorn_nfs_confirm=true -e longhorn_nfs_backup_server=<synology-ip-or-dns> -e longhorn_nfs_backup_export=/volume1/longhorn-backups -e longhorn_nfs_run_probe=true
+cd ansible && ansible-playbook playbooks/prepare-longhorn-synology-nfs.yml -e longhorn_nfs_confirm=true -e longhorn_nfs_backup_server=192.168.178.120 -e longhorn_nfs_backup_export=/srv/longhorn_backups -e longhorn_nfs_run_probe=true
 ```
 
 Expected per-node result:
@@ -155,7 +155,7 @@ kubernetes/infrastructure/longhorn/backup-target-synology-nfs.yaml.template
 Do not apply the template directly; it intentionally contains placeholders. Use the guarded script after the node probe passes:
 
 ```bash
-./scripts/configure-longhorn-synology-nfs-backup-target.sh --server <synology-ip-or-dns> --export /volume1/longhorn-backups --confirm
+./scripts/configure-longhorn-synology-nfs-backup-target.sh --server 192.168.178.120 --export /srv/longhorn_backups --confirm
 ```
 
 If `default` already points to another non-empty target, inspect the existing non-secret metadata first:
@@ -167,7 +167,7 @@ kubectl get backuptargets.longhorn.io default -n longhorn-system -o json | jq '{
 Only after confirming that replacing it is intended, run:
 
 ```bash
-./scripts/configure-longhorn-synology-nfs-backup-target.sh --server <synology-ip-or-dns> --export /volume1/longhorn-backups --confirm --replace-default
+./scripts/configure-longhorn-synology-nfs-backup-target.sh --server 192.168.178.120 --export /srv/longhorn_backups --confirm --replace-default
 ```
 
 Expected result:
@@ -248,7 +248,7 @@ scripts/rehearse-longhorn-backup-restore.sh
 ```text
 [ ] Synology has a dedicated longhorn-backups share.
 [ ] NFSv4.1 is enabled on the NAS.
-[ ] Only 192.168.178.80, .81, .82, .83, and .84 have read/write NFS access.
+[ ] Only 192.168.178.80 through .84 have read/write NFS access.
 [ ] NFS client/probe passes on every K3s node.
 [ ] Longhorn BackupTarget/default reports available: true.
 [ ] The isolated backup/restore script returns [PASS].
