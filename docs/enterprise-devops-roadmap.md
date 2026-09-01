@@ -69,6 +69,8 @@ Use one registry lifecycle owner: Harbor once installed.
 
 Make operational recovery, capacity management, upgrades, and data retention routine rather than emergency-only procedures.
 
+Current backup baseline: Longhorn volume backups run every Sunday at 01:00 and retain two recovery points per volume; Longhorn system backups run at 01:30 and retain two configuration bundles. The policy is GitOps-managed and verified by `scripts/verify-gitops-health.sh`. Backup-freshness/failure alerting, application-specific restore drills, and a second/off-site NAS copy remain Phase 5 work.
+
 ### Task map
 
 | Task | Outcome | Technologies/patterns |

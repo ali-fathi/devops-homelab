@@ -241,6 +241,54 @@ check_daemonset() {
   fi
 }
 
+check_longhorn_backup_protection() {
+  local target_json volume_json bad_volumes volume_count
+  local volume_job system_job
+
+  if ! kubectl -n longhorn-system get backuptarget.longhorn.io default >/dev/null 2>&1; then
+    fail 'Longhorn BackupTarget/default is missing'
+    return
+  fi
+
+  target_json=$(kubectl -n longhorn-system get backuptarget.longhorn.io default -o json)
+  if jq -e '.status.available == true and (.spec.backupTargetURL // "") != ""' <<<"$target_json" >/dev/null; then
+    pass 'Longhorn BackupTarget/default is configured and available'
+  else
+    fail 'Longhorn BackupTarget/default is missing a target URL or is unavailable'
+  fi
+
+  volume_job=$(kubectl -n longhorn-system get recurringjob.longhorn.io weekly-volume-backup-2week -o json 2>/dev/null || true)
+  if jq -e '(.spec.task == "backup" and .spec.cron == "0 1 * * SUN" and .spec.retain == 2 and ((.spec.groups // []) | index("default") != null))' <<<"$volume_job" >/dev/null 2>&1; then
+    pass 'Longhorn weekly volume backup is scheduled for the default group with retain=2'
+  else
+    fail 'Longhorn weekly volume backup is missing or does not match the declared schedule/retention'
+  fi
+
+  system_job=$(kubectl -n longhorn-system get recurringjob.longhorn.io weekly-system-backup-2week -o json 2>/dev/null || true)
+  if jq -e '.spec.task == "system-backup" and .spec.cron == "30 1 * * SUN" and .spec.retain == 2 and .spec.parameters["volume-backup-policy"] == "if-not-present"' <<<"$system_job" >/dev/null 2>&1; then
+    pass 'Longhorn weekly system backup is scheduled with retain=2 and if-not-present volume policy'
+  else
+    fail 'Longhorn weekly system backup is missing or does not match the declared schedule/retention'
+  fi
+
+  volume_json=$(kubectl -n longhorn-system get volumes.longhorn.io -o json)
+  volume_count=$(jq '.items | length' <<<"$volume_json")
+  bad_volumes=$(jq -r '.items[] | select(.metadata.labels["recurring-job-group.longhorn.io/default"] != "enabled") | .metadata.name' <<<"$volume_json")
+  if (( volume_count > 0 )) && [[ -z "$bad_volumes" ]]; then
+    pass "all $volume_count Longhorn volume(s) are assigned to the default backup group"
+  elif (( volume_count == 0 )); then
+    fail 'Longhorn has no volumes assigned to the backup schedule'
+  else
+    fail "Longhorn volumes missing default backup-group label: $(tr '\n' ';' <<<"$bad_volumes")"
+  fi
+
+  if kubectl -n longhorn-system get recurringjob.longhorn.io 2week >/dev/null 2>&1; then
+    fail 'obsolete manually-created Longhorn recurring job 2week still exists'
+  else
+    pass 'obsolete manually-created Longhorn recurring job 2week is absent'
+  fi
+}
+
 main() {
   printf '%s\n' '=== Homelab GitOps post-sync health gate ==='
   printf '%s\n' 'Read-only: no resources will be changed.'
@@ -283,6 +331,9 @@ main() {
 
   printf '\n%s\n' '--- Control-plane networking ---'
   check_daemonset kube-system kube-vip-ds
+
+  printf '\n%s\n' '--- Longhorn backup protection ---'
+  check_longhorn_backup_protection
 
   printf '\n%s\n' '--- Observability resources ---'
   check_prometheus_resource prometheus monitoring-kube-prometheus-prometheus

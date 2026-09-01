@@ -65,7 +65,7 @@ The DevContainer is the preferred tool installation method because it provides a
 
 ## `verify-gitops-health.sh`
 
-This is the read-only post-sync platform health gate. It checks the root and child Argo CD Applications, Pod readiness, PVC binding, important Service endpoints, ExternalSecret readiness, and core monitoring/logging resources.
+This is the read-only post-sync platform health gate. It checks the root and child Argo CD Applications, Pod readiness, PVC binding, important Service endpoints, ExternalSecret readiness, core monitoring/logging resources, and Longhorn backup protection. The Longhorn checks verify the available external BackupTarget, exact weekly schedules and two-backup retention, default backup-group coverage for every volume, and removal of the obsolete manual job.
 
 Run:
 

@@ -24,6 +24,7 @@ ExternalSecret Ready conditions
 Prometheus and Alertmanager custom resources
 Loki StatefulSet readiness
 Alloy DaemonSet coverage
+Longhorn external BackupTarget availability and recurring backup protection
 ```
 
 It does not:
@@ -108,6 +109,8 @@ monitoring
 loki
 alloy
 observability-config
+csi-snapshotter
+longhorn-config
 garmin
 ring-health-tracker
 health-dashboard
@@ -159,7 +162,33 @@ docs/runbooks/argocd-app-outofsync.md
 docs/runbooks/argocd-comparison-error.md
 ```
 
-### 2. Pod readiness
+### 3. Longhorn backup protection
+
+The gate validates the non-secret Longhorn disaster-recovery controls that are
+managed by GitOps:
+
+```text
+BackupTarget/default exists, has a target URL, and reports available=true
+weekly-volume-backup-2week runs at 01:00 Sunday and retains 2 backups
+weekly-system-backup-2week runs at 01:30 Sunday and retains 2 system backups
+The system backup uses volume-backup-policy=if-not-present
+Every Longhorn volume has the default recurring-job-group label enabled
+The obsolete manually-created 2week job is absent
+```
+
+These checks prove that the protection policy is present; they do not wait for
+the next Sunday schedule. Use the backup/restore rehearsal and the Longhorn
+operation runbook for an end-to-end data restore test.
+
+Manual inspection without printing credentials:
+
+```bash
+kubectl -n longhorn-system get backuptarget.longhorn.io default -o json | jq '{available: .status.available, lastSyncedAt: .status.lastSyncedAt}'
+kubectl -n longhorn-system get recurringjobs.longhorn.io -o custom-columns='NAME:.metadata.name,TASK:.spec.task,CRON:.spec.cron,RETAIN:.spec.retain,GROUPS:.spec.groups'
+kubectl -n longhorn-system get volumes.longhorn.io -o custom-columns='VOLUME:.metadata.name,STATE:.status.state,ROBUSTNESS:.status.robustness,BACKUP-GROUP:.metadata.labels.recurring-job-group\\.longhorn\\.io/default'
+```
+
+### 4. Pod readiness
 
 Namespaces checked:
 
@@ -201,7 +230,7 @@ kubectl describe pod <pod-name> -n <namespace>
 kubectl logs <pod-name> -n <namespace> --all-containers --tail=100
 ```
 
-### 3. PersistentVolumeClaims
+### 5. PersistentVolumeClaims
 
 Namespaces checked:
 
@@ -240,7 +269,7 @@ For Longhorn, also inspect volume state before modifying a workload:
 kubectl get volumes.longhorn.io -n longhorn-system
 ```
 
-### 4. Service endpoints
+### 6. Service endpoints
 
 The script checks these workload-facing Services:
 
@@ -273,7 +302,7 @@ Workload has zero replicas
 Namespace or Service name is incorrect
 ```
 
-### 5. External Secrets
+### 7. External Secrets
 
 The gate checks that every discovered `ExternalSecret` has a condition:
 
@@ -308,7 +337,7 @@ Use the dedicated troubleshooting guide for failures:
 docs/runbooks/external-secrets-debug.md
 ```
 
-### 6. Observability custom resources and workloads
+### 8. Observability custom resources and workloads
 
 The gate verifies:
 

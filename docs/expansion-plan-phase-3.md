@@ -44,8 +44,8 @@ To:
 | **3.4** Root app-of-apps | Complete | One root Application manages all child Application objects | `bootstrap/root-application.yaml` |
 | **3.5** GitOps chain proof | Complete | Metadata-only child Application change reconciled through the root Application | `health-dashboard.yaml` |
 | **3.6** Helm render CI gate | Verified | CI renders the exact pinned observability Helm charts and values | `.github/workflows/kubernetes-validate.yaml`, GitHub Actions run `31790818607` |
-| **3.7** Deployment health gates | Verified | Reusable post-sync verification for applications, Pods, PVCs, endpoints, metrics, logs, and alerts | `scripts/verify-gitops-health.sh`, `docs/runbooks/gitops-post-sync-verification.md` |
-| **3.8** Backup/restore rehearsal | Verified 2026-09-01 | Prove external-backup recovery before enabling pruning or larger upgrades | `scripts/rehearse-longhorn-backup-restore.sh`, `docs/runbooks/longhorn-backup-restore-rehearsal.md` |
+| **3.7** Deployment health gates | Verified | Reusable post-sync verification for applications, Pods, PVCs, endpoints, metrics, logs, alerts, and Longhorn backup protection | `scripts/verify-gitops-health.sh`, `docs/runbooks/gitops-post-sync-verification.md` |
+| **3.8** Backup/restore rehearsal | Verified 2026-09-01 | Prove external-backup recovery before enabling pruning or larger upgrades; schedule weekly volume and system backups with two-point retention | `scripts/rehearse-longhorn-backup-restore.sh`, `docs/runbooks/longhorn-backup-restore-rehearsal.md`, `docs/runbooks/longhorn-recurring-backup-operations.md` |
 
 ## Task 3.1 — Observability convergence ✅
 
