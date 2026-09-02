@@ -401,7 +401,7 @@ the K3s restore procedure; it does not restore Longhorn volume bytes.
 Prometheus scrapes the Longhorn backend through the GitOps-managed
 `ServiceMonitor` in `kubernetes/observability/config/prometheusrules/longhorn-backup-monitoring.yaml`.
 The alert rules use Longhorn's documented backup metrics and the existing
-critical Telegram route:
+warning/critical Telegram route:
 
 ```text
 LonghornBackupMetricsMissing              scrape unavailable for 15 minutes
@@ -432,6 +432,44 @@ The rollout test confirmed five healthy Longhorn scrape targets, all backup
 metrics present, no active freshness/failure alerts after the current backups,
 and a temporary critical alert reached both Prometheus and Alertmanager before
 being removed.
+
+### Telegram delivery
+
+Alertmanager receives Prometheus alerts after their configured `for` period.
+Alerts labeled `severity=warning` or `severity=critical` are grouped by alert
+name and severity, wait one minute for grouping, and are sent to the Telegram
+receiver. Messages include the alert name, severity, summary, description,
+workload/volume context where available, and the runbook link. A resolved
+message is sent when the condition clears; repeated firing alerts are limited
+to one notification per 24 hours. `Watchdog` and unclassified alerts are not
+sent.
+
+The bot token and chat ID are mounted from the Azure Key Vault-backed
+`telegram-alerts` Secret. Confirm the integration without printing credentials:
+
+```bash
+kubectl -n monitoring get secret telegram-alerts
+kubectl -n monitoring get secret alertmanager-monitoring-kube-prometheus-alertmanager \\
+  -o jsonpath='{.data.alertmanager\\.yaml}' | base64 -d | grep -E \\
+  'receiver:|send_resolved|severity=~'
+```
+
+### Grafana dashboard
+
+Open Grafana and select **Homelab / Homelab - Cluster Health & Recovery**.
+The dashboard refreshes every 30 seconds and includes:
+
+```text
+Ready nodes, firing/pending alert names and labels, critical alert count,
+unavailable deployments, non-ready pods, Bound PVCs, BackupTarget status,
+system-backup age and state, oldest volume-backup age, healthy Longhorn volumes,
+node CPU/memory, Longhorn disk usage, and backup-age trends.
+```
+
+Its GitOps source is
+`kubernetes/observability/monitoring/dashboards/custom/homelab-cluster-health.json`
+and its automatically provisioned ConfigMap is
+`kubernetes/observability/config/homelab-cluster-health-dashboard.yaml`.
 
 ## Failure response
 
