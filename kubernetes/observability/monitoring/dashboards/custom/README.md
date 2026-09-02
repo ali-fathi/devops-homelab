@@ -27,6 +27,7 @@ dashboards/
 ├── README.md
 ├── homelab-kubernetes-overview.json
 ├── homelab-alerting-overview.json
+├── homelab-cluster-health.json
 └── homelab-loki-critical-error.json
 ```
 
@@ -308,6 +309,29 @@ Datasource:
 ```text
 Prometheus
 ```
+
+### Homelab Cluster Health & Recovery
+
+File:
+
+```text
+homelab-cluster-health.json
+```
+
+This dashboard is provisioned automatically from the GitOps-managed
+`homelab-cluster-health-dashboard` ConfigMap. It is the operational view for
+cluster health and backup recovery:
+
+```text
+Ready nodes, firing/pending alerts, critical alerts, unavailable deployments,
+non-ready pods, Bound PVCs, BackupTarget availability, system-backup age,
+oldest volume-backup age, healthy Longhorn volumes, volume backup age by PVC,
+system-backup state, node CPU/memory, Longhorn disk usage, and backup-age trends
+```
+
+Open it in Grafana under the **Homelab** folder. The alert table uses Prometheus
+`ALERTS` series, so it shows every active firing or pending alert with its name,
+state, severity, namespace, pod, and volume when those labels exist.
 
 Purpose:
 

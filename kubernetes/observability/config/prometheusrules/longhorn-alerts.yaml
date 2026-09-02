@@ -15,7 +15,13 @@ spec:
       rules:
 
         - alert: LonghornVolumeDegraded
-          expr: longhorn_volume_robustness != 2
+          # Longhorn exposes one-hot robustness series. Healthy is 1; the
+          # alert fires once no manager reports the volume as healthy. The
+          # max aggregation avoids one alert per Longhorn manager replica.
+          expr: |
+            max by (volume, pvc, pvc_namespace) (
+              longhorn_volume_robustness{state="healthy"}
+            ) == 0
           for: 5m
 
           labels:

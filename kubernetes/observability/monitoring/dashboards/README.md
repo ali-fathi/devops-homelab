@@ -30,6 +30,7 @@ Grafana will automatically download the dashboard.
 
 | Dashboard | ID | Purpose |
 |------------|------------|------------|
+| Homelab Cluster Health & Recovery | `homelab-cluster-health-recovery` | Cluster, alerts, backups, and critical system status |
 | Node Exporter Full | 1860 | Node metrics |
 | Kubernetes Cluster Monitoring | 7249 | Cluster overview |
 | Kubernetes Views Global | 15757 | Workloads and namespaces |
@@ -53,6 +54,12 @@ Custom dashboards are stored in:
 ```text
 custom/
 ```
+
+`homelab-cluster-health.json` is also wrapped as the GitOps-managed
+`homelab-cluster-health-dashboard` ConfigMap, so Grafana provisions it
+automatically in the **Homelab** folder. It is the primary dashboard for
+cluster status, active/pending alerts, Longhorn backup state and age, node
+resources, and storage capacity.
 
 Documentation includes:
 

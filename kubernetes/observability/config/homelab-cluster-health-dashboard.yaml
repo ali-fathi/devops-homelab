@@ -1,0 +1,229 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homelab-cluster-health-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: Homelab
+    homelab.devops/dashboard-source: kubernetes/observability/monitoring/dashboards/custom/homelab-cluster-health.json
+data:
+  homelab-cluster-health.json: |
+    {
+      "__inputs": [
+        {
+          "name": "DS_PROMETHEUS",
+          "label": "Prometheus",
+          "type": "datasource",
+          "pluginId": "prometheus",
+          "pluginName": "Prometheus"
+        }
+      ],
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {"type": "grafana", "uid": "-- Grafana --"},
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "editable": true,
+      "graphTooltip": 1,
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Ready Kubernetes Nodes",
+          "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "count(kube_node_status_condition{condition=\"Ready\",status=\"true\"})", "instant": true}],
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background", "graphMode": "none", "textMode": "auto", "justifyMode": "auto"},
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 5}]}}, "overrides": []}
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Firing Alerts",
+          "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "sum(ALERTS{alertstate=\"firing\",alertname!=\"Watchdog\"})", "instant": true}],
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background", "graphMode": "none", "textMode": "auto", "justifyMode": "auto"},
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []}
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Critical Firing Alerts",
+          "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "sum(ALERTS{alertstate=\"firing\",severity=\"critical\"})", "instant": true}],
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background", "graphMode": "none", "textMode": "auto", "justifyMode": "auto"},
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []}
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Unavailable Deployments",
+          "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "sum(kube_deployment_status_replicas_unavailable)", "instant": true}],
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background", "graphMode": "none", "textMode": "auto", "justifyMode": "auto"},
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []}
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "Bound PVCs",
+          "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "sum(kube_persistentvolumeclaim_status_phase{phase=\"Bound\"} == 1)", "instant": true}],
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background", "graphMode": "none", "textMode": "auto", "justifyMode": "auto"},
+          "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []}
+        },
+        {
+          "id": 6,
+          "type": "stat",
+          "title": "Non-Ready Pods",
+          "gridPos": {"h": 4, "w": 4, "x": 20, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "sum(kube_pod_status_phase{phase=~\"Pending|Failed\"} == 1)", "instant": true}],
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background", "graphMode": "none", "textMode": "auto", "justifyMode": "auto"},
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []}
+        },
+        {
+          "id": 7,
+          "type": "table",
+          "title": "Active and Pending Alerts",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 4},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "ALERTS{alertstate=~\"firing|pending\",alertname!=\"Watchdog\"}", "format": "table", "instant": true}],
+          "transformations": [{"id": "organize", "options": {"excludeByName": {"Time": true, "Value": true, "job": true, "instance": true}, "renameByName": {"alertname": "Alert", "alertstate": "State", "severity": "Severity", "namespace": "Namespace", "pod": "Pod", "volume": "Volume"}}}],
+          "options": {"showHeader": true, "cellHeight": "sm", "footer": {"show": false}},
+          "fieldConfig": {"defaults": {}, "overrides": [{"matcher": {"id": "byName", "options": "Severity"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-text"}}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}, {"color": "red", "value": 2}]}}]}]}
+        },
+        {
+          "id": 8,
+          "type": "stat",
+          "title": "BackupTarget Available",
+          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 12},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "homelab_longhorn_backuptarget_available{name=\"default\"}", "instant": true}],
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background", "graphMode": "none", "textMode": "name", "justifyMode": "auto"},
+          "fieldConfig": {"defaults": {"unit": "bool", "mappings": [{"type": "value", "options": {"0": {"text": "UNAVAILABLE", "color": "red"}, "1": {"text": "AVAILABLE", "color": "green"}}}]}, "overrides": []}
+        },
+        {
+          "id": 9,
+          "type": "stat",
+          "title": "Newest Ready System Backup Age",
+          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 12},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "(time() - max(homelab_longhorn_systembackup_created * on (name) group_left (state) homelab_longhorn_systembackup_state{state=\"Ready\"})) / 86400", "instant": true}],
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background", "graphMode": "none", "textMode": "auto", "justifyMode": "auto"},
+          "fieldConfig": {"defaults": {"unit": "d", "decimals": 2, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 8}, {"color": "red", "value": 10}]}}, "overrides": []}
+        },
+        {
+          "id": 10,
+          "type": "stat",
+          "title": "Oldest Volume Backup Age",
+          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 12},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "max((time() - longhorn_volume_last_backup_at) / 86400)", "instant": true}],
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background", "graphMode": "none", "textMode": "auto", "justifyMode": "auto"},
+          "fieldConfig": {"defaults": {"unit": "d", "decimals": 2, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 8}, {"color": "red", "value": 10}]}}, "overrides": []}
+        },
+        {
+          "id": 11,
+          "type": "stat",
+          "title": "Healthy Longhorn Volumes",
+          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 12},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "count(max by (volume) (longhorn_volume_robustness{state=\"healthy\"}) == 1)", "instant": true}],
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background", "graphMode": "none", "textMode": "auto", "justifyMode": "auto"},
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 7}]}}, "overrides": []}
+        },
+        {
+          "id": 12,
+          "type": "table",
+          "title": "Volume Backup Age by PVC",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "sort_desc(max by (volume, pvc, pvc_namespace) ((time() - longhorn_volume_last_backup_at) / 86400))", "format": "table", "instant": true}],
+          "transformations": [{"id": "organize", "options": {"excludeByName": {"Time": true, "Value": true, "volume": true}, "renameByName": {"pvc_namespace": "Namespace", "pvc": "PVC", "Value #A": "Age (days)"}}}],
+          "options": {"showHeader": true, "cellHeight": "sm"},
+          "fieldConfig": {"defaults": {"unit": "short", "decimals": 2}, "overrides": []}
+        },
+        {
+          "id": 13,
+          "type": "table",
+          "title": "Longhorn System Backups",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "homelab_longhorn_systembackup_state == 1", "format": "table", "instant": true}],
+          "transformations": [{"id": "organize", "options": {"excludeByName": {"Time": true, "Value": true, "customresource_group": true, "customresource_kind": true, "customresource_version": true, "container": true, "endpoint": true, "instance": true, "job": true, "pod": true, "service": true}, "renameByName": {"name": "System Backup", "state": "State"}}}],
+          "options": {"showHeader": true, "cellHeight": "sm"},
+          "fieldConfig": {"defaults": {}, "overrides": []}
+        },
+        {
+          "id": 14,
+          "type": "timeseries",
+          "title": "Node CPU Usage",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "legendFormat": "{{instance}}"}],
+          "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi"}},
+          "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "custom": {"drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 10, "showPoints": "never"}}, "overrides": []}
+        },
+        {
+          "id": 15,
+          "type": "timeseries",
+          "title": "Node Memory Usage",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)", "legendFormat": "{{instance}}"}],
+          "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi"}},
+          "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "custom": {"drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 10, "showPoints": "never"}}, "overrides": []}
+        },
+        {
+          "id": 16,
+          "type": "timeseries",
+          "title": "Longhorn Disk Usage",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "100 * max by (node, disk) (longhorn_disk_usage_bytes / longhorn_disk_capacity_bytes)", "legendFormat": "{{node}} / {{disk}}"}],
+          "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi"}},
+          "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "custom": {"drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 10, "showPoints": "never"}}, "overrides": []}
+        },
+        {
+          "id": 17,
+          "type": "timeseries",
+          "title": "Volume Backup Age",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+          "datasource": {"type": "prometheus", "uid": "${datasource}"},
+          "targets": [{"refId": "A", "expr": "max by (pvc, pvc_namespace) ((time() - longhorn_volume_last_backup_at) / 86400)", "legendFormat": "{{pvc_namespace}} / {{pvc}}"}],
+          "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi"}},
+          "fieldConfig": {"defaults": {"unit": "d", "decimals": 2, "custom": {"drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 10, "showPoints": "never"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 8}, {"color": "red", "value": 10}]}}, "overrides": []}
+        },
+        {
+          "id": 18,
+          "type": "text",
+          "title": "Operational thresholds and ownership",
+          "gridPos": {"h": 7, "w": 24, "x": 0, "y": 40},
+          "options": {"mode": "markdown", "content": "### Recovery monitoring\n\n- **Telegram:** warning and critical Prometheus alerts are sent through Alertmanager; resolved notifications are also enabled.\n- **Volume backups:** warning at 8 days, critical at 10 days.\n- **System backups:** critical when no Ready bundle exists for 10 days.\n- **BackupTarget:** critical after 15 minutes unavailable.\n- **Schedules:** weekly volume backup Sunday 01:00; weekly system backup Sunday 01:30; K3s etcd export Sunday 02:30.\n- **Recovery source:** Longhorn backups and system backups use the Synology NFS target. Git and Azure Key Vault remain required for complete cluster reconstruction.\n\nUse the runbook linked in alert annotations for response and restore procedures."}
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["homelab", "cluster", "backup", "recovery", "alerts"],
+      "templating": {"list": [{"name": "datasource", "label": "Prometheus", "type": "datasource", "query": "prometheus", "current": {"text": "Prometheus", "value": ""}}]},
+      "time": {"from": "now-24h", "to": "now"},
+      "timezone": "browser",
+      "title": "Homelab - Cluster Health & Recovery",
+      "uid": "homelab-cluster-health-recovery",
+      "version": 1
+    }

@@ -1,5 +1,33 @@
 # Dashboard Catalog
 
+## Homelab Cluster Health & Recovery
+
+File:
+
+```text
+custom/homelab-cluster-health.json
+```
+
+Purpose:
+
+```text
+Cluster readiness and critical system indicators
+Active and pending alert names, severity, and workload labels
+Longhorn BackupTarget and system-backup status
+Volume backup age and backup-age trends
+Node CPU, memory, and Longhorn disk usage
+```
+
+Provisioning:
+
+```text
+GitOps ConfigMap: homelab-cluster-health-dashboard
+Grafana folder: Homelab
+Refresh: 30 seconds
+```
+
+---
+
 ## Node Exporter Full
 
 Dashboard ID:
@@ -104,6 +132,7 @@ Storage Capacity
 
 ```text
 Infrastructure
+├── Homelab Cluster Health & Recovery
 ├── Node Exporter Full
 └── Cluster Monitoring
 
