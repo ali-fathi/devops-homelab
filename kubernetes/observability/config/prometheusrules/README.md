@@ -491,21 +491,26 @@ alertmanager:
 
     route:
 
-      receiver: telegram
+      receiver: "null"
 
       group_by:
         - alertname
+        - severity
 
-      group_wait: 30s
+      group_wait: 1m
 
-      group_interval: 5m
+      group_interval: 15m
 
-      repeat_interval: 12h
+      repeat_interval: 24h
 
       routes:
         - matchers:
             - alertname="Watchdog"
           receiver: "null"
+
+        - matchers:
+            - severity=~"critical|warning"
+          receiver: telegram
 
     receivers:
 
