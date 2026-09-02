@@ -40,3 +40,10 @@ k3s_server_iscsi_service:
   RedHat: iscsid
 k3s_server_minimum_root_free_mb: 20480
 k3s_server_minimum_memory_mb: 4096
+
+# K3s embedded-etcd snapshots are copied to the same external NFS target used
+# by Longhorn. The playbook mounts NFS only during the backup operation.
+k3s_etcd_backup_server: 192.168.178.120
+k3s_etcd_backup_export: /srv/longhorn_backups
+k3s_etcd_backup_retention_days: 14
+k3s_etcd_backup_schedule: 'Sun *-*-* 02:30:00'

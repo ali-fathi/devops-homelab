@@ -305,8 +305,31 @@ Evidence: artifacts/longhorn-rehearsal/20260901151703-11241/result.txt
 ```
 
 The fixture result is evidence for the backup path, not an application-specific
-RTO. Restore drills for Grafana, Loki, Alertmanager, Garmin InfluxDB, and
-VictoriaMetrics remain separate operational work.
+RTO. The application restore drill is implemented by
+`scripts/rehearse-application-restores.sh`. It restores the newest completed
+backup for every current stateful application PVC into a separate namespace,
+uses one Longhorn replica to limit capacity, mounts each restored volume
+read-only, runs a workload-specific filesystem validation, records the source
+backup and elapsed restore time, and removes only its temporary resources when
+`--cleanup` is used.
+
+The full seven-volume drill passed on 2026-09-02:
+
+```text
+Run: artifacts/application-restore-drills/20260902095006-11538
+Grafana: passed, 72s
+Alertmanager: passed, 39s
+Loki: passed, 138s
+Prometheus: passed, 381s
+Garmin InfluxDB: passed, 73s
+Garmin tokens/cache: passed, 39s
+VictoriaMetrics: passed, 40s
+```
+
+These are isolated data/filesystem restore results. They do not stop or
+reconfigure production workloads. A future deeper drill may start each
+application against its restored PVC and run database-native consistency and
+query checks during a maintenance window.
 
 ## What is backed up elsewhere
 
@@ -317,13 +340,98 @@ VictoriaMetrics remain separate operational work.
 | Kubernetes and Argo CD manifests | Git history and Argo CD | Reviewed Git branch/merge history |
 | Alerting and workload secret values | Azure Key Vault and External Secrets definitions | Key Vault plus Git manifests |
 | Operator kubeconfig | Encrypted workstation backup procedure | `scripts/backup-kubeconfig.sh`, age key kept separately |
-| K3s embedded-etcd state | K3s local etcd snapshot mechanism | Control-plane snapshot files; off-host copy is a separate gap |
+| K3s embedded-etcd state | Weekly Ansible-managed snapshot copy | Synology NFS `k3s-etcd/<control-plane>/` directories |
 
 Longhorn system backup does not make a full cluster backup. In particular, it
 does not include Kubernetes Nodes or external systems such as the NAS, GitHub,
-Azure Key Vault, or the operator workstation. Before claiming complete
-site-loss recovery, add and test an off-host K3s etcd snapshot copy and a
-second/off-site copy of the Synology backup share.
+Azure Key Vault, or the operator workstation. The K3s etcd gap is addressed for
+this homelab by the Ansible-managed service and timer described below. The NAS
+is intentionally the single external backup location; a second copy is not
+part of this homelab's current risk acceptance.
+
+## K3s etcd snapshot export
+
+K3s embedded-etcd snapshots contain Kubernetes control-plane state and may
+contain Kubernetes Secret data. They are therefore copied only to the restricted
+NAS export and must not be printed, committed, or exposed to application Pods.
+The Ansible playbook installs a temporary NFSv4.1 mount, creates a fresh K3s
+snapshot, copies it into a host-specific NAS directory, writes a checksum sidecar,
+removes files older than 14 days, unmounts NFS, and enables a systemd timer.
+NFS is never configured as an application runtime mount.
+
+Install or reconcile the host configuration from `ansible/`:
+
+```bash
+ansible-playbook playbooks/manage-k3s-etcd-nfs-backup.yml \
+  -e k3s_etcd_backup_confirm=true
+```
+
+The timer runs Sunday at 02:30 with a random delay of up to 15 minutes, after
+the Longhorn volume and system backup windows. It runs independently on all
+three control-plane nodes, so the NAS contains a snapshot copy from each
+embedded-etcd member:
+
+```text
+/srv/longhorn_backups/k3s-etcd/k3s-master/
+/srv/longhorn_backups/k3s-etcd/k3s-master2/
+/srv/longhorn_backups/k3s-etcd/k3s-master3/
+```
+
+Verify only filenames and checksums:
+
+```bash
+ansible k3s_control_plane -b -m shell -a \
+  'systemctl is-enabled k3s-etcd-nfs-backup.timer && systemctl is-active k3s-etcd-nfs-backup.timer'
+```
+
+A manual test run can be performed during an approved maintenance window:
+
+```bash
+ansible k3s_control_plane -b -m command -a \
+  'systemctl start k3s-etcd-nfs-backup.service'
+```
+
+Then mount the export temporarily and run `sha256sum -c` against the `.sha256`
+sidecars. Never copy or display the snapshot contents. K3s etcd restore is a
+control-plane operation and must be rehearsed on an isolated cluster or under
+the K3s restore procedure; it does not restore Longhorn volume bytes.
+
+## Backup freshness and failure alerts
+
+Prometheus scrapes the Longhorn backend through the GitOps-managed
+`ServiceMonitor` in `kubernetes/observability/config/prometheusrules/longhorn-backup-monitoring.yaml`.
+The alert rules use Longhorn's documented backup metrics and the existing
+critical Telegram route:
+
+```text
+LonghornBackupMetricsMissing              scrape unavailable for 15 minutes
+LonghornBackupTargetScrapeFailed          backend target down for 15 minutes
+LonghornBackupTargetUnavailable           BackupTarget status unavailable for 15 minutes
+LonghornSystemBackupStale                 no Ready system backup for 10 days
+LonghornSystemBackupFailed                system backup Error for 5 minutes
+LonghornVolumeBackupStale                  last backup older than 8 days
+LonghornVolumeBackupCriticallyStale        last backup older than 10 days
+LonghornBackupFailed                       backup reports error/unknown for 5 minutes
+LonghornBackupStuck                        pending/in-progress for 2 hours
+```
+
+The freshness warning is intentionally eight days rather than exactly seven:
+it allows for the Sunday schedule, controller delay, and a short NAS outage.
+The ten-day critical threshold leaves recovery time before the two-week policy
+is exhausted. Backup failure and telemetry loss are critical because they
+remove confidence in the recovery point.
+
+Validate alert ingestion without displaying credentials:
+
+```bash
+kubectl -n monitoring get servicemonitor longhorn-backend
+kubectl -n monitoring get prometheusrule longhorn-backup-alerts
+```
+
+The rollout test confirmed five healthy Longhorn scrape targets, all backup
+metrics present, no active freshness/failure alerts after the current backups,
+and a temporary critical alert reached both Prometheus and Alertmanager before
+being removed.
 
 ## Failure response
 
@@ -365,6 +473,7 @@ secondary copy and test restoration separately.
 [ ] Latest system backup is Ready.
 [ ] verify-gitops-health.sh reports zero failures and zero warnings.
 [ ] The latest restore rehearsal evidence is available.
-[ ] NAS capacity and a second/off-site copy are reviewed.
-[ ] Application-specific restore drills are scheduled.
+[ ] NAS capacity and its single-copy risk acceptance are reviewed.
+[ ] K3s etcd timer is enabled on all three control-plane nodes.
+[ ] Application-specific restore drills have current evidence.
 ```

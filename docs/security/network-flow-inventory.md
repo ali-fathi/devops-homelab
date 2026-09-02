@@ -18,7 +18,7 @@ monitoring         Prometheus, Grafana, Alertmanager
 logging            Loki and Alloy
 external-secrets   Azure Key Vault synchronization controller
 application zones  health, garmin, ring-health, future Harbor
-LAN/NAS            MetalLB endpoints and future Synology NFS backup target
+LAN/NAS            MetalLB endpoints and Synology NFS backup target (Longhorn and host etcd backups)
 internet           Git sources, Helm repositories, Azure APIs, image registries
 ```
 
@@ -33,7 +33,7 @@ internet           Git sources, Helm repositories, Azure APIs, image registries
 | Alloy | Loki gateway/service | Log ingestion | Explicit egress/ingress allow |
 | Applications | Their declared database/backend | Business traffic | Exact namespace/selector/port allow |
 | External Secrets Operator | Azure Key Vault | Secret synchronization | Explicit external egress assessment |
-| Longhorn manager/CSI | Synology NFS | Future external backup target | Node/platform flow; outside Pod NetworkPolicy scope may apply |
+| Longhorn manager/CSI and control-plane backup service | Synology NFS | External Longhorn volume/system backups and K3s etcd snapshot copies | Node/platform flow; outside Pod NetworkPolicy scope may apply |
 | LAN client | MetalLB LoadBalancer Service | User access to approved apps | Explicit service/workload ingress allow |
 
 No row is an allow policy yet. All selectors and ports must be confirmed from live Services, EndpointSlices, Pods, Helm-rendered manifests, and application documentation.

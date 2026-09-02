@@ -30,13 +30,23 @@ The observability layer observes applications; it should not become a place to s
 Metrics:
 
 ```text
-Kubernetes and workloads
+Kubernetes, workloads, and Longhorn
+  → ServiceMonitors / kube-state-metrics
   → Prometheus
-  → Grafana dashboards
-  → PrometheusRules
+  → Grafana dashboards and PrometheusRules
   → Alertmanager
   → Telegram
 ```
+
+Longhorn backup monitoring is defined in:
+
+```text
+kubernetes/observability/config/prometheusrules/longhorn-backup-monitoring.yaml
+```
+
+It scrapes the Longhorn backend, reads non-secret BackupTarget/SystemBackup
+status through kube-state-metrics, and alerts on scrape loss, target failure,
+stale volume backups, failed/stuck backups, and stale/failed system backups.
 
 Logs:
 
@@ -73,7 +83,7 @@ Contains Loki values, Alloy values, Grafana Loki datasource, Loki log alert rule
 kubernetes/observability/alerting/
 ```
 
-Contains Alertmanager values, Telegram ExternalSecret, PrometheusRules, alert runbooks, and message templates.
+Contains Alertmanager values, Telegram ExternalSecret, PrometheusRules, Longhorn backup monitoring, alert runbooks, and message templates.
 
 ## GitOps adoption order
 

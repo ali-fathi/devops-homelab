@@ -1,6 +1,13 @@
 # 🚨 Alerting & Notifications
 # Prometheus + Alertmanager + Telegram + Azure Key Vault
 
+This directory also contains the GitOps-managed Longhorn metrics ServiceMonitor
+and backup protection alerts. Longhorn backup alerts depend on scraping the
+`longhorn-backend` Service in `longhorn-system`; the alert rules then monitor
+scrape availability, stale volume backups, failed/stuck backup states, and the
+existing critical Telegram route. See
+`docs/runbooks/longhorn-recurring-backup-operations.md` for the complete policy.
+
 ## Overview
 
 This phase adds proactive monitoring and alerting to the Kubernetes homelab.
@@ -843,6 +850,12 @@ PodCrashLoopBackOff
 DeploymentUnavailable
 LonghornVolumeDegraded
 LonghornReplicaFailure
+LonghornBackupMetricsMissing
+LonghornBackupTargetScrapeFailed
+LonghornVolumeBackupStale
+LonghornVolumeBackupCriticallyStale
+LonghornBackupFailed
+LonghornBackupStuck
 ```
 
 These alerts cover most real-world homelab failures.

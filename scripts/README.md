@@ -177,6 +177,32 @@ docs/runbooks/longhorn-backup-restore-rehearsal.md
 
 ---
 
+## `rehearse-application-restores.sh`
+
+This is an explicit, opt-in **mutating test** for every stateful application PVC. It selects the newest completed backup on the external Longhorn target, restores it into an isolated namespace using a temporary one-replica StorageClass, mounts the result read-only, runs a workload-specific filesystem validation, records the backup and elapsed restore time, and removes only test resources when `--cleanup` is used. It never stops, patches, deletes, or mounts the production workloads.
+
+Run:
+
+```bash
+./scripts/rehearse-application-restores.sh --confirm --cleanup
+```
+
+Available individual tests are `grafana`, `alertmanager`, `loki`, `prometheus`, `influxdb`, `tokens`, and `victoriametrics`:
+
+```bash
+./scripts/rehearse-application-restores.sh --confirm --cleanup --only grafana
+```
+
+The script requires a healthy external Longhorn `BackupTarget`, completed backups for each selected PVC, CSI snapshot CRDs, and enough temporary Longhorn capacity. It records non-secret evidence beneath the ignored `artifacts/application-restore-drills/` directory.
+
+Read the full scope, limitations, validation rules, and recovery procedure:
+
+```text
+docs/runbooks/longhorn-recurring-backup-operations.md
+```
+
+---
+
 ## `verify-cluster.sh`
 
 The verification script checks:

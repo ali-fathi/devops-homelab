@@ -5,13 +5,13 @@ Use this runbook when you are ready to configure the Synology NAS as Longhorn's 
 ## Status and scope
 
 ```text
-Status: NFS target configured and available; live backup/restore rehearsal pending
+Status: NFS target configured and available; Longhorn and application restore rehearsals passed; K3s etcd export is Ansible-managed and tested
 Longhorn release: chart 1.12.1
 Protocol: NFSv4.1
 Longhorn target: longhorn-system/BackupTarget named default
 ```
 
-This configuration protects against loss of a Longhorn disk, K3s node, or the whole K3s cluster because the backup data is stored on the separate Synology NAS. It does **not** protect against a NAS failure, fire, theft, ransomware, or site loss. After this rehearsal is verified, add a separately tested Synology replication or off-site backup plan.
+This configuration protects against loss of a Longhorn disk, K3s node, or the whole K3s cluster because the backup data is stored on the separate Synology NAS. It also stores Ansible-managed K3s embedded-etcd snapshot copies. It does **not** protect against a NAS failure, fire, theft, ransomware, or site loss; this homelab accepts one external NAS copy as its current risk boundary.
 
 ## Architecture and boundaries
 
@@ -259,8 +259,10 @@ scripts/rehearse-longhorn-backup-restore.sh
 [ ] Only 192.168.178.80 through .84 have read/write NFS access.
 [ ] NFS client/probe passes on every K3s node.
 [ ] Longhorn BackupTarget/default reports available: true.
-[ ] The isolated backup/restore script returns [PASS].
-[ ] Result evidence and observed RTO are recorded.
-[ ] Stateful Argo CD pruning remains disabled until workload-specific restores are tested.
-[ ] A separate NAS/off-site recovery copy is planned and tested.
+[x] The isolated backup/restore script returns [PASS].
+[x] Result evidence and observed RTO are recorded.
+[x] Application-specific restore drills pass for all seven stateful PVCs.
+[x] K3s embedded-etcd snapshots are copied to the NAS by an Ansible-managed timer.
+[ ] Stateful Argo CD pruning is enabled only after the reviewed workload restore evidence and separate approval.
+[ ] NAS encryption/key-recovery procedure is reviewed if Synology shared-folder encryption is enabled.
 ```

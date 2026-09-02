@@ -3,6 +3,10 @@ kind: PrometheusRule
 metadata:
   name: storage-alerts
   namespace: monitoring
+  labels:
+    release: monitoring
+    app.kubernetes.io/name: storage-alerts
+    app.kubernetes.io/component: storage-monitoring
 
 spec:
   groups:

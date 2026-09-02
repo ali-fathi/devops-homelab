@@ -1,0 +1,168 @@
+---
+# Manage an off-node copy of K3s embedded-etcd snapshots on the reviewed
+# Synology NFS backup target. This is host backup storage, not an application
+# runtime mount.
+#
+# Required invocation (from ansible/):
+# ansible-playbook playbooks/manage-k3s-etcd-nfs-backup.yml \
+#   -e k3s_etcd_backup_confirm=true
+
+- name: Manage K3s embedded-etcd backup export
+  hosts: k3s_control_plane
+  become: true
+  gather_facts: true
+  serial: 1
+
+  vars:
+    k3s_etcd_backup_confirm: false
+    k3s_etcd_backup_server: 192.168.178.120
+    k3s_etcd_backup_export: /srv/longhorn_backups
+    k3s_etcd_backup_mountpoint: /run/k3s-etcd-backup
+    k3s_etcd_backup_retention_days: 14
+    k3s_etcd_backup_schedule: 'Sun *-*-* 02:30:00'
+    k3s_etcd_backup_script: /usr/local/sbin/k3s-etcd-nfs-backup
+    k3s_etcd_backup_unit: k3s-etcd-nfs-backup.service
+    k3s_etcd_backup_timer: k3s-etcd-nfs-backup.timer
+
+  pre_tasks:
+    - name: Require explicit confirmation for etcd backup automation
+      ansible.builtin.assert:
+        that:
+          - k3s_etcd_backup_confirm | bool
+        fail_msg: >-
+          Set k3s_etcd_backup_confirm=true only after reviewing the temporary
+          NFS mount and K3s snapshot copy. This does not reboot or drain nodes.
+
+    - name: Require control-plane host facts
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.os_family in ['Debian', 'RedHat']
+          - ansible_facts.service_mgr == 'systemd'
+        fail_msg: 'The etcd backup playbook requires a Debian/RedHat system using systemd.'
+
+  tasks:
+    - name: Install NFS client package without upgrading the host
+      ansible.builtin.package:
+        name: >-
+          {{ 'nfs-common' if ansible_facts.os_family == 'Debian' else 'nfs-utils' }}
+        state: present
+
+    - name: Create the temporary NFS mountpoint
+      ansible.builtin.file:
+        path: '{{ k3s_etcd_backup_mountpoint }}'
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+
+    - name: Install the off-node etcd snapshot copy script
+      ansible.builtin.copy:
+        dest: '{{ k3s_etcd_backup_script }}'
+        owner: root
+        group: root
+        mode: '0700'
+        content: |
+          #!/usr/bin/env bash
+          set -Eeuo pipefail
+          umask 077
+
+          readonly SERVER='{{ k3s_etcd_backup_server }}'
+          readonly EXPORT='{{ k3s_etcd_backup_export }}'
+          readonly MOUNTPOINT='{{ k3s_etcd_backup_mountpoint }}'
+          readonly RETENTION_DAYS='{{ k3s_etcd_backup_retention_days }}'
+          readonly SNAPSHOT_DIR='/var/lib/rancher/k3s/server/db/snapshots'
+          readonly HOST_NAME="$(hostname -s)"
+          readonly HOST_DIR="${MOUNTPOINT}/k3s-etcd/${HOST_NAME}"
+          mounted=false
+
+          cleanup() {
+            if [[ "${mounted}" == true ]]; then
+              umount "${MOUNTPOINT}"
+            fi
+          }
+          trap cleanup EXIT
+
+          mount -t nfs4 -o vers=4.1,proto=tcp "${SERVER}:${EXPORT}" "${MOUNTPOINT}"
+          mounted=true
+          install -d -m 0700 "${HOST_DIR}"
+
+          /usr/local/bin/k3s etcd-snapshot save \
+            --name "offsite-${HOST_NAME}-$(date -u +%Y%m%d%H%M%S)"
+
+          snapshot="$(find "${SNAPSHOT_DIR}" -maxdepth 1 -type f -printf '%T@ %p\n' \
+            | sort -nr | awk 'NR == 1 { sub(/^[^ ]+ /, ""); print; exit }')"
+          [[ -n "${snapshot}" && -f "${snapshot}" ]] || {
+            echo 'No K3s etcd snapshot was created.' >&2
+            exit 1
+          }
+
+          destination="${HOST_DIR}/$(basename "${snapshot}")"
+          install -m 0600 "${snapshot}" "${destination}"
+          sha256sum "${destination}" > "${destination}.sha256"
+          find "${HOST_DIR}" -type f -mtime "+${RETENTION_DAYS}" -delete
+          printf 'K3s etcd snapshot copied to the external backup target: %s\n' "$(basename "${destination}")"
+
+    - name: Install the etcd backup systemd service
+      ansible.builtin.copy:
+        dest: '/etc/systemd/system/{{ k3s_etcd_backup_unit }}'
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Copy a K3s embedded-etcd snapshot to the external NFS backup target
+          Wants=network-online.target
+          After=network-online.target k3s.service
+
+          [Service]
+          Type=oneshot
+          ExecStart={{ k3s_etcd_backup_script }}
+          TimeoutStartSec=30min
+          User=root
+          Group=root
+          NoNewPrivileges=true
+          PrivateTmp=true
+          ProtectHome=true
+          ProtectSystem=full
+          ReadWritePaths={{ k3s_etcd_backup_mountpoint }} /var/lib/rancher/k3s/server/db/snapshots
+          RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+    - name: Install the etcd backup systemd timer
+      ansible.builtin.copy:
+        dest: '/etc/systemd/system/{{ k3s_etcd_backup_timer }}'
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Weekly K3s embedded-etcd off-node backup
+
+          [Timer]
+          OnCalendar={{ k3s_etcd_backup_schedule }}
+          Persistent=true
+          RandomizedDelaySec=15m
+          Unit={{ k3s_etcd_backup_unit }}
+
+          [Install]
+          WantedBy=timers.target
+
+    - name: Reload systemd after installing the backup units
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Enable the weekly etcd backup timer
+      ansible.builtin.systemd:
+        name: '{{ k3s_etcd_backup_timer }}'
+        enabled: true
+        state: started
+
+    - name: Verify the timer is scheduled
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - list-timers
+          - '{{ k3s_etcd_backup_timer }}'
+          - --no-legend
+      register: k3s_etcd_backup_timer_status
+      changed_when: false
+      failed_when: k3s_etcd_backup_timer_status.rc != 0 or k3s_etcd_backup_timer_status.stdout | trim == ''
