@@ -5,7 +5,7 @@ This directory also contains the GitOps-managed Longhorn metrics ServiceMonitor
 and backup protection alerts. Longhorn backup alerts depend on scraping the
 `longhorn-backend` Service in `longhorn-system`; the alert rules then monitor
 scrape availability, stale volume backups, failed/stuck backup states, and the
-existing critical Telegram route. See
+warning/critical Telegram route. See
 `docs/runbooks/longhorn-recurring-backup-operations.md` for the complete policy.
 
 ## Overview
@@ -38,6 +38,24 @@ Custom Alert Rules
 ```
 
 The goal is to automatically receive notifications when infrastructure, workloads, storage, or Kubernetes resources experience problems.
+
+# Notification behavior
+
+Prometheus evaluates `PrometheusRule` resources. A firing or pending alert is
+shown in Grafana through the `ALERTS` metric and is sent to Alertmanager. The
+GitOps-managed Alertmanager route sends every alert labeled `severity=warning`
+or `severity=critical` to the Telegram receiver, grouped by alert name and
+severity. Delivery waits one minute for grouping, repeats every 24 hours while
+still firing, and sends a resolved message when the condition clears.
+
+The `Watchdog` alert is intentionally routed to the null receiver. Alerts
+without a warning/critical severity are not sent until they are explicitly
+classified. Telegram credentials remain mounted from the Azure Key Vault-backed
+`telegram-alerts` Secret; no token or chat ID is stored in Git.
+
+Use the automatically provisioned **Homelab - Cluster Health & Recovery**
+dashboard for active/pending alert names, labels, backup state, and cluster
+health. Its source is `monitoring/dashboards/custom/homelab-cluster-health.json`.
 
 ---
 
