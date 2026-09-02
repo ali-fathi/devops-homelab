@@ -20,6 +20,7 @@ k3s-config
 
 # Local, non-secret operational evidence
 artifacts/longhorn-rehearsal/
+artifacts/application-restore-drills/
 artifacts/longhorn-nfs-target/
 artifacts/platform-security-baseline/
 artifacts/networkpolicy-enforcement/

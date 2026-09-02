@@ -69,7 +69,7 @@ Use one registry lifecycle owner: Harbor once installed.
 
 Make operational recovery, capacity management, upgrades, and data retention routine rather than emergency-only procedures.
 
-Current backup baseline: Longhorn volume backups run every Sunday at 01:00 and retain two recovery points per volume; Longhorn system backups run at 01:30 and retain two configuration bundles. The policy is GitOps-managed and verified by `scripts/verify-gitops-health.sh`. Backup-freshness/failure alerting, application-specific restore drills, and a second/off-site NAS copy remain Phase 5 work.
+Current backup baseline: Longhorn volume backups run every Sunday at 01:00 and retain two recovery points per volume; Longhorn system backups run at 01:30 and retain two configuration bundles. Prometheus monitors Longhorn scrape health, backup failures, stuck backups, and stale volume backups. Application PVC restore drills and Ansible-managed K3s etcd snapshot copies to the same NAS are implemented and tested. The homelab intentionally accepts one external NAS copy; NAS/site-loss protection is outside the current risk boundary.
 
 ### Task map
 
@@ -96,8 +96,8 @@ Blameless postmortem for material failed change or recovery exercise.
 ### Completion criteria
 
 ```text
-[ ] Backup age/failure alert is tested.
-[ ] Harbor and one observability workload have isolated restore evidence.
+[x] Backup age/failure alert is tested for Prometheus and Alertmanager routing.
+[x] All current stateful application PVCs have isolated restore evidence.
 [ ] K3s upgrade rehearsal and rollback are documented.
 [ ] Capacity dashboards and actionable thresholds exist.
 [ ] Synology has a separately tested second-copy strategy.

@@ -3,6 +3,10 @@ kind: PrometheusRule
 metadata:
   name: node-alerts
   namespace: monitoring
+  labels:
+    release: monitoring
+    app.kubernetes.io/name: node-alerts
+    app.kubernetes.io/component: node-monitoring
 
 spec:
   groups:

@@ -310,11 +310,11 @@ kubectl get prometheus,alertmanager -n monitoring
 
 The script should return a non-zero status when an expected resource is unhealthy, but it should always print enough context for an operator to begin troubleshooting.
 
-## Task 3.8 — Backup and restore rehearsal 🟡
+## Task 3.8 — Backup and restore rehearsal ✅
 
 An isolated, opt-in Longhorn rehearsal is implemented in `scripts/rehearse-longhorn-backup-restore.sh`. The configured external target is `nfs://192.168.178.120:/srv/longhorn_backups` using a dedicated NFSv4.1 share, prepared with `ansible/playbooks/prepare-longhorn-synology-nfs.yml` and configured only through the guarded `scripts/configure-longhorn-synology-nfs-backup-target.sh`. The rehearsal records non-secret PVC/Longhorn inventory, writes a deterministic fixture to a new test PVC, creates an external backup with a CSI `VolumeSnapshotClass` (`type: bak`), restores a second new PVC, and verifies equal SHA-256 checksums. The NAS setup is documented in [Synology NFS Backup Target for Longhorn](runbooks/synology-nfs-longhorn-backup-target-setup.md); recovery, cleanup, rollback, and RPO/RTO guidance is in [Longhorn Backup and Restore Rehearsal](runbooks/longhorn-backup-restore-rehearsal.md).
 
-The default external Longhorn `BackupTarget` is configured as `nfs://192.168.178.120:/srv/longhorn_backups` and reports available. The matching CSI snapshot CRDs/controller are installed and a live run returned `[PASS]` on 2026-09-01. Evidence is recorded at `artifacts/longhorn-rehearsal/20260901151703-11241/result.txt`: source/restored SHA-256 matched, backup duration was 11 seconds, and observed RTO was 77 seconds. Do not enable stateful pruning until workload-specific restore procedures are also reviewed.
+The default external Longhorn `BackupTarget` is configured as `nfs://192.168.178.120:/srv/longhorn_backups` and reports available. The matching CSI snapshot CRDs/controller are installed and a live run returned `[PASS]` on 2026-09-01. Evidence is recorded at `artifacts/longhorn-rehearsal/20260901151703-11241/result.txt`: source/restored SHA-256 matched, backup duration was 11 seconds, and observed RTO was 77 seconds. Weekly volume and system recurring jobs are GitOps-managed with two-backup retention. Prometheus backup freshness/failure alerts and Ansible-managed K3s etcd NAS copies are also configured and tested. The application restore drill passed for all seven stateful PVCs on 2026-09-02; production workloads were never modified.
 
 The rehearsal should cover at least one non-production or low-risk recovery path:
 
@@ -371,9 +371,12 @@ A task is only **verified** after its intended end-to-end behavior has been obse
 [ ] Root Application is Synced and Healthy.
 [ ] Git -> root -> child Application reconciliation is proven.
 [x] Helm render CI job is green in GitHub Actions (run 31790818607).
-[ ] Read-only post-sync health gate exists and is tested.
+[x] Read-only post-sync health gate exists and is tested.
 [x] Stateful backup and restore rehearsal is documented and tested.
-[x] Pruning remains disabled until restore is proven.
+[x] Application-specific restore drill is implemented and tested for all seven stateful PVCs.
+[x] Backup freshness/failure rules are loaded and critical Alertmanager routing is tested.
+[x] K3s etcd snapshots are copied to the Synology target by an Ansible-managed timer.
+[x] Pruning remains disabled until restore is proven and separately approved.
 ```
 
 ## Related documentation
@@ -386,4 +389,7 @@ docs/ci-manifest-validation.md
 docs/terraform-ci-runbook.md
 docs/runbooks/argocd-app-outofsync.md
 docs/runbooks/external-secrets-debug.md
+docs/runbooks/longhorn-recurring-backup-operations.md
+scripts/rehearse-application-restores.sh
+ansible/playbooks/manage-k3s-etcd-nfs-backup.yml
 ```

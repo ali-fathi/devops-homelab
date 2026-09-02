@@ -718,6 +718,36 @@ Run it only after reviewing the maintenance impact:
 ansible-playbook playbooks/manage-longhorn-host-baseline.yml -e longhorn_host_baseline_confirm=true
 ```
 
+# K3s Embedded-etcd NAS Backup
+
+K3s embedded-etcd snapshots contain Kubernetes control-plane state and can contain Kubernetes Secrets. The following playbook installs a root-only systemd service and weekly timer on each control-plane node. At runtime it creates a temporary NFSv4.1 mount to the same reviewed Synology export used by Longhorn, creates a fresh K3s snapshot, copies it into a host-specific `k3s-etcd/<hostname>/` directory, writes a SHA-256 sidecar, removes copies older than 14 days, and unmounts NFS. NFS is never mounted into an application Pod or used as application runtime storage.
+
+The playbook does not reboot or drain nodes. Review the full procedure and recovery boundary in:
+
+```text
+docs/runbooks/longhorn-recurring-backup-operations.md
+```
+
+Install or reconcile it only with explicit confirmation:
+
+```bash
+ansible-playbook playbooks/manage-k3s-etcd-nfs-backup.yml -e k3s_etcd_backup_confirm=true
+```
+
+Verify the timers without printing snapshot contents:
+
+```bash
+ansible k3s_control_plane -b -m shell -a 'systemctl is-enabled k3s-etcd-nfs-backup.timer && systemctl is-active k3s-etcd-nfs-backup.timer'
+```
+
+Run a controlled copy test and verify only checksum sidecars:
+
+```bash
+ansible k3s_control_plane -b -m command -a 'systemctl start k3s-etcd-nfs-backup.service'
+```
+
+The NAS is the accepted single external backup location for this homelab. Because etcd snapshots contain Secrets, protect the NAS share and any NAS encryption key as administrative credentials; never commit, paste, or print snapshot files.
+
 # Detailed Health Check
 
 The current detailed playbook is:

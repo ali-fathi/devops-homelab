@@ -3,6 +3,10 @@ kind: PrometheusRule
 metadata:
   name: longhorn-alerts
   namespace: monitoring
+  labels:
+    release: monitoring
+    app.kubernetes.io/name: longhorn-alerts
+    app.kubernetes.io/component: storage-monitoring
 
 spec:
   groups:

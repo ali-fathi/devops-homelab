@@ -54,7 +54,7 @@ Operator workstation
 | Synology NFS export and ACL | NAS operator | Dedicated share `/srv/longhorn_backups`, NFSv4.1, and access only from the five K3s nodes; no Kubernetes credential Secret is used. |
 | Longhorn `BackupTarget` | Explicit operator configuration script | Must be named `default`, point at the reviewed Synology NFS export, and report `status.available: true`. |
 | Rehearsal namespace, PVCs, Pods, VolumeSnapshot, and VolumeSnapshotClass | Explicit operator script | Created with a unique run ID; not Argo CD or Terraform managed. |
-| Evidence files | Operator workstation | Written beneath ignored `artifacts/longhorn-rehearsal/`; no secret values or full backup URL are recorded. |
+| Evidence files | Operator workstation | Written beneath ignored `artifacts/longhorn-rehearsal/` and `artifacts/application-restore-drills/`; no secret values or full backup URL are recorded. |
 
 ## Backup target prerequisite
 
@@ -190,7 +190,7 @@ The restored fixture checksum exactly matched the source checksum.
 
 The script's **observed RTO** is its elapsed time from submission of the restored PVC until the restored reader Pod verifies the checksum. Record it as a baseline, not a production promise: it excludes backup creation and operator decision time, and a larger volume, a busy backup target, or recovery to a new cluster can take longer.
 
-The script's **fixture RPO** is near zero because it writes the fixture immediately before backup creation. That does not establish an RPO for Grafana, Prometheus, Loki, Alertmanager, InfluxDB, or VictoriaMetrics. Define each workload's production RPO from its recurring backup cadence and its RTO from a workload-specific restore exercise.
+The script's **fixture RPO** is near zero because it writes the fixture immediately before backup creation. That does not establish an RPO for Grafana, Prometheus, Loki, Alertmanager, InfluxDB, or VictoriaMetrics. Define each workload's production RPO from its recurring backup cadence and its RTO from the workload-specific restore exercise in `scripts/rehearse-application-restores.sh`. The detailed schedule, alerting, K3s etcd export, and application drill procedure is documented in [`longhorn-recurring-backup-operations.md`](longhorn-recurring-backup-operations.md).
 
 Initial targets until application-specific rehearsals exist:
 

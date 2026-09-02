@@ -1,0 +1,131 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: longhorn-backend
+  namespace: monitoring
+  labels:
+    release: monitoring
+    app.kubernetes.io/name: longhorn-backend-monitoring
+    app.kubernetes.io/component: metrics
+spec:
+  namespaceSelector:
+    matchNames:
+      - longhorn-system
+  selector:
+    matchLabels:
+      app: longhorn-manager
+  endpoints:
+    - port: manager
+      path: /metrics
+      interval: 60s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: longhorn-backup-alerts
+  namespace: monitoring
+  labels:
+    release: monitoring
+    app.kubernetes.io/name: longhorn-backup-alerts
+    app.kubernetes.io/component: backup-monitoring
+spec:
+  groups:
+    - name: longhorn-backup-alerts
+      rules:
+        - alert: LonghornBackupMetricsMissing
+          expr: absent(up{namespace="longhorn-system",service="longhorn-backend"})
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Longhorn backup metrics are unavailable"
+            description: "Prometheus cannot scrape the Longhorn backend. Backup health and freshness cannot be verified."
+            runbook_url: "https://github.com/ali-fathi/devops-homelab/blob/main/docs/runbooks/longhorn-recurring-backup-operations.md"
+
+        - alert: LonghornBackupTargetScrapeFailed
+          expr: up{namespace="longhorn-system",service="longhorn-backend"} == 0
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Longhorn backend metrics scrape failed"
+            description: "Prometheus cannot scrape one or more Longhorn backend targets. Check Longhorn managers and the backup target."
+            runbook_url: "https://github.com/ali-fathi/devops-homelab/blob/main/docs/runbooks/longhorn-recurring-backup-operations.md"
+
+        - alert: LonghornBackupTargetUnavailable
+          expr: homelab_longhorn_backuptarget_available == 0
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Longhorn BackupTarget is unavailable"
+            description: "Longhorn BackupTarget/default is not available. New volume and system backups cannot be trusted."
+            runbook_url: "https://github.com/ali-fathi/devops-homelab/blob/main/docs/runbooks/longhorn-recurring-backup-operations.md"
+
+        - alert: LonghornSystemBackupStale
+          expr: |
+            (
+              max(
+                homelab_longhorn_systembackup_created
+                * on (name) group_left (state)
+                  homelab_longhorn_systembackup_state{state="Ready"}
+              ) or vector(0)
+            ) < time() - 10 * 24 * 60 * 60
+          for: 1h
+          labels:
+            severity: critical
+          annotations:
+            summary: "Longhorn system backup is stale or missing"
+            description: "No Ready Longhorn system backup has been created within the last ten days."
+            runbook_url: "https://github.com/ali-fathi/devops-homelab/blob/main/docs/runbooks/longhorn-recurring-backup-operations.md"
+
+        - alert: LonghornSystemBackupFailed
+          expr: homelab_longhorn_systembackup_state{state="Error"} == 1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Longhorn system backup failed"
+            description: "Longhorn system backup {{ $labels.name }} is reporting Error."
+            runbook_url: "https://github.com/ali-fathi/devops-homelab/blob/main/docs/runbooks/longhorn-recurring-backup-operations.md"
+
+        - alert: LonghornVolumeBackupStale
+          expr: time() - longhorn_volume_last_backup_at > 8 * 24 * 60 * 60
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Longhorn volume backup is older than eight days"
+            description: "The latest successful backup for volume {{ $labels.volume }} is older than the weekly RPO warning threshold."
+            runbook_url: "https://github.com/ali-fathi/devops-homelab/blob/main/docs/runbooks/longhorn-recurring-backup-operations.md"
+
+        - alert: LonghornVolumeBackupCriticallyStale
+          expr: time() - longhorn_volume_last_backup_at > 10 * 24 * 60 * 60
+          for: 1h
+          labels:
+            severity: critical
+          annotations:
+            summary: "Longhorn volume backup is critically stale"
+            description: "The latest successful backup for volume {{ $labels.volume }} is older than ten days. The two-week recovery policy is at risk."
+            runbook_url: "https://github.com/ali-fathi/devops-homelab/blob/main/docs/runbooks/longhorn-recurring-backup-operations.md"
+
+        - alert: LonghornBackupFailed
+          expr: longhorn_backup_state >= 4
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Longhorn backup failed or is unknown"
+            description: "Backup {{ $labels.backup }} for volume {{ $labels.volume }} is reporting an error or unknown state."
+            runbook_url: "https://github.com/ali-fathi/devops-homelab/blob/main/docs/runbooks/longhorn-recurring-backup-operations.md"
+
+        - alert: LonghornBackupStuck
+          expr: longhorn_backup_state == 1 or longhorn_backup_state == 2
+          for: 2h
+          labels:
+            severity: critical
+          annotations:
+            summary: "Longhorn backup is stuck"
+            description: "Backup {{ $labels.backup }} for volume {{ $labels.volume }} has remained pending or in progress for more than two hours."
+            runbook_url: "https://github.com/ali-fathi/devops-homelab/blob/main/docs/runbooks/longhorn-recurring-backup-operations.md"

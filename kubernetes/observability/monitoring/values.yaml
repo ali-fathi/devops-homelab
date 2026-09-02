@@ -45,3 +45,60 @@ alertmanager:
           resources:
             requests:
               storage: 5Gi
+
+# Expose non-secret Longhorn custom-resource status through kube-state-metrics.
+# Prometheus uses these metrics to alert on BackupTarget and system-backup
+# freshness; the RBAC is read-only and limited to the required Longhorn CRDs.
+kube-state-metrics:
+  customResourceState:
+    enabled: true
+    config:
+      kind: CustomResourceStateMetrics
+      spec:
+        resources:
+          - groupVersionKind:
+              group: longhorn.io
+              version: v1beta2
+              kind: BackupTarget
+            metricNamePrefix: homelab_longhorn_backuptarget
+            labelsFromPath:
+              name: [metadata, name]
+              namespace: [metadata, namespace]
+            metrics:
+              - name: available
+                help: "Whether a Longhorn BackupTarget is available."
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, available]
+          - groupVersionKind:
+              group: longhorn.io
+              version: v1beta2
+              kind: SystemBackup
+            metricNamePrefix: homelab_longhorn_systembackup
+            labelsFromPath:
+              name: [metadata, name]
+              namespace: [metadata, namespace]
+            metrics:
+              - name: created
+                help: "Creation timestamp of a Longhorn system backup."
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [metadata, creationTimestamp]
+              - name: state
+                help: "Current state of a Longhorn system backup."
+                each:
+                  type: StateSet
+                  stateSet:
+                    labelName: state
+                    path: [status, state]
+                    list: [CreatingVolumeBackups, Uploading, Ready, Error]
+  rbac:
+    extraRules:
+      - apiGroups: [longhorn.io]
+        resources: [backuptargets, systembackups]
+        verbs: [list, watch]
+      - apiGroups: [apiextensions.k8s.io]
+        resources: [customresourcedefinitions]
+        verbs: [list, watch]
