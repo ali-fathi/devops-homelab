@@ -216,10 +216,17 @@ jobs:
             exit 0
           fi
           git commit -m "chore(health-dashboard): deploy image ${GITHUB_SHA::12}"
-          git push --set-upstream origin "${branch}"
-          pr_url="$(gh pr create \
-            --base main \
-            --head "${branch}" \
-            --title "chore(health-dashboard): deploy image ${GITHUB_SHA::12}" \
-            --body "Automated immutable image digest update for ${GITHUB_SHA}.\n\nImage: ${IMAGE_NAME}@${DIGEST}\n\nRequired checks must pass before this PR is merged.")"
+          # A retry may find the branch left behind after a failed PR creation.
+          # It is uniquely tied to this source commit, so replacing it is safe.
+          git push --force origin "HEAD:${branch}"
+          pr_url="$(gh pr list --head "${branch}" --state open --json url --jq '.[0].url // empty')"
+          if [[ -z "${pr_url}" ]]; then
+            pr_url="$(gh pr create \
+              --base main \
+              --head "${branch}" \
+              --title "chore(health-dashboard): deploy image ${GITHUB_SHA::12}" \
+              --body "$(printf 'Automated immutable image digest update for %s.\\n\\nImage: %s@%s\\n\\nRequired checks must pass before this PR is merged.\\n' "${GITHUB_SHA}" "${IMAGE_NAME}" "${DIGEST}")")"
+          else
+            echo "Reusing existing digest PR: ${pr_url}"
+          fi
           gh pr merge "${pr_url}" --auto --squash --delete-branch
