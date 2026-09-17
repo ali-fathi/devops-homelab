@@ -12,6 +12,7 @@ on:
     paths:
       - "apps/health-dashboard/**"
       - ".github/workflows/health-dashboard-build.yaml"
+      - "kubernetes/applications/health-dashboard/kustomization.yaml"
 
   workflow_dispatch:
 
@@ -97,6 +98,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       packages: write
+    outputs:
+      digest: ${{ steps.publish-image.outputs.digest }}
 
     env:
       IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/health-dashboard
@@ -118,6 +121,7 @@ jobs:
             --password-stdin
 
       - name: Push immutable and latest image tags and publish digest summary
+        id: publish-image
         shell: bash
         run: |
           set -euo pipefail
@@ -128,11 +132,94 @@ jobs:
 
           digest="$(sed -n 's/.*digest: \(sha256:[0-9a-f]*\).*/\1/p' /tmp/image-push.log | tail -n 1)"
           test -n "${digest}"
+          echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
           echo "Published ${IMAGE_NAME}@${digest}"
           {
             echo "### Published Health Dashboard image"
             echo
             echo "\`${IMAGE_NAME}@${digest}\`"
             echo
-            echo "Update kubernetes/applications/health-dashboard/kustomization.yaml in a reviewed GitOps PR to deploy this digest."
+            echo "GitHub Actions will create an immutable-digest GitOps PR automatically."
           } >> "${GITHUB_STEP_SUMMARY}"
+
+  deploy-pr:
+    name: Create and auto-merge GitOps digest PR
+    needs: publish
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # This job uses a dedicated token so its branch and PR trigger the normal
+    # pull_request checks. GITHUB_TOKEN-created PRs do not trigger new runs.
+    permissions:
+      contents: read
+      pull-requests: read
+
+    env:
+      DEPLOY_TOKEN: ${{ secrets.HEALTH_DASHBOARD_DEPLOY_TOKEN }}
+      DIGEST: ${{ needs.publish.outputs.digest }}
+      KUSTOMIZATION: kubernetes/applications/health-dashboard/kustomization.yaml
+
+    steps:
+      - name: Check deployment token is configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${DEPLOY_TOKEN}" ]]; then
+            echo "::error::Configure the HEALTH_DASHBOARD_DEPLOY_TOKEN repository secret."
+            exit 1
+          fi
+
+      - name: Checkout main
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.HEALTH_DASHBOARD_DEPLOY_TOKEN }}
+
+      - name: Update image digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIGEST="${DIGEST}" python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          path = Path(os.environ["KUSTOMIZATION"])
+          content = path.read_text(encoding="utf-8")
+          digest = os.environ["DIGEST"]
+          if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+              raise SystemExit(f"Invalid image digest: {digest!r}")
+          updated, count = re.subn(
+              r"(?m)^(\s*digest:\s*)sha256:[0-9a-f]{64}\s*$",
+              rf"\g<1>{digest}",
+              content,
+          )
+          if count != 1:
+              raise SystemExit(f"Expected exactly one image digest, found {count}")
+          path.write_text(updated, encoding="utf-8")
+          PY
+
+      - name: Create digest PR and enable auto-merge
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.HEALTH_DASHBOARD_DEPLOY_TOKEN }}
+          IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/health-dashboard
+        run: |
+          set -euo pipefail
+          branch="automation/health-dashboard-digest-${GITHUB_SHA::12}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "${branch}"
+          git add "${KUSTOMIZATION}"
+          if git diff --cached --quiet; then
+            echo "The desired digest is already current; no PR is needed."
+            exit 0
+          fi
+          git commit -m "chore(health-dashboard): deploy image ${GITHUB_SHA::12}"
+          git push --set-upstream origin "${branch}"
+          pr_url="$(gh pr create \
+            --base main \
+            --head "${branch}" \
+            --title "chore(health-dashboard): deploy image ${GITHUB_SHA::12}" \
+            --body "Automated immutable image digest update for ${GITHUB_SHA}.\n\nImage: ${IMAGE_NAME}@${DIGEST}\n\nRequired checks must pass before this PR is merged.")"
+          gh pr merge "${pr_url}" --auto --squash --delete-branch

@@ -582,6 +582,7 @@ The workflow runs when:
 ```text
 apps/health-dashboard/** changes
 .github/workflows/health-dashboard-build.yaml changes
+kubernetes/applications/health-dashboard/kustomization.yaml changes on deployment PRs
 ```
 
 It runs for:
@@ -674,25 +675,29 @@ This gives:
 
 ### GitOps write-back
 
-After pushing the image, GitHub Actions updates:
+After pushing the image, GitHub Actions captures its immutable digest and
+creates a deployment PR that updates:
 
 ```text
 kubernetes/applications/health-dashboard/kustomization.yaml
 ```
 
-It changes:
+The PR is configured for auto-merge after all required repository checks pass.
+The write-back job uses the `HEALTH_DASHBOARD_DEPLOY_TOKEN` repository secret,
+which must be a GitHub App token or fine-grained PAT with `Contents`
+read/write and `Pull requests` read/write permissions. A dedicated token is
+used so the PR triggers the normal validation workflows. Add it in GitHub
+under **Settings → Secrets and variables → Actions → New repository secret**,
+or with the GitHub CLI:
 
-```yaml
-newTag: latest
+```bash
+gh secret set HEALTH_DASHBOARD_DEPLOY_TOKEN --repo ali-fathi/devops-homelab
 ```
 
-to:
-
-```yaml
-digest: sha256:...
-```
-
-Then the GitHub Actions bot commits the file to `main`.
+The token must be allowed to create branches, open PRs, and merge PRs. If the
+repository rules require human approval, auto-merge will wait for that approval;
+remove that requirement or grant the bot an explicit bypass only if completely
+unattended deployment is intended.
 
 This is the key GitOps principle:
 
@@ -700,22 +705,9 @@ This is the key GitOps principle:
 The cluster deploys what Git declares.
 ```
 
-The workflow does not call `kubectl apply` directly. Argo CD performs the deployment.
-
-### Branch protection improvement
-
-The current workflow commits directly to `main`, which is convenient for this homelab.
-
-For stricter production use:
-
-```text
-GitHub Actions creates a Pull Request instead.
-A reviewer approves the image update.
-The Pull Request merges into main.
-Argo CD syncs the merged commit.
-```
-
-This provides a security approval gate while retaining automation.
+The workflow does not call `kubectl apply` directly. Argo CD performs the
+deployment after the digest PR is merged. The cluster deploys what Git
+declares, while every deployment remains reproducible and auditable.
 
 ---
 
@@ -1097,7 +1089,9 @@ Test
 Build
 Scan
 Push image
-Commit digest to Kustomize
+Create digest deployment PR
+Run required PR checks
+Auto-merge the PR after checks pass
 ```
 
 Pull the bot commit:
