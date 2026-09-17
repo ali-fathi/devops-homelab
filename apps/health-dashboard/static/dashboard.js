@@ -179,7 +179,10 @@ function fetchRingData() {
         })
         .then(data => {
             ringDataLoaded = true;
-            if (data.status === "no_data") {
+            if (data.abnormal_sleep?.length) {
+                status.className = "ring-source-status warning";
+                status.innerText = `Connected to VictoriaMetrics · filtered ${data.abnormal_sleep.length} abnormal sleep sample(s) over 12 hours.`;
+            } else if (data.status === "no_data") {
                 status.className = "ring-source-status empty";
                 status.innerText = `VictoriaMetrics is available, but no ${data.device || "Ring"} samples were found in this range.`;
             } else if (data.mocked) {
@@ -279,13 +282,17 @@ function primarySleepSessions(series) {
     // Some R0x firmware versions return more than one record for the same
     // night. Use the longest record as that day's main sleep session so a
     // duplicate record cannot inflate a nightly trend to an impossible value.
+    // Keep this guard in the browser too: it protects the chart if an older API
+    // response is still cached or a future caller bypasses API sanitization.
     const sessionsByDay = new Map();
     for (const [timestamp, minutes] of series.biometric_sleep_total_min || []) {
+        const numericMinutes = Number(minutes);
+        if (!Number.isFinite(numericMinutes) || numericMinutes < 0 || numericMinutes > 12 * 60) continue;
         const sampleTime = new Date(Number(timestamp));
         const dayStart = new Date(
             sampleTime.getFullYear(), sampleTime.getMonth(), sampleTime.getDate()
         ).getTime();
-        const candidate = { timestamp: Number(timestamp), minutes: Number(minutes) };
+        const candidate = { timestamp: Number(timestamp), minutes: numericMinutes };
         const current = sessionsByDay.get(dayStart);
         if (!current || candidate.minutes > current.minutes ||
             (candidate.minutes === current.minutes && candidate.timestamp > current.timestamp)) {
@@ -440,6 +447,8 @@ function renderRingCharts(series) {
 
     const sleepTotalContext = document.getElementById("ringSleepTotalChart").getContext("2d");
     const sleepTotalOptions = ringTimeChartOptions("hours", 0, 12);
+    sleepTotalOptions.scales.y.min = 0;
+    sleepTotalOptions.scales.y.max = 12;
     sleepTotalOptions.scales.x.ticks.callback = value => formatRingTimestamp(value, true);
     sleepTotalOptions.plugins.tooltip.callbacks.label = context =>
         `Nightly sleep: ${formatMinutes(context.parsed.y * 60)}`;
@@ -537,7 +546,9 @@ function populateCommandCenter(daily) {
 
     // Sleep
     document.getElementById("sleep-value").innerText = daily.sleep_duration ?? "N/A";
-    document.getElementById("sleep-quality").innerText = daily.sleep_quality ? `(${daily.sleep_quality})` : "";
+    document.getElementById("sleep-quality").innerText = daily.sleep_status === "abnormal"
+        ? "(filtered: abnormal value over 12h)"
+        : daily.sleep_quality ? `(${daily.sleep_quality})` : "";
     document.getElementById("sleep-change").innerHTML = formatChange(daily.sleep_change);
 
     // Stress & SpO2

@@ -19,6 +19,7 @@ k3s-config
 *.log
 
 # Local, non-secret operational evidence
+ring-sleep-export-*.jsonl
 artifacts/longhorn-rehearsal/
 artifacts/application-restore-drills/
 artifacts/longhorn-nfs-target/
