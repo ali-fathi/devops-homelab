@@ -196,6 +196,8 @@ jobs:
           )
           if count != 1:
               raise SystemExit(f"Expected exactly one image digest, found {count}")
+          if not updated.endswith("\n"):
+              updated += "\n"
           path.write_text(updated, encoding="utf-8")
           PY
 
