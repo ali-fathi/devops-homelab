@@ -281,6 +281,27 @@ Mock mode is deterministic for the same month. It is useful for UI work, PDF tes
 
 It must not be enabled in Kubernetes.
 
+### Sleep data validation
+
+The dashboard applies a hard plausibility limit of **12 hours (720 minutes) per
+sleep session/day**. Ring sleep sessions above the limit are logged as abnormal,
+returned in the Ring API's `abnormal_sleep` list, and excluded together with
+nearby stage samples from the summary and charts. Garmin `sleepDuration` values
+above the same limit are returned with `sleep_status: "abnormal"` and excluded
+from the daily duration and chart. This is a data-quality safeguard, not a
+medical claim about an individual's sleep.
+
+The filter is intentionally read-only: it does not mutate VictoriaMetrics.
+Use `scripts/clean-ring-sleep-anomalies.py` for a reviewed, explicit database
+cleanup. With no date arguments it checks the entire history retained by
+VictoriaMetrics (currently 12 months). VictoriaMetrics can delete complete
+time series, but not selected samples in a time range, so the utility exports
+the four Ring sleep series, removes abnormal total-session samples and their
+nearby stage samples, deletes those complete series, and re-imports the
+retained samples. Duplicate sessions are not summed; the dashboard uses the
+longest valid session for each day. It is a dry run unless `--apply --yes` is
+supplied.
+
 ### Missing data
 
 A day may contain partial data:

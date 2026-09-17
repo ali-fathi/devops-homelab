@@ -203,6 +203,10 @@ RING_RANGE_DAYS = {"24h": 1, "7d": 7, "30d": 30, "365d": 365}
 # A session is timestamped at sleep start, so keep it visible through the day
 # after waking even when the vitals view is limited to 24 hours.
 RING_SLEEP_LOOKBACK_HOURS = 48
+# Values above this limit are not plausible for one day's sleep. They are
+# reported as abnormal and omitted from dashboard calculations and charts.
+MAX_SLEEP_MINUTES = 12 * 60
+SLEEP_SAMPLE_MATCH_TOLERANCE_MS = 5 * 60 * 1000
 # A year of high-frequency vitals is unnecessarily expensive for the Ring tab.
 # The 12-month view keeps the full sleep history and limits other charts to 30d.
 RING_NON_SLEEP_MAX_DAYS = 30
@@ -412,6 +416,61 @@ def vm_export_ring_metrics(
     }
 
 
+def sanitize_sleep_series(
+    series: Dict[str, List[Tuple[int, float]]],
+) -> Tuple[Dict[str, List[Tuple[int, float]]], List[Dict[str, Any]]]:
+    """Remove implausible Ring sleep sessions before they reach the UI.
+
+    Sleep stage samples are removed when they belong to an abnormal total
+    session. This prevents a bad total from being hidden while its stages still
+    appear in the stacked chart. The original VM data is deliberately not
+    modified here; cleanup is an explicit operator action.
+    """
+    abnormal: List[Dict[str, Any]] = []
+    abnormal_timestamps: List[int] = []
+    clean_series = {name: list(points) for name, points in series.items()}
+    total_points = series.get("biometric_sleep_total_min", [])
+
+    for timestamp, value in total_points:
+        if value > MAX_SLEEP_MINUTES:
+            abnormal_timestamps.append(timestamp)
+            record = {
+                "timestamp": timestamp,
+                "date": dt.datetime.fromtimestamp(timestamp / 1000, tz=UTC).date().isoformat(),
+                "minutes": value,
+                "source": "ring",
+                "reason": f"sleep duration exceeds {MAX_SLEEP_MINUTES // 60} hours",
+            }
+            abnormal.append(record)
+            app.logger.warning(
+                "Filtering abnormal Ring sleep sample: device=%s date=%s minutes=%s timestamp_ms=%s",
+                RING_DEVICE,
+                record["date"],
+                value,
+                timestamp,
+            )
+
+    if not abnormal_timestamps:
+        return clean_series, abnormal
+
+    clean_series["biometric_sleep_total_min"] = [
+        point for point in total_points if point[1] <= MAX_SLEEP_MINUTES
+    ]
+    for metric in RING_SLEEP_METRICS:
+        if metric == "biometric_sleep_total_min":
+            continue
+        clean_series[metric] = [
+            point
+            for point in series.get(metric, [])
+            if all(
+                abs(point[0] - abnormal_timestamp) > SLEEP_SAMPLE_MATCH_TOLERANCE_MS
+                for abnormal_timestamp in abnormal_timestamps
+            )
+        ]
+
+    return clean_series, abnormal
+
+
 def downsample_points(
     points: List[Tuple[int, float]], maximum: int = 1500
 ) -> List[Tuple[int, float]]:
@@ -439,6 +498,7 @@ def build_ring_payload(
     end: dt.datetime,
     mocked: bool = False,
 ) -> Dict[str, Any]:
+    series, abnormal_sleep = sanitize_sleep_series(series)
     last_day_start_ms = int((end - dt.timedelta(hours=24)).timestamp() * 1000)
     recent_hr = [
         value
@@ -496,6 +556,7 @@ def build_ring_payload(
             sum(value for _, value in series.get("biometric_distance_meters", []))
         ),
         "sleep_total_min": as_int(sleep_total[-1][1]) if sleep_total else None,
+        "abnormal_sleep_count": len(abnormal_sleep),
         "sleep_deep_min": as_int(sleep_stage("biometric_sleep_deep_min")),
         "sleep_rem_min": as_int(sleep_stage("biometric_sleep_rem_min")),
         "sleep_light_min": as_int(sleep_stage("biometric_sleep_light_min")),
@@ -516,6 +577,7 @@ def build_ring_payload(
             "end": end.isoformat(),
         },
         "summary": summary,
+        "abnormal_sleep": abnormal_sleep,
         "series": chart_series,
     }
 
@@ -699,11 +761,23 @@ def fetch_and_merge_production_data(
         calories = as_int(daily_point.get("caloriesBurned"))
         active_minutes = as_int(daily_point.get("activeMinutes"))
         sleep_duration_minutes = as_number(sleep_point.get("sleepDuration"))
-        sleep_duration = (
-            round(sleep_duration_minutes / 60, 1)
-            if sleep_duration_minutes is not None
-            else None
+        sleep_is_abnormal = (
+            sleep_duration_minutes is not None
+            and sleep_duration_minutes > MAX_SLEEP_MINUTES
         )
+        if sleep_is_abnormal:
+            app.logger.warning(
+                "Filtering abnormal Garmin sleep sample: date=%s minutes=%s",
+                current_day.isoformat(),
+                sleep_duration_minutes,
+            )
+            sleep_duration = None
+        else:
+            sleep_duration = (
+                round(sleep_duration_minutes / 60, 1)
+                if sleep_duration_minutes is not None
+                else None
+            )
 
         workouts = []
         for workout in workouts_points:
@@ -757,6 +831,16 @@ def fetch_and_merge_production_data(
                 "resting_hr": as_int(resting_hr),
                 "hrv": as_int(hrv),
                 "sleep_duration": sleep_duration,
+                "sleep_status": (
+                    "abnormal"
+                    if sleep_is_abnormal
+                    else "valid"
+                    if sleep_duration_minutes is not None
+                    else "missing"
+                ),
+                "sleep_abnormal_minutes": (
+                    sleep_duration_minutes if sleep_is_abnormal else None
+                ),
                 "sleep_quality": sleep_quality,
                 "sleep_score": as_int(sleep_score),
                 "stress": as_int(ring_stress),
@@ -1174,6 +1258,15 @@ def api_health():
             "mocked": is_mocked,
             "daily": latest,
             "charts": charts,
+            "abnormal_sleep": [
+                {
+                    "date": day["date"],
+                    "minutes": day["sleep_abnormal_minutes"],
+                    "source": "garmin",
+                }
+                for day in daily_data
+                if day.get("sleep_status") == "abnormal"
+            ],
             "weekly": generate_weekly_narrative(daily_data),
             "monthly": {
                 "trends_summary": trends_summary,

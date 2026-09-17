@@ -151,6 +151,37 @@ class HealthDashboardTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["battery"], 77)
         self.assertFalse(payload["summary"]["charging"])
 
+    def test_ring_sleep_values_over_12_hours_are_reported_and_filtered(self):
+        start_ms = int(dt.datetime(2026, 8, 22, tzinfo=dt.timezone.utc).timestamp() * 1000)
+        series = {name: [] for name in health_app.RING_METRICS}
+        series["biometric_sleep_total_min"] = [
+            (start_ms, 450.0),
+            (start_ms + 86400000, 12001.0),
+        ]
+        series["biometric_sleep_deep_min"] = [
+            (start_ms + 1000, 90.0),
+            (start_ms + 86400000 + 1000, 500.0),
+        ]
+
+        payload = health_app.build_ring_payload(
+            series,
+            "30d",
+            dt.datetime(2026, 8, 1, tzinfo=dt.timezone.utc),
+            dt.datetime(2026, 8, 31, tzinfo=dt.timezone.utc),
+        )
+
+        self.assertEqual(payload["summary"]["abnormal_sleep_count"], 1)
+        self.assertEqual(len(payload["abnormal_sleep"]), 1)
+        self.assertEqual(payload["abnormal_sleep"][0]["minutes"], 12001.0)
+        self.assertEqual(
+            payload["series"]["biometric_sleep_total_min"],
+            [[start_ms, 450.0]],
+        )
+        self.assertEqual(
+            payload["series"]["biometric_sleep_deep_min"],
+            [[start_ms + 1000, 90.0]],
+        )
+
     def test_ring_endpoint_supports_12_month_sleep_trend(self):
         series = {name: [] for name in health_app.RING_METRICS}
         with patch.object(health_app, "vm_export_ring_metrics", return_value=series) as export:
@@ -185,6 +216,34 @@ class HealthDashboardTests(unittest.TestCase):
             series["biometric_hr_bpm"],
             [(1700000000000, 65.0), (1700000300000, 71.0)],
         )
+
+    def test_garmin_sleep_values_over_12_hours_are_marked_abnormal(self):
+        class QueryResult:
+            def __init__(self, points):
+                self.points = points
+
+            def get_points(self):
+                return iter(self.points)
+
+        class InfluxClient:
+            def query(self, query):
+                if "SleepSummary" in query:
+                    return QueryResult([{
+                        "time": "2026-08-22T00:00:00Z",
+                        "sleepDuration": 721,
+                        "sleepScore": 90,
+                    }])
+                return QueryResult([])
+
+        with patch.object(health_app, "vm_query_range", return_value={}):
+            rows = health_app.fetch_and_merge_production_data(
+                InfluxClient(), 2026, 8
+            )
+
+        row = next(row for row in rows if row["date"] == "2026-08-22")
+        self.assertEqual(row["sleep_status"], "abnormal")
+        self.assertIsNone(row["sleep_duration"])
+        self.assertEqual(row["sleep_abnormal_minutes"], 721)
 
     def test_real_merge_keeps_missing_values_empty(self):
         class EmptyQueryResult:

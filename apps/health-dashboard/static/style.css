@@ -709,7 +709,8 @@ table.comparison-table tr:hover td {
 
 .ring-source-status.connected { border-color: rgba(16, 185, 129, 0.3); color: #6ee7b7; }
 .ring-source-status.loading,
-.ring-source-status.mock { border-color: rgba(245, 158, 11, 0.3); color: #fbbf24; }
+.ring-source-status.mock,
+.ring-source-status.warning { border-color: rgba(245, 158, 11, 0.3); color: #fbbf24; }
 .ring-source-status.error { border-color: rgba(239, 68, 68, 0.35); color: #fca5a5; }
 .ring-source-status.empty { border-color: rgba(156, 163, 175, 0.25); }
 

@@ -1051,6 +1051,48 @@ Check app logs if available.
 
 ---
 
+## Removing abnormal Ring sleep samples
+
+The Health Dashboard rejects Ring sleep sessions above **12 hours (720
+minutes)**, but this read-time safeguard does not modify VictoriaMetrics. To
+remove the bad samples from the database, use the repository utility from the
+repository root. VictoriaMetrics' `delete_series` API deletes complete series,
+not individual samples, so the utility safely performs an export → local filter
+→ complete series delete → re-import workflow for the four sleep metrics.
+
+First take a Longhorn/application backup and pause Ring syncing during the
+replacement to avoid concurrent writes. The utility now defaults to the Ring
+Health LAN endpoint (`http://192.168.178.214:8428`):
+
+```bash
+python3 scripts/clean-ring-sleep-anomalies.py
+```
+
+Use this only from a trusted LAN. Do not run the destructive operation through
+the Cloudflare endpoint. If preferred, a local port-forward also works with
+`--url http://127.0.0.1:8428`.
+
+The first command is a dry run over the entire VictoriaMetrics retained
+history and prints the dates and values it would remove. This installation has
+`-retentionPeriod=12`, so "whole history" currently means up to 12 months of
+stored data. Review it, then run:
+
+```bash
+python3 scripts/clean-ring-sleep-anomalies.py --apply --yes
+```
+
+An export backup is written before deletion. Verify afterward, for example:
+
+```bash
+curl -G -s --data-urlencode \
+  'query=biometric_sleep_total_min{device="colmi_r02"}' \
+  http://192.168.178.214:8428/api/v1/query | jq
+```
+
+The Android collector can write the same bad value again if its source data is
+still wrong, so monitor the next sync. The dashboard will continue to filter
+future abnormal values even if that happens.
+
 ## Backup Notes
 
 VictoriaMetrics data is stored in:
