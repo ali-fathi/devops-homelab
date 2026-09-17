@@ -156,18 +156,9 @@ ghcr.io/ali-fathi/health-dashboard:<commit-sha>
 
 The workflow also publishes `latest`, but Kubernetes does not permanently rely on that tag.
 
-After the image is pushed, GitHub Actions captures the registry digest and changes `kustomization.yaml` from:
-
-```yaml
-newTag: latest
-```
-
-to:
-
-```yaml
-digest: sha256:...
-```
-
+After the image is pushed, GitHub Actions captures the registry digest,
+updates `kustomization.yaml`, creates a GitOps deployment PR, and enables
+GitHub auto-merge. Required repository checks must pass before the PR merges.
 Kustomize then renders the final image as:
 
 ```text
@@ -176,10 +167,16 @@ ghcr.io/ali-fathi/health-dashboard@sha256:...
 
 This means:
 
-- no manual image edit is needed;
+- no manual image edit or deployment command is needed;
 - each deployment refers to one exact image;
 - rollback is a Git revert;
 - Argo CD remains the component that deploys Kubernetes resources.
+
+The write-back job uses the `HEALTH_DASHBOARD_DEPLOY_TOKEN` repository secret.
+It must be a GitHub App token or fine-grained PAT with `Contents: read/write`
+and `Pull requests: read/write`. A dedicated token is required because
+PRs created with the default `GITHUB_TOKEN` do not trigger the normal PR
+workflows. Configure the secret before merging this automation change.
 
 The GHCR package must be public, or the namespace must have a valid image-pull Secret.
 
@@ -247,7 +244,9 @@ Run tests
 Build the image
 Run Trivy
 Push the image
-Commit the image digest to kustomization.yaml
+Create the immutable-digest deployment PR
+Run the required PR checks
+Auto-merge the PR after checks pass
 ```
 
 Pull the automatic bot commit:
@@ -502,9 +501,9 @@ Do not use manual `kubectl edit` as a permanent configuration change. Make chang
 Edit apps/health-dashboard
 → push main
 → GitHub Actions tests/builds/scans/pushes
-→ GitHub Actions updates kustomization.yaml
+→ GitHub Actions creates and auto-merges the digest PR
 → Argo CD detects the Git commit
-→ Kubernetes rolls out the digest
+→ Kubernetes rolls out the immutable digest
 ```
 
 Monitor:
