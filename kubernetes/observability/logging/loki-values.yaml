@@ -28,7 +28,7 @@ loki:
           period: 24h
 
   limits_config:
-    # Keep Kubernetes logs for 14 days; older data is not useful for this
+    # Keep Kubernetes logs for 7 days; older data is not useful for this
     # homelab and would unnecessarily consume the Longhorn volume.
     retention_period: 168h
     reject_old_samples: true

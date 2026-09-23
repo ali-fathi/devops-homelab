@@ -12,7 +12,7 @@ spec:
     targetRevision: 88.2.0   # matches the live release shown by Argo diff (chart 88.2.0)
     helm:
       valueFiles:
-        - https://raw.githubusercontent.com/ali-fathi/devops-homelab/main/kubernetes/observability/monitoring/values.yaml
+        - https://raw.githubusercontent.com/ali-fathi/devops-homelab/main/kubernetes/observability/monitoring/values.yaml?cache=84d3861
         - https://raw.githubusercontent.com/ali-fathi/devops-homelab/main/kubernetes/observability/alerting/values-alertmanager.yaml
 
   destination:
