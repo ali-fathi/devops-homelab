@@ -26,7 +26,10 @@ defaultRules:
 
 prometheus:
   prometheusSpec:
-    retention: 30d
+    # Keep only two weeks of metrics and cap TSDB blocks below the 20Gi PVC
+    # limit, leaving room for the WAL and compaction headroom.
+    retention: 14d
+    retentionSize: 14GB
 
     storageSpec:
       volumeClaimTemplate:
