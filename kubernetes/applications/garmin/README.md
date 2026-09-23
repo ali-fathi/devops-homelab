@@ -225,8 +225,8 @@ Recommended low-cost settings:
 ```text
 Use existing Key Vault
 Use Standard tier
-Use ExternalSecret refreshInterval: 48h
-Avoid frequent force-sync
+Use ExternalSecret refreshPolicy: OnChange for static credentials
+Use an explicit force-sync only after rotating a credential
 Avoid reading Key Vault directly from application pods
 Use one ExternalSecret for Garmin-related secrets
 ```
@@ -234,10 +234,12 @@ Use one ExternalSecret for Garmin-related secrets
 The Garmin ExternalSecret uses:
 
 ```yaml
-refreshInterval: 48h
+refreshPolicy: OnChange
 ```
 
-Garmin and InfluxDB credentials rarely change, so there is no need to refresh them every few minutes.
+Garmin and InfluxDB credentials rarely change. OnChange avoids periodic Azure
+Key Vault reads; rotate credentials by changing the ExternalSecret metadata or
+using the documented force-sync command.
 
 ---
 

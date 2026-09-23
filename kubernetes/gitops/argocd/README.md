@@ -1223,11 +1223,9 @@ InfluxDB credentials
 Grafana admin credentials if externalized later
 ```
 
-Use External Secrets with:
-
-```yaml
-refreshInterval: 48h
-```
+Use External Secrets with `refreshPolicy: OnChange` for static credentials.
+This avoids periodic Azure Key Vault reads. Force a sync explicitly only after
+rotating a credential.
 
 Keep Argo CD repository access read-only.
 
