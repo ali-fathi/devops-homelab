@@ -1,0 +1,56 @@
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: monitoring-snapshot-delete
+  namespace: longhorn-system
+  labels:
+    app.kubernetes.io/name: longhorn-monitoring-cleanup
+    app.kubernetes.io/component: snapshot-retention
+spec:
+  name: monitoring-snapshot-delete
+  task: snapshot-delete
+  cron: "15 3 * * *"
+  retain: 2
+  concurrency: 1
+  groups:
+    - monitoring-cleanup
+  labels: {}
+  parameters: {}
+---
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: monitoring-snapshot-cleanup
+  namespace: longhorn-system
+  labels:
+    app.kubernetes.io/name: longhorn-monitoring-cleanup
+    app.kubernetes.io/component: snapshot-retention
+spec:
+  name: monitoring-snapshot-cleanup
+  task: snapshot-cleanup
+  cron: "30 3 * * *"
+  retain: 0
+  concurrency: 1
+  groups:
+    - monitoring-cleanup
+  labels: {}
+  parameters: {}
+---
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: monitoring-filesystem-trim
+  namespace: longhorn-system
+  labels:
+    app.kubernetes.io/name: longhorn-monitoring-cleanup
+    app.kubernetes.io/component: filesystem-maintenance
+spec:
+  name: monitoring-filesystem-trim
+  task: filesystem-trim
+  cron: "0 4 * * SUN"
+  retain: 0
+  concurrency: 1
+  groups:
+    - monitoring-cleanup
+  labels: {}
+  parameters: {}
