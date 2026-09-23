@@ -45,6 +45,22 @@ spec:
             summary: "Longhorn Replica Failure"
             description: "Volume {{ $labels.volume }} has lost replicas."
 
+        - alert: LonghornDiskSchedulingPressure
+          expr: |
+            (
+              longhorn_disk_usage_bytes
+              /
+              longhorn_disk_capacity_bytes
+            ) * 100 > 75
+          for: 10m
+
+          labels:
+            severity: warning
+
+          annotations:
+            summary: "Longhorn Disk Usage Above 75%"
+            description: "Disk {{ $labels.disk }} is approaching Longhorn's scheduling threshold."
+
         - alert: LonghornDiskPressure
           expr: |
             (
