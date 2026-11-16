@@ -39,6 +39,13 @@ spec:
               - matchExpressions:
                   - key: node-role.kubernetes.io/control-plane
                     operator: Exists
+                  # Retired master remains an etcd member during the power-saving
+                  # trial. Do not let it keep advertising the API VIP after its
+                  # K3s service is stopped.
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - k3s-master
       tolerations:
         - effect: NoSchedule
           operator: Exists
