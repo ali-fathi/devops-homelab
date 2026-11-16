@@ -10,8 +10,11 @@ mode:      ARP with leader election
 interface: ens18
 ```
 
-It runs only on nodes labelled `node-role.kubernetes.io/control-plane`. One
-leader advertises the VIP; leadership can move to another control-plane node.
+It runs on `node-role.kubernetes.io/control-plane` nodes **except**
+`k3s-master`, which is being retired for a two-powered-server trial. The VIP
+leader must be `k3s-master2` or `k3s-master3` before stopping K3s on the old
+master; otherwise its still-running DaemonSet may keep the VIP while its API
+server is unavailable. This does not remove the old etcd member.
 
 ## Scope and safety boundary
 
@@ -40,9 +43,9 @@ Before the first sync:
   Longhorn health, and GitOps health gates pass.
 ```
 
-The first sync occurred while only `k3s-master` existed. The DaemonSet has
-subsequently expanded to all three control-plane servers: `k3s-master`,
-`k3s-master2`, and `k3s-master3`.
+The first sync occurred while only `k3s-master` existed. It later ran on all
+three control-plane servers. During the old-master retirement trial, it runs
+only on `k3s-master2` and `k3s-master3`.
 
 ## First installation
 
@@ -57,7 +60,8 @@ ip addr | grep 192.168.178.85
 curl -k https://192.168.178.85:6443/readyz
 ```
 
-The three-server HA expansion is complete. For the reusable staged join,
+The three-server HA expansion is complete. The old server remains available
+for rollback, but only the two remaining servers advertise kube-vip. For the reusable staged join,
 validation, and rollback procedure, read
 `docs/runbooks/k3s-ha-control-plane-ansible-join.md`.
 
