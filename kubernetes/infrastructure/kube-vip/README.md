@@ -91,5 +91,8 @@ stopping K3s on the old master. If any check fails, restart K3s on the old
 master and investigate; do not power it off. Keeping its etcd membership
 makes rollback as simple as powering it back on and starting K3s.
 
-When the old master is restored for a permanent three-server configuration,
-review the node-affinity exclusion before enabling it as a VIP candidate.
+For the exact power-on, verification, uncordon, Longhorn scheduling, and
+optional kube-vip restoration steps, follow the
+[`k3s-master` restoration runbook](../../../docs/runbooks/k3s-original-master-power-saving-restore.md).
+Do not assume that powering it on automatically reverses the cordon, Longhorn
+node eviction settings, or this DaemonSet's node-affinity exclusion.
