@@ -61,8 +61,8 @@ curl -k https://192.168.178.85:6443/readyz
 ```
 
 The three-server HA expansion is complete. The old server remains available
-for rollback, but only the two remaining servers advertise kube-vip. For the reusable staged join,
-validation, and rollback procedure, read
+for rollback, but only the two remaining servers advertise kube-vip. For the
+reusable staged join, validation, and rollback procedure, read
 `docs/runbooks/k3s-ha-control-plane-ansible-join.md`.
 
 ## Rollback
@@ -73,10 +73,23 @@ administration while the issue is investigated. Revert the reviewed Git change
 and manually sync the child Application only after reviewing the Argo diff. Do
 not delete Longhorn resources or modify the K3s datastore as part of rollback.
 
-## Failover test
+## Two-powered-server trial
 
-Test failover only after all three control-plane nodes are Ready and a fresh
-etcd snapshot and GitOps health verification have passed. During an approved
-maintenance window, stop K3s only on the current VIP leader and prove API
-access through `192.168.178.85:6443`; then restore that server and rerun the
-health gate.
+`k3s-master` remains a third etcd member but its K3s service can be stopped
+for a reversible power-saving trial. **The other two etcd members are both
+required for quorum; do not stop, restart, or test VIP failover on either
+remaining master while the old master is offline.** Restore the old master
+before maintenance on either remaining server.
+
+Before powering off the old master, ensure that its workloads are drained,
+all Longhorn replicas are on other nodes and healthy, both workers use
+`K3S_URL='https://192.168.178.85:6443'` (not the old master's IP), a fresh
+etcd snapshot has been copied off-host, and the VIP Lease is held by
+`k3s-master2` or `k3s-master3`. The operator's kubeconfig must also use the
+VIP. Confirm API readiness through the VIP and both remaining servers after
+stopping K3s on the old master. If any check fails, restart K3s on the old
+master and investigate; do not power it off. Keeping its etcd membership
+makes rollback as simple as powering it back on and starting K3s.
+
+When the old master is restored for a permanent three-server configuration,
+review the node-affinity exclusion before enabling it as a VIP candidate.
